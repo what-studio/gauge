@@ -1,0 +1,4 @@
+gauge
+=====
+
+Deterministic gauge library
