@@ -3,6 +3,7 @@ from contextlib import contextmanager
 from datetime import datetime
 
 from freezegun import freeze_time
+import pytest
 
 from gauge import Gauge, Stairs, Linear
 
@@ -19,11 +20,10 @@ class Energy(Gauge):
 
     min = 0
     max = 10
-    base = 10
-    gravity = Stairs(1, 10)  # +1 energy per 10 seconds
+    gravity = Stairs(+1, 10)  # +1 energy per 10 seconds
 
-    def use(self, amount=1, at=None):
-        return self.decr(amount, at)
+    def use(self, amount=1, limit=True, at=None):
+        return self.decr(amount, limit, at)
 
     def recover_in(self, at=None):
         return self.gravity.apply_in(self, at)
@@ -33,14 +33,13 @@ class Life(Gauge):
 
     min = 0
     max = 100
-    base = 0
     gravity = Linear(-1, 10)  # -1 life per 10 seconds
 
-    def recover(self, amount=1, at=None):
-        return self.incr(amount, at)
+    def recover(self, amount=1, limit=True, at=None):
+        return self.incr(amount, limit, at)
 
-    def hurt(self, amount=1, at=None):
-        return self.decr(amount, at)
+    def hurt(self, amount=1, limit=True, at=None):
+        return self.decr(amount, limit, at)
 
 
 def test_energy():
@@ -73,9 +72,9 @@ def test_energy():
         assert energy == 30
 
 
-def _test_life():
+def test_life():
     with t(0):
-        life = Life()
+        life = Life(Life.max)
         assert life == 100
     with t(1):
         assert life == 99.9
@@ -85,5 +84,5 @@ def _test_life():
         assert life == 99
     with t(100):
         assert life == 90
-        life.recover(1000)
-        assert life == 100  # limited by the maximum
+        with pytest.raises(ValueError):
+            life.recover(1000)
