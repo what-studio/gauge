@@ -47,6 +47,7 @@ class Gauge(object):
             self.set_at = None
 
     def decr(self, delta, limit=True, at=None):
+        """Decreases the value by the given delta."""
         return self.incr(-delta, limit, at)
 
     def set(self, value, limit=True, at=None):
@@ -59,21 +60,25 @@ class Gauge(object):
         self.incr(value - self.goal(), limit, at)
 
     def current(self, at=None):
-        return self.goal() + self.delta + self.delta_by_gravity(at)
+        """Calculates the current value."""
+        return self.goal() + self.delta + self.delta_gravitated(at)
 
     def time_passed(self, at=None):
+        """The timedelta object passed from :attr:`set_at`."""
         if self.set_at is None:
             return None
         at = at or datetime.utcnow()
         return at - self.set_at
 
     def ticks_passed(self, at=None):
+        """The ticks passed from :attr:`set_at`."""
         timedelta = self.time_passed(at)
         if timedelta is None:
             return None
         return timedelta.total_seconds() / self.gravity.interval
 
-    def delta_by_gravity(self, at=None):
+    def delta_gravitated(self, at=None):
+        """The delta moved by gravity."""
         ticks = self.ticks_passed(at)
         if ticks is None:
             return 0
