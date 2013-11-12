@@ -9,18 +9,23 @@ __all__ = ['Gravity', 'Linear', 'Discrete']
 
 class Gravity(namedtuple('Gravity', ['delta', 'interval'])):
 
-    normalize_ticks = lambda x: x
+    normalize_ticks = float
 
     def applies(self, gauge, at=None):
         """Weather this gravity is applying to the gauge."""
         current = gauge.current(at)
         return current < gauge.max if self.delta > 0 else current > gauge.min
 
+    def delta_gravitated(self, gauge, seconds):
+        ticks = self.normalize_ticks(seconds / self.interval)
+        delta = self.delta * ticks
+        return self.limit(gauge, delta)
+
     def limit(self, gauge, value):
         if self.delta > 0:
-            return min(value, -gauge.delta)
+            return min(gauge.max - gauge.delta, value)
         else:
-            return max(value, -gauge.delta)
+            return max(gauge.min - gauge.delta, value)
 
     def __gauge_repr_extra__(self, gauge, at=None):
         pass

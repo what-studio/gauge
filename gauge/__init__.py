@@ -14,18 +14,20 @@ class Gauge(object):
     min = None
     max = None
     default_gravity = None
-    normalize = float
+    value_type = float
 
     delta = 0
     set_at = None
 
     def __init__(self, value, limit=True, at=None):
+        if value is None:
+            value = self.max
+        #self.set(value, limit, at)
+        self.delta = value
+        self.set_at = now_or(at)
         self.gravities = set()
         if self.default_gravity is not None:
             self.add_gravity(self.default_gravity)
-        if value is None:
-            value = self.max
-        self.set(value, limit, at)
 
     def add_gravity(self, gravity):
         self.gravities.add(gravity)
@@ -38,18 +40,7 @@ class Gauge(object):
         :param at: the datetime. Defaults to now.
         """
         at = now_or(at)
-        current = self.current(at)
-        if limit:
-            if value < current and value < self.min:
-                raise ValueError('The value to set is too low')
-            elif value > current and value > self.max:
-                raise ValueError('The value to set is too high')
-        if self.set_at is None or not self.min < current < self.max:
-            # go to be gravitated
-            self.set_at = at
-            self.delta = value
-        else:
-            self.delta += (value - current)
+        return self.incr(value - self.current(at), limit, at)
 
     def incr(self, delta, limit=True, at=None):
         """Increases the value by the given delta.
@@ -59,7 +50,19 @@ class Gauge(object):
         :param at: the datetime. Defaults to now.
         """
         at = now_or(at)
-        return self.set(self.current(at) + delta, limit, at)
+        current = self.current(at)
+        next = current + delta
+        if limit:
+            if delta > 0 and next > self.max:
+                raise ValueError('The value to set is over the maximum')
+            elif delta < 0 and next < self.min:
+                raise ValueError('The value to set is under the minimum')
+        if self.set_at is None or not self.min < current < self.max:
+            # go to be gravitated
+            self.set_at = at
+            self.delta = next
+        else:
+            self.delta += delta
 
     def decr(self, delta, limit=True, at=None):
         """Decreases the value by the given delta."""
@@ -67,7 +70,7 @@ class Gauge(object):
 
     def current(self, at=None):
         """Calculates the current value."""
-        return self.normalize(self.delta + self.delta_gravitated(at))
+        return self.value_type(self.delta + self.delta_gravitated(at))
 
     def time_passed(self, at=None):
         """The timedelta object passed from :attr:`set_at`."""
@@ -75,13 +78,6 @@ class Gauge(object):
             return None
         at = at or datetime.utcnow()
         return at - self.set_at
-
-    def ticks_passed(self, at=None):
-        """The ticks passed from :attr:`set_at`."""
-        timedelta = self.time_passed(at)
-        if timedelta is None:
-            return None
-        return timedelta.total_seconds() / next(iter(self.gravities)).interval
 
     def delta_gravitated(self, at=None):
         """The delta moved by the gravities."""
@@ -91,11 +87,8 @@ class Gauge(object):
         seconds = timedelta.total_seconds()
         deltas = []
         for gravity in self.gravities:
-            delta = gravity.delta * seconds / gravity.interval
-            if gravity.delta > 0:
-                deltas.append(min(self.max - self.delta, delta))
-            elif gravity.delta < 0:
-                deltas.append(max(self.min - self.delta, delta))
+            deltas.append(gravity.delta_gravitated(self, seconds))
+        print deltas
         return sum(deltas)
 
     def __eq__(self, other, at=None):
