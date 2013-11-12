@@ -19,7 +19,7 @@ class Gravity(namedtuple('Gravity', ['delta', 'interval'])):
     def delta_gravitated(self, gauge, seconds):
         ticks = self.normalize_ticks(seconds / self.interval)
         delta = self.delta * ticks
-        return self.limit(gauge, delta)
+        return delta
 
     def limit(self, gauge, value):
         if self.delta > 0:

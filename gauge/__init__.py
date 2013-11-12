@@ -25,12 +25,12 @@ class Gauge(object):
         #self.set(value, limit, at)
         self.delta = value
         self.set_at = now_or(at)
-        self.gravities = set()
+        self.gravities = []
         if self.default_gravity is not None:
             self.add_gravity(self.default_gravity)
 
     def add_gravity(self, gravity):
-        self.gravities.add(gravity)
+        self.gravities.append(gravity)
 
     def set(self, value, limit=True, at=None):
         """Sets as the given value.
@@ -57,12 +57,13 @@ class Gauge(object):
                 raise ValueError('The value to set is over the maximum')
             elif delta < 0 and next < self.min:
                 raise ValueError('The value to set is under the minimum')
-        if self.set_at is None or not self.min < current < self.max:
+        if not self.min < current < self.max:
             # go to be gravitated
             self.set_at = at
             self.delta = next
         else:
             self.delta += delta
+        print next, self.set_at, self.delta
 
     def decr(self, delta, limit=True, at=None):
         """Decreases the value by the given delta."""
@@ -70,14 +71,8 @@ class Gauge(object):
 
     def current(self, at=None):
         """Calculates the current value."""
+        print self.delta, self.delta_gravitated(at)
         return self.value_type(self.delta + self.delta_gravitated(at))
-
-    def time_passed(self, at=None):
-        """The timedelta object passed from :attr:`set_at`."""
-        if self.set_at is None:
-            return None
-        at = at or datetime.utcnow()
-        return at - self.set_at
 
     def delta_gravitated(self, at=None):
         """The delta moved by the gravities."""
@@ -85,11 +80,26 @@ class Gauge(object):
         if timedelta is None:
             return 0
         seconds = timedelta.total_seconds()
-        deltas = []
+        pos_deltas = []
+        neg_deltas = []
         for gravity in self.gravities:
-            deltas.append(gravity.delta_gravitated(self, seconds))
-        print deltas
-        return sum(deltas)
+            delta = gravity.delta_gravitated(self, seconds)
+            (pos_deltas if delta > 0 else neg_deltas).append(delta)
+        pos_delta = sum(pos_deltas)
+        neg_delta = sum(neg_deltas)
+        print pos_delta, neg_delta
+        #print min(max(self.min, self.max - self.delta - neg_delta), pos_delta),\
+        #      max(min(self.max, self.min - self.delta - pos_delta), neg_delta)
+        return (
+            min(max(self.min, self.max - self.delta - neg_delta), pos_delta) +
+            max(min(self.max, self.min - self.delta - pos_delta), neg_delta))
+
+    def time_passed(self, at=None):
+        """The timedelta object passed from :attr:`set_at`."""
+        if self.set_at is None:
+            return None
+        at = at or datetime.utcnow()
+        return at - self.set_at
 
     def __eq__(self, other, at=None):
         if isinstance(other, type(self)):
