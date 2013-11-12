@@ -5,7 +5,7 @@ from datetime import datetime
 from freezegun import freeze_time
 import pytest
 
-from gauge import Gauge, Stairs, Linear
+from gauge import Discrete, Gauge, Linear
 
 
 @contextmanager
@@ -20,7 +20,7 @@ class Energy(Gauge):
 
     min = 0
     max = 10
-    gravity = Stairs(+1, 10)  # +1 energy per 10 seconds
+    gravity = Discrete(+1, 10)  # +1 energy per 10 seconds
 
     def use(self, amount=1, limit=True, at=None):
         return self.decr(amount, limit, at)
