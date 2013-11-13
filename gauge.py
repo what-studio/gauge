@@ -1,8 +1,16 @@
 # -*- coding: utf-8 -*-
-from __future__ import absolute_import
-from datetime import datetime
+"""
+    gauge
+    ~~~~~
 
-from .gravity import Discrete, Gravity, Linear
+    Deterministic gauge library.
+
+    :copyright: (c) 2013 by Heungsub Lee
+    :license: BSD, see LICENSE for more details.
+"""
+from collections import namedtuple
+from datetime import datetime
+import math
 
 
 def now_or(at):
@@ -13,7 +21,7 @@ class Gauge(object):
 
     min = None
     max = None
-    default_gravity = None
+    default_momentum = None
     value_type = float
 
     delta = 0
@@ -25,12 +33,12 @@ class Gauge(object):
         #self.set(value, limit, at)
         self.delta = value
         self.set_at = now_or(at)
-        self.gravities = []
-        if self.default_gravity is not None:
-            self.add_gravity(self.default_gravity)
+        self.momenta = []
+        if self.default_momentum is not None:
+            self.add_momentum(self.default_momentum)
 
-    def add_gravity(self, gravity):
-        self.gravities.append(gravity)
+    def add_momentum(self, momentum):
+        self.momenta.append(momentum)
 
     def set(self, value, limit=True, at=None):
         """Sets as the given value.
@@ -58,12 +66,12 @@ class Gauge(object):
             elif delta < 0 and next < self.min:
                 raise ValueError('The value to set is under the minimum')
         if not self.min < current < self.max:
-            # go to be gravitated
+            # go to be movable by momenta
             self.set_at = at
             self.delta = next
         else:
             self.delta += delta
-        print next, self.set_at, self.delta
+        #print next, self.set_at, self.delta
 
     def decr(self, delta, limit=True, at=None):
         """Decreases the value by the given delta."""
@@ -71,23 +79,23 @@ class Gauge(object):
 
     def current(self, at=None):
         """Calculates the current value."""
-        print self.delta, self.delta_gravitated(at)
-        return self.value_type(self.delta + self.delta_gravitated(at))
+        #print self.delta, self.delta_moved(at)
+        return self.value_type(self.delta + self.delta_moved(at))
 
-    def delta_gravitated(self, at=None):
-        """The delta moved by the gravities."""
+    def delta_moved(self, at=None):
+        """The delta moved by the momenta."""
         timedelta = self.time_passed(at)
         if timedelta is None:
             return 0
         seconds = timedelta.total_seconds()
         pos_deltas = []
         neg_deltas = []
-        for gravity in self.gravities:
-            delta = gravity.delta_gravitated(self, seconds)
+        for momentum in self.momenta:
+            delta = momentum.move(self, seconds)
             (pos_deltas if delta > 0 else neg_deltas).append(delta)
         pos_delta = sum(pos_deltas)
         neg_delta = sum(neg_deltas)
-        print pos_delta, neg_delta
+        #print pos_delta, neg_delta
         #print min(max(self.min, self.max - self.delta - neg_delta), pos_delta),\
         #      max(min(self.max, self.min - self.delta - pos_delta), neg_delta)
         return (
@@ -113,10 +121,61 @@ class Gauge(object):
         current = self.current(at)
         rv = '<%s %d/%d' % (type(self).__name__, current, self.max)
         try:
-            extra = self.gravity.__gauge_repr_extra__(self, at)
+            extra = self.momentum.__gauge_repr_extra__(self, at)
         except AttributeError:
             pass
         else:
             if extra is not None:
                 rv += ' ({})'.format(extra)
         return rv + '>'
+
+
+class Momentum(namedtuple('Momentum', ['delta', 'interval'])):
+
+    normalize_ticks = float
+
+    def applies(self, gauge, at=None):
+        """Weather this momentum is applying to the gauge."""
+        current = gauge.current(at)
+        return current < gauge.max if self.delta > 0 else current > gauge.min
+
+    def move(self, gauge, seconds):
+        ticks = self.normalize_ticks(seconds / self.interval)
+        delta = self.delta * ticks
+        return delta
+
+    def limit(self, gauge, value):
+        if self.delta > 0:
+            return min(gauge.max - gauge.delta, value)
+        else:
+            return max(gauge.min - gauge.delta, value)
+
+    def __gauge_repr_extra__(self, gauge, at=None):
+        pass
+
+    def __repr__(self):
+        return '<{0} {1}/{2}s>'.format(type(self).__name__, *self)
+
+
+class Linear(Momentum):
+
+    pass
+
+
+class Discrete(Momentum):
+
+    normalize_ticks = int
+
+    def apply_in(self, gauge, at=None):
+        at = at or datetime.utcnow()
+        if self.applies(gauge, at):
+            timedelta = gauge.time_passed(at)
+            return self.interval - (timedelta.total_seconds() % self.interval)
+
+    def __gauge_repr_extra__(self, gauge, at=None):
+        apply_in = self.apply_in(gauge, at)
+        if apply_in is None:
+            return
+        sign = '+' if self.delta > 0 else ''
+        seconds = math.ceil(apply_in)
+        return  '{0}{1} in {2} sec'.format(sign, self.delta, seconds)
