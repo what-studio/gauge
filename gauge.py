@@ -10,7 +10,6 @@
 """
 from collections import namedtuple
 from datetime import datetime
-import math
 
 
 def now_or(at):
@@ -84,6 +83,11 @@ class Gauge(object):
 
     def delta_moved(self, at=None):
         """The delta moved by the momenta."""
+        stuffs = self.stuffs(at)
+        if stuffs is None:
+            return 0
+        return stuffs[-1] + stuffs[-2]
+        '''
         timedelta = self.time_passed(at)
         if timedelta is None:
             return 0
@@ -95,18 +99,40 @@ class Gauge(object):
             (pos_deltas if delta > 0 else neg_deltas).append(delta)
         pos_delta = sum(pos_deltas)
         neg_delta = sum(neg_deltas)
-        #print pos_delta, neg_delta
-        #print min(max(self.min, self.max - self.delta - neg_delta), pos_delta),\
-        #      max(min(self.max, self.min - self.delta - pos_delta), neg_delta)
+        if self.delta < 0:
+            neg_delta -= pos_delta
+            pos_delta = 0
         return (
             min(max(self.min, self.max - self.delta - neg_delta), pos_delta) +
             max(min(self.max, self.min - self.delta - pos_delta), neg_delta))
+        '''
+
+    def stuffs(self, at=None):
+        timedelta = self.time_passed(at)
+        seconds = timedelta.total_seconds()
+        pos_deltas = []
+        neg_deltas = []
+        for momentum in self.momenta:
+            delta = momentum.move(self, seconds)
+            (pos_deltas if delta > 0 else neg_deltas).append(delta)
+        pos_delta = sum(pos_deltas)
+        neg_delta = sum(neg_deltas)
+        if self.delta < 0:
+            limited_neg_delta = min(
+                max(self.min, self.max - self.delta - pos_delta), neg_delta)
+        else:
+            limited_neg_delta = max(
+                min(self.max, self.min - self.delta - pos_delta), neg_delta)
+        return (
+            self.delta,
+            pos_delta,
+            neg_delta,
+            min(max(self.min, self.max - self.delta - neg_delta), pos_delta),
+            limited_neg_delta)
 
     def time_passed(self, at=None):
         """The timedelta object passed from :attr:`set_at`."""
-        if self.set_at is None:
-            return None
-        at = at or datetime.utcnow()
+        at = now_or(at)
         return at - self.set_at
 
     def __eq__(self, other, at=None):
@@ -117,24 +143,20 @@ class Gauge(object):
         return False
 
     def __repr__(self, at=None):
-        at = at or datetime.utcnow()
+        at = now_or(at)
         current = self.current(at)
-        rv = '<%s %d/%d' % (type(self).__name__, current, self.max)
-        try:
-            extra = self.momentum.__gauge_repr_extra__(self, at)
-        except AttributeError:
-            pass
+        if self.min == 0:
+            fmt = '<{0} {1}/{2}>'
         else:
-            if extra is not None:
-                rv += ' ({})'.format(extra)
-        return rv + '>'
+            fmt = '<{0} {1}>'
+        return fmt.format(type(self).__name__, current, self.max)
 
 
 class Momentum(namedtuple('Momentum', ['delta', 'interval'])):
 
     normalize_ticks = float
 
-    def applies(self, gauge, at=None):
+    def effects(self, gauge, at=None):
         """Weather this momentum is applying to the gauge."""
         current = gauge.current(at)
         return current < gauge.max if self.delta > 0 else current > gauge.min
@@ -166,16 +188,8 @@ class Discrete(Momentum):
 
     normalize_ticks = int
 
-    def apply_in(self, gauge, at=None):
-        at = at or datetime.utcnow()
-        if self.applies(gauge, at):
+    def move_in(self, gauge, at=None):
+        at = now_or(at)
+        if self.effects(gauge, at):
             timedelta = gauge.time_passed(at)
             return self.interval - (timedelta.total_seconds() % self.interval)
-
-    def __gauge_repr_extra__(self, gauge, at=None):
-        apply_in = self.apply_in(gauge, at)
-        if apply_in is None:
-            return
-        sign = '+' if self.delta > 0 else ''
-        seconds = math.ceil(apply_in)
-        return  '{0}{1} in {2} sec'.format(sign, self.delta, seconds)

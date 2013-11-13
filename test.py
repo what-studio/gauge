@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 from contextlib import contextmanager
 from datetime import datetime
+import math
 
 from freezegun import freeze_time
 import pytest
 
-from gauge import Discrete, Gauge, Linear
+from gauge import Discrete, Gauge, Linear, now_or
 
 
 @contextmanager
@@ -20,13 +21,14 @@ class Energy(Gauge):
 
     min = 0
     max = 10
-    gravity = Discrete(+1, 10)  # +1 energy per 10 seconds
+    default_momentum = Discrete(+1, 10)  # +1 energy per 10 seconds
+    value_type = int
 
     def use(self, amount=1, limit=True, at=None):
         return self.decr(amount, limit, at)
 
     def recover_in(self, at=None):
-        return self.gravity.apply_in(self, at)
+        return self.default_momentum.move_in(self, at)
 
     def recover_fully_in(self, at=None):
         """Calculates seconds to be recovered fully. If the energy is full or
@@ -36,14 +38,26 @@ class Energy(Gauge):
         if recover_in is None:
             return
         to_recover = self.max - self.current(at)
-        return recover_in + self.gravity.interval * (to_recover - 1)
+        return recover_in + self.default_momentum.interval * (to_recover - 1)
+
+    def __repr__(self, at=None):
+        at = now_or(at)
+        momentum = self.default_momentum
+        text = super(Energy, self).__repr__(at)
+        recover_in = self.recover_in(at)
+        if recover_in is None:
+            return text
+        sign = '+' if momentum.delta > 0 else ''
+        seconds = int(math.ceil(recover_in))
+        args = (sign, momentum.delta, seconds)
+        return text[:-1] + ' {0}{1} in {2}s>'.format(*args)
 
 
 class Life(Gauge):
 
     min = 0
     max = 100
-    gravity = Linear(-1, 10)  # -1 life per 10 seconds
+    default_momentum = Linear(-1, 10)  # -1 life per 10 seconds
 
     def recover(self, amount=1, limit=True, at=None):
         return self.incr(amount, limit, at)
@@ -54,7 +68,7 @@ class Life(Gauge):
 
 def test_energy():
     with t(0):
-        energy = Energy()
+        energy = Energy(Energy.max)
         assert energy == 10  # maximum by the default
         energy.use()
         assert energy == 9
@@ -111,72 +125,67 @@ def test_life():
             life.recover(1000)
 
 
-'''
 def test_set_energy():
-    energy = Energy(10, 1000)
-    energy.set(1)
-    assert energy == 1
-    energy.set(5)
-    assert energy == 5
+    with t(0):
+        energy = Energy(Energy.max)
+        energy.set(1)
+        assert energy == 1
+        energy.set(5)
+        assert energy == 5
 
 
-def test_reset_energy():
-    energy = Energy(10, 1000)
-    energy.use(5)
-    assert energy == 5
-    energy.reset()
-    assert energy == 10
-
-
+'''
 def test_cast_energy():
-    true_energy = Energy(1, 1000)
-    false_energy = Energy(0, 1000)
-    assert int(true_energy) == 1
-    assert int(false_energy) == 0
-    assert float(true_energy) == 1.0
-    assert float(false_energy) == 0.0
-    assert bool(true_energy) is True
-    assert bool(false_energy) is False
+    with t(0):
+        true_energy = Energy(1)
+        false_energy = Energy(0)
+        assert int(true_energy) == 1
+        assert int(false_energy) == 0
+        assert float(true_energy) == 1.0
+        assert float(false_energy) == 0.0
+        assert bool(true_energy) is True
+        assert bool(false_energy) is False
+'''
 
 
 def test_recover_energy():
-    energy = Energy(10, 5)
     with t(0):
+        energy = Energy(Energy.max)
         energy.use(2)
     with t(1):
         assert energy == 8
-        assert energy.recover_in() == 4
-        assert energy.recover_fully_in() == 9
+        assert energy.recover_in() == 9
+        #assert energy.recover_fully_in() == 9
     with t(2):
         assert energy == 8
-        assert energy.recover_in() == 3
-        assert energy.recover_fully_in() == 8
+        assert energy.recover_in() == 8
+        #assert energy.recover_fully_in() == 8
     with t(3):
         assert energy == 8
-        assert energy.recover_in() == 2
-        assert energy.recover_fully_in() == 7
-    with t(4):
+        assert energy.recover_in() == 7
+        #assert energy.recover_fully_in() == 7
+    with t(9):
         assert energy == 8
         assert energy.recover_in() == 1
-        assert energy.recover_fully_in() == 6
-    with t(5):
+        #assert energy.recover_fully_in() == 6
+    with t(10):
         assert energy == 9
-        assert energy.recover_in() == 5
-        assert energy.recover_fully_in() == 5
-    with t(9):
+        assert energy.recover_in() == 10
+        #assert energy.recover_fully_in() == 5
+    with t(19):
         assert energy == 9
         assert energy.recover_in() == 1
-        assert energy.recover_fully_in() == 1
-    with t(10):
+        #assert energy.recover_fully_in() == 1
+    with t(20):
         assert energy == 10
         assert energy.recover_in() == None
-        assert energy.recover_fully_in() == None
+        #assert energy.recover_fully_in() == None
     with t(100):
         assert energy == 10
         assert energy.recover_in() == None
-        assert energy.recover_fully_in() == None
+        #assert energy.recover_fully_in() == None
 
-
+'''
 def test_use_energy_while_recovering():
     energy = Energy(10, 5)
     with t(0):
