@@ -165,7 +165,7 @@ def test_out_of_range():
         falling.decr(1, limit=False)
         assert rising == 11
         assert falling == -1
-    # of course, more movement
+    # of course, they should still not move
     with t(11):
         assert rising == 11
         assert falling == -1
