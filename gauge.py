@@ -18,8 +18,8 @@ def now_or(at):
 
 class Gauge(object):
 
-    min = None
-    max = None
+    top = None
+    bottom = None
     default_momentum = None
     value_type = float
 
@@ -28,7 +28,7 @@ class Gauge(object):
 
     def __init__(self, value, limit=True, at=None):
         if value is None:
-            value = self.max
+            value = self.top
         #self.set(value, limit, at)
         self.delta = value
         self.set_at = now_or(at)
@@ -60,11 +60,11 @@ class Gauge(object):
         current = self.current(at)
         next = current + delta
         if limit:
-            if delta > 0 and next > self.max:
+            if delta > 0 and next > self.top:
                 raise ValueError('The value to set is over the maximum')
-            elif delta < 0 and next < self.min:
+            elif delta < 0 and next < self.bottom:
                 raise ValueError('The value to set is under the minimum')
-        if not self.min < current < self.max:
+        if not self.bottom < current < self.top:
             # go to be movable by momenta
             self.set_at = at
             self.delta = next
@@ -87,25 +87,6 @@ class Gauge(object):
         if stuffs is None:
             return 0
         return stuffs[-1] + stuffs[-2]
-        '''
-        timedelta = self.time_passed(at)
-        if timedelta is None:
-            return 0
-        seconds = timedelta.total_seconds()
-        pos_deltas = []
-        neg_deltas = []
-        for momentum in self.momenta:
-            delta = momentum.move(self, seconds)
-            (pos_deltas if delta > 0 else neg_deltas).append(delta)
-        pos_delta = sum(pos_deltas)
-        neg_delta = sum(neg_deltas)
-        if self.delta < 0:
-            neg_delta -= pos_delta
-            pos_delta = 0
-        return (
-            min(max(self.min, self.max - self.delta - neg_delta), pos_delta) +
-            max(min(self.max, self.min - self.delta - pos_delta), neg_delta))
-        '''
 
     def stuffs(self, at=None):
         timedelta = self.time_passed(at)
@@ -117,17 +98,12 @@ class Gauge(object):
             (pos_deltas if delta > 0 else neg_deltas).append(delta)
         pos_delta = sum(pos_deltas)
         neg_delta = sum(neg_deltas)
-        if self.delta < 0:
-            limited_neg_delta = min(
-                max(self.min, self.max - self.delta - pos_delta), neg_delta)
-        else: limited_neg_delta = max(
-                min(self.max, self.min - self.delta - pos_delta), neg_delta)
         return (
             self.delta,
             pos_delta,
             neg_delta,
-            min(max(0, self.max - self.delta - neg_delta), pos_delta),
-            max(min(0, self.min - self.delta - pos_delta), neg_delta))
+            min(max(0, self.top - self.delta - neg_delta), pos_delta),
+            max(min(0, self.bottom - self.delta - pos_delta), neg_delta))
 
     def time_passed(self, at=None):
         """The timedelta object passed from :attr:`set_at`."""
@@ -144,11 +120,11 @@ class Gauge(object):
     def __repr__(self, at=None):
         at = now_or(at)
         current = self.current(at)
-        if self.min == 0:
+        if self.bottom == 0:
             fmt = '<{0} {1}/{2}>'
         else:
             fmt = '<{0} {1}>'
-        return fmt.format(type(self).__name__, current, self.max)
+        return fmt.format(type(self).__name__, current, self.top)
 
 
 class Momentum(namedtuple('Momentum', ['delta', 'interval'])):
@@ -158,7 +134,10 @@ class Momentum(namedtuple('Momentum', ['delta', 'interval'])):
     def effects(self, gauge, at=None):
         """Weather this momentum is applying to the gauge."""
         current = gauge.current(at)
-        return current < gauge.max if self.delta > 0 else current > gauge.min
+        if self.delta > 0:
+            return current < gauge.top
+        else:
+            return current > gauge.bottom
 
     def move(self, gauge, seconds):
         ticks = self.normalize_ticks(seconds / self.interval)
@@ -167,9 +146,9 @@ class Momentum(namedtuple('Momentum', ['delta', 'interval'])):
 
     def limit(self, gauge, value):
         if self.delta > 0:
-            return min(gauge.max - gauge.delta, value)
+            return min(gauge.top - gauge.delta, value)
         else:
-            return max(gauge.min - gauge.delta, value)
+            return max(gauge.bottom - gauge.delta, value)
 
     def __gauge_repr_extra__(self, gauge, at=None):
         pass

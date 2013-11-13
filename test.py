@@ -17,19 +17,19 @@ def t(timestamp):
         yield
 
 
-def define_gauge(name, min, max, value_type=float):
+def define_gauge(name, top, bottom=0, value_type=float):
     class TemporaryGauge(Gauge): pass
     TemporaryGauge.__name__ = name
-    TemporaryGauge.min = min
-    TemporaryGauge.max = max
+    TemporaryGauge.top = top
+    TemporaryGauge.bottom = bottom
     TemporaryGauge.value_type = value_type
     return TemporaryGauge
 
 
 class Energy(Gauge):
 
-    min = 0
-    max = 10
+    top = 10
+    bottom = 0
     default_momentum = Discrete(+1, 10)  # +1 energy per 10 seconds
     value_type = int
 
@@ -46,7 +46,7 @@ class Energy(Gauge):
         recover_in = self.recover_in(at)
         if recover_in is None:
             return
-        to_recover = self.max - self.current(at)
+        to_recover = self.top - self.current(at)
         return recover_in + self.default_momentum.interval * (to_recover - 1)
 
     def __repr__(self, at=None):
@@ -64,8 +64,8 @@ class Energy(Gauge):
 
 class Life(Gauge):
 
-    min = 0
-    max = 100
+    top = 100
+    bottom = 0
     default_momentum = Linear(-1, 10)  # -1 life per 10 seconds
 
     def recover(self, amount=1, limit=True, at=None):
@@ -77,7 +77,7 @@ class Life(Gauge):
 
 def test_energy():
     with t(0):
-        energy = Energy(Energy.max)
+        energy = Energy(Energy.top)
         assert energy == 10  # maximum by the default
         energy.use()
         assert energy == 9
@@ -120,7 +120,7 @@ def test_energy():
 
 def test_life():
     with t(0):
-        life = Life(Life.max)
+        life = Life(Life.top)
         assert life == 100
     with t(1):
         assert life == 99.9
@@ -135,7 +135,7 @@ def test_life():
 
 
 def test_out_of_range():
-    TemporaryGauge = define_gauge('TemporaryGauge', 0, 10, int)
+    TemporaryGauge = define_gauge('TemporaryGauge', 10, 0, int)
     with t(0):
         rising = TemporaryGauge(5)
         rising.add_momentum(Discrete(+1, 1))
@@ -174,9 +174,15 @@ def test_out_of_range():
         assert falling == -1
 
 
+def test_no_ceil():
+    pass
+def test_no_floor():
+    pass
+
+
 def test_set_energy():
     with t(0):
-        energy = Energy(Energy.max)
+        energy = Energy(Energy.top)
         energy.set(1)
         assert energy == 1
         energy.set(5)
@@ -199,7 +205,7 @@ def test_cast_energy():
 
 def test_recover_energy():
     with t(0):
-        energy = Energy(Energy.max)
+        energy = Energy(Energy.top)
         energy.use(2)
     with t(1):
         assert energy == 8
