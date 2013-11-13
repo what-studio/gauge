@@ -17,6 +17,15 @@ def t(timestamp):
         yield
 
 
+def define_gauge(name, min, max, value_type=float):
+    class TemporaryGauge(Gauge): pass
+    TemporaryGauge.__name__ = name
+    TemporaryGauge.min = min
+    TemporaryGauge.max = max
+    TemporaryGauge.value_type = value_type
+    return TemporaryGauge
+
+
 class Energy(Gauge):
 
     min = 0
@@ -123,6 +132,46 @@ def test_life():
         assert life == 90
         with pytest.raises(ValueError):
             life.recover(1000)
+
+
+def test_out_of_range():
+    TemporaryGauge = define_gauge('TemporaryGauge', 0, 10, int)
+    with t(0):
+        rising = TemporaryGauge(5)
+        rising.add_momentum(Discrete(+1, 1))
+        falling = TemporaryGauge(5)
+        falling.add_momentum(Discrete(-1, 1))
+        assert rising == 5
+        assert falling == 5
+    with t(1):
+        assert rising == 6
+        assert falling == 4
+    with t(4):
+        assert rising == 9
+        assert falling == 1
+    with t(5):
+        assert rising == 10
+        assert falling == 0
+    # no more movement
+    with t(6):
+        assert rising == 10
+        assert falling == 0
+    with t(10):
+        with pytest.raises(ValueError):
+            rising.incr(1)
+        with pytest.raises(ValueError):
+            falling.decr(1)
+        rising.incr(1, limit=False)
+        falling.decr(1, limit=False)
+        assert rising == 11
+        assert falling == -1
+    # of course, more movement
+    with t(11):
+        assert rising == 11
+        assert falling == -1
+    with t(60):
+        assert rising == 11
+        assert falling == -1
 
 
 def test_set_energy():

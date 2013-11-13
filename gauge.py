@@ -120,15 +120,14 @@ class Gauge(object):
         if self.delta < 0:
             limited_neg_delta = min(
                 max(self.min, self.max - self.delta - pos_delta), neg_delta)
-        else:
-            limited_neg_delta = max(
+        else: limited_neg_delta = max(
                 min(self.max, self.min - self.delta - pos_delta), neg_delta)
         return (
             self.delta,
             pos_delta,
             neg_delta,
-            min(max(self.min, self.max - self.delta - neg_delta), pos_delta),
-            limited_neg_delta)
+            min(max(0, self.max - self.delta - neg_delta), pos_delta),
+            max(min(0, self.min - self.delta - pos_delta), neg_delta))
 
     def time_passed(self, at=None):
         """The timedelta object passed from :attr:`set_at`."""
