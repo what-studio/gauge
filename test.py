@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 import math
 
 from freezegun import freeze_time
@@ -16,6 +16,18 @@ def t(timestamp):
     time_freezer.time_to_freeze = frozen_at
     with time_freezer:
         yield frozen_at
+
+
+def later(seconds):
+    return datetime.utcnow() + timedelta(0, seconds)
+
+
+def period(gauge, start, stop):
+    values = []
+    for timestamp in xrange(start, stop):
+        with t(timestamp):
+            values.append(gauge.current())
+    return values
 
 
 def define_gauge(name, max, min=0, value_type=float):
@@ -74,6 +86,9 @@ class Life(Gauge):
 
     def hurt(self, amount=1, limit=True, at=None):
         return self.decr(amount, limit, at)
+
+
+Static = define_gauge('Static', 10, 0, int)
 
 
 def test_energy():
@@ -136,11 +151,10 @@ def test_life():
 
 
 def test_out_of_range():
-    TemporaryGauge = define_gauge('TemporaryGauge', 10, 0, int)
     with t(0):
-        rising = TemporaryGauge(5)
+        rising = Static(5)
         rising.add_momentum(Discrete(+1, 1))
-        falling = TemporaryGauge(5)
+        falling = Static(5)
         falling.add_momentum(Discrete(-1, 1))
         assert rising == 5
         assert falling == 5
@@ -176,9 +190,8 @@ def test_out_of_range():
 
 
 def test_out_of_range_dont_change_set_at():
-    TemporaryGauge = define_gauge('TemporaryGauge', 10, 0, int)
     with t(0):
-        rising = TemporaryGauge(0)
+        rising = Static(0)
         rising.add_momentum(Discrete(+1, 10))
     with t(5) as at:
         rising.set(-1, limit=False)
@@ -188,6 +201,90 @@ def test_out_of_range_dont_change_set_at():
         assert rising == -1
     with t(10):
         assert rising == 0
+
+
+def test_out_of_range_change_set_at_if_momentum_isnt_present():
+    with t(0):
+        rising = Static(0)
+        rising.add_momentum(Discrete(+1, 1), since=later(6))
+    with t(5) as at:
+        rising.set(-1, limit=False)
+        assert rising == -1
+        assert rising.set_at == at
+    with t(7) as at:
+        assert rising == 0
+    with t(8) as at:
+        assert rising == 1
+    with t(9):
+        assert rising == 2
+    with t(10):
+        assert rising == 3
+
+
+def test_momentum_until():
+    with t(0):
+        rising = Static(0)
+        falling = Static(10)
+        rising.add_momentum(Discrete(+1, 1), until=later(5))
+        falling.add_momentum(Discrete(-1, 1), until=later(5))
+    assert period(rising, 0, 10) == [0, 1, 2, 3, 4, 5, 5, 5, 5, 5]
+    assert period(falling, 0, 10) == [10, 9, 8, 7, 6, 5, 5, 5, 5, 5]
+
+
+def test_momentum_since():
+    with t(0):
+        rising = Static(0)
+        falling = Static(10)
+        rising.add_momentum(Discrete(+1, 1), since=later(5))
+        falling.add_momentum(Discrete(-1, 1), since=later(5))
+    assert period(rising, 0, 10) == [0, 0, 0, 0, 0, 0, 1, 2, 3, 4]
+    assert period(falling, 0, 10) == [10, 10, 10, 10, 10, 10, 9, 8, 7, 6]
+
+
+def test_case_1():
+    with t(0):
+        g = Static(0)
+        g.add_momentum(Linear(+1, 2))
+        assert g == 0
+    with t(1):
+        assert g == 0
+    with t(2):
+        assert g == 1
+
+
+def test_case_2():
+    with t(0):
+        g = Static(0)
+        g.add_momentum(Linear(+1, 2))
+        g.add_momentum(Linear(+1, 1), since=later(5), until=later(10))
+        assert g == 0
+    with t(1):
+        assert g == 0
+    with t(2):
+        assert g == 1
+    with t(3):
+        assert g == 1
+    with t(4):
+        assert g == 2
+    with t(5):
+        assert g == 2
+    with t(6):
+        assert g == 4
+    with t(7):
+        assert g == 5
+    with t(8):
+        assert g == 7
+    with t(9):
+        assert g == 8
+    with t(10) as at:
+        assert g == 10
+        g.decr(1)
+        assert g == 9
+        assert g.set_at == at
+    with t(11) as at:
+        assert g == 9
+        g.decr(1)
+        assert g == 8
 
 
 def test_no_max():

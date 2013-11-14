@@ -3,11 +3,12 @@ import math
 import pdb
 import sys
 
+from freezegun import freeze_time
 import pygame
-from pygame.locals import MOUSEBUTTONUP, QUIT
+from pygame.locals import K_SPACE, KEYDOWN, MOUSEBUTTONUP, QUIT
 
 from gauge import Discrete, Gauge, Linear
-from test import Energy, Life, define_gauge
+from test import Energy, Life, define_gauge, later
 
 
 SCREEN_SIZE = (300, 200)
@@ -86,7 +87,7 @@ class GaugeDisplay(object):
         # write time recover in
         dps = 0
         effects = False
-        for momentum in self.gauge.momenta:
+        for momentum, since, until in self.gauge.momenta:
             effects = effects or momentum.effects(self.gauge, at)
             dps += float(momentum.delta) / momentum.interval
         timedelta = self.gauge.time_passed(at)
@@ -128,6 +129,10 @@ def main(gauges, fps=30, padding=10):
                 if e.type == QUIT:
                     pygame.display.quit()
                     raise KeyboardInterrupt
+                elif e.type == KEYDOWN:
+                    if pygame.key.get_pressed()[K_SPACE]:
+                        with freeze_time(at):
+                            pdb.set_trace()
                 elif e.type == MOUSEBUTTONUP and e.button == 3:
                     do = Gauge.incr
                 elif e.type == MOUSEBUTTONUP and e.button == 1:
@@ -162,12 +167,13 @@ def main(gauges, fps=30, padding=10):
 
 if __name__ == '__main__':
     Gauge10 = define_gauge('Gauge10', 10, value_type=float)
-    g1 = Gauge10(8)
+    g1 = Gauge10(0)
     g2 = Gauge10(8)
     g3 = Gauge10(0)
-    g1.add_momentum(Discrete(+1, 3))
+    g1.add_momentum(Linear(+1, 3))
+    g1.add_momentum(Linear(+1, 1), since=later(5), until=later(10))
     #g2.add_momentum(Linear(+1, 2))
     g2.add_momentum(Discrete(-1, 3))
     g3.add_momentum(Linear(-1, 5))
     g3.add_momentum(Linear(-1, 30))
-    main([g1, g2, g3], 5)
+    main([g1], 5)

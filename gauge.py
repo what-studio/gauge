@@ -37,8 +37,8 @@ class Gauge(object):
         if self.default_momentum is not None:
             self.add_momentum(self.default_momentum)
 
-    def add_momentum(self, momentum):
-        self.momenta.append(momentum)
+    def add_momentum(self, momentum, since=None, until=None):
+        self.momenta.append((momentum, since, until))
 
     def set(self, value, limit=True, at=None):
         """Sets as the given value.
@@ -66,7 +66,11 @@ class Gauge(object):
             elif delta < 0 and next < self.min:
                 raise ValueError('The value to set is under the minimum')
         pos, neg = False, False
-        for momentum in self.momenta:
+        for momentum, since, until in self.momenta:
+            future = since is not None and at < since
+            past = until is not None and at > until
+            if future or past:
+                continue
             if momentum.delta > 0:
                 pos = True
             else:
@@ -96,12 +100,17 @@ class Gauge(object):
         return stuffs[-1] + stuffs[-2]
 
     def stuffs(self, at=None):
+        at = now_or(at)
         timedelta = self.time_passed(at)
         seconds = timedelta.total_seconds()
         pos_deltas = []
         neg_deltas = []
-        for momentum in self.momenta:
-            delta = momentum.move(self, seconds)
+        for momentum, since, until in self.momenta:
+            since = self.set_at if since is None else max(since, self.set_at)
+            until = at if until is None else min(until, at)
+            if until < since:
+                continue
+            delta = momentum.move(self, (until - since).total_seconds())
             (pos_deltas if delta > 0 else neg_deltas).append(delta)
         pos_delta = sum(pos_deltas)
         neg_delta = sum(neg_deltas)
