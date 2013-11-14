@@ -53,7 +53,7 @@ class GaugeDisplay(object):
         surf = self.surf
         surf.fill(BASE2)
         # draw bar
-        ratio = max(0, min(1, self.gauge.current(at) / float(self.gauge.top)))
+        ratio = self.gauge.current(at) / float(self.gauge.max)
         if ratio > 1:
             bar_color = BLUE
             text_colors = (BASE3, BASE3)
@@ -70,18 +70,33 @@ class GaugeDisplay(object):
         elif ratio > 0:
             bar_color = ORANGE
             text_colors = (BASE3, BASE1)
-        else:
-            bar_color = BASE2
+        elif ratio == 0:
             text_colors = (BASE1, BASE1)
-        bar = pygame.Surface((int(self.size[0] * ratio), self.size[1]))
-        bar.fill(bar_color)
-        surf.blit(bar, (0, 0))
+        else:
+            text_colors = (RED, BASE1)
+        if ratio > 0:
+            bar = pygame.Surface((int(self.size[0] * ratio), self.size[1]))
+            bar.fill(bar_color)
+            surf.blit(bar, (0, 0))
         # write current state
         text = font.render(
-            '{0}/{1}'.format(int(self.gauge.current(at)), self.gauge.top),
+            '{0}/{1}'.format(int(self.gauge.current(at)), self.gauge.max),
             True, text_colors[0])
         surf.blit(text, (10, font.get_height() / 2))
         # write time recover in
+        dps = 0
+        effects = False
+        for momentum in self.gauge.momenta:
+            effects = effects or momentum.effects(self.gauge, at)
+            dps += float(momentum.delta) / momentum.interval
+        timedelta = self.gauge.time_passed(at)
+        interval = 1 / dps
+        move_in = interval - timedelta.total_seconds() % interval
+        if effects and move_in:
+            text = font.render('{0:.1f}'.format(move_in), True, text_colors[1])
+            surf.blit(text, (surf.get_width() - text.get_width() - 10,
+                             font.get_height() / 2))
+        '''
         try:
             move_in = self.gauge.momenta[0].move_in(self.gauge, at)
         except (AttributeError, IndexError):
@@ -93,6 +108,7 @@ class GaugeDisplay(object):
                     move_in / 60, move_in % 60), True, text_colors[1])
                 surf.blit(text, (surf.get_width() - text.get_width() - 10,
                                  font.get_height() / 2))
+        '''
         return surf
 
 
@@ -128,12 +144,13 @@ def main(gauges, fps=30, padding=10):
                         surf.fill(RED)
                 if surf is None:
                     surf = disp.render(at)
+                #print disp.gauge.current(at), disp.gauge.stuffs(at)
                 left = (screen.get_width() - surf.get_width()) / 2
-                top = int(
+                max = int(
                     screen.get_height() / 2 +
                     (surf.get_height() + padding) *
                     (x - len(gauge_displays) / 2.))
-                screen.blit(surf, (left, top))
+                screen.blit(surf, (left, max))
             first = False
     except KeyboardInterrupt:
         pass
@@ -144,9 +161,13 @@ def main(gauges, fps=30, padding=10):
 
 
 if __name__ == '__main__':
-    Gauge10 = define_gauge('Gauge10', 10, value_type=int)
-    g1 = Gauge10(Gauge10.top / 2)
-    g2 = Gauge10(Gauge10.top / 2)
+    Gauge10 = define_gauge('Gauge10', 10, value_type=float)
+    g1 = Gauge10(8)
+    g2 = Gauge10(8)
+    g3 = Gauge10(0)
     g1.add_momentum(Discrete(+1, 3))
+    #g2.add_momentum(Linear(+1, 2))
     g2.add_momentum(Discrete(-1, 3))
-    main([g1, g2])
+    g3.add_momentum(Linear(-1, 5))
+    g3.add_momentum(Linear(-1, 30))
+    main([g1, g2, g3], 5)
