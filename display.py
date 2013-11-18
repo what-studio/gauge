@@ -85,6 +85,7 @@ class GaugeDisplay(object):
             True, text_colors[0])
         surf.blit(text, (10, font.get_height() / 2))
         # write time recover in
+        '''
         dps = 0
         effects = False
         for momentum, since, until in self.gauge.momenta:
@@ -97,6 +98,7 @@ class GaugeDisplay(object):
             text = font.render('{0:.1f}'.format(move_in), True, text_colors[1])
             surf.blit(text, (surf.get_width() - text.get_width() - 10,
                              font.get_height() / 2))
+        '''
         '''
         try:
             move_in = self.gauge.momenta[0].move_in(self.gauge, at)
@@ -170,8 +172,9 @@ if __name__ == '__main__':
     g1 = Gauge10(0)
     g2 = Gauge10(8)
     g3 = Gauge10(0)
-    g1.add_momentum(Linear(+1, 3))
-    g1.add_momentum(Linear(+1, 1), since=later(5), until=later(10))
+    g1.add_momentum(Discrete(+1, 1), until=later(30))
+    g1.add_momentum(Discrete(+1, 1), since=later(33), until=later(36))
+    g1.add_momentum(Discrete(-2, 3))
     #g2.add_momentum(Linear(+1, 2))
     g2.add_momentum(Discrete(-1, 3))
     g3.add_momentum(Linear(-1, 5))

@@ -287,6 +287,26 @@ def test_case_2():
         assert g == 8
 
 
+@pytest.mark.xfail
+def test_falling_after_full():
+    with t(0):
+        g = Static(0)
+        g.add_momentum(Discrete(+1, 1))
+        g.add_momentum(Discrete(-2, 3), since=later(1))
+    assert period(g, 0, 10) == [0, 1, 2, 3, 2, 3, 4, 3, 4, 5]
+    with t(0):
+        g = Static(8)
+        g.add_momentum(Discrete(+1, 1))
+        g.add_momentum(Discrete(-1, 3), since=later(1))
+        g.add_momentum(Discrete(-1, 3), since=later(2))
+    assert period(g, 0, 10) == [8, 9, 10, 10, 9, 9, 10, 9, 9, 10]
+    with t(0):
+        g = Static(8)
+        g.add_momentum(Discrete(+1, 1))
+        g.add_momentum(Discrete(-2, 3), since=later(1))
+    assert period(g, 0, 10) == [8, 9, 10, 10, 8, 9, 10, 8, 9, 10]
+
+
 def test_no_max():
     pytest.skip()
 def test_no_min():

@@ -9,8 +9,12 @@
     :license: BSD, see LICENSE for more details.
 """
 from collections import namedtuple
-from datetime import datetime
+from datetime import datetime, timedelta
 import functools
+
+
+POSITIVE = 0
+NEGATIVE = 1
 
 
 def now_or(at):
@@ -89,20 +93,16 @@ class Gauge(object):
 
     def current(self, at=None):
         """Calculates the current value."""
-        #print self.delta, self.delta_moved(at)
         return self.value_type(self.delta + self.delta_moved(at))
 
     def delta_moved(self, at=None):
         """The delta moved by the momenta."""
-        stuffs = self.stuffs(at)
-        if stuffs is None:
-            return 0
-        return stuffs[-1] + stuffs[-2]
+        pos_delta, pos_limit, neg_delta, neg_limit = self.stuffs(at)
+        return min(pos_delta, pos_limit) + max(neg_delta, neg_limit)
 
     def stuffs(self, at=None):
         at = now_or(at)
-        timedelta = self.time_passed(at)
-        seconds = timedelta.total_seconds()
+        seconds = self.time_passed(at).total_seconds()
         pos_deltas = []
         neg_deltas = []
         for momentum, since, until in self.momenta:
@@ -110,17 +110,14 @@ class Gauge(object):
             until = at if until is None else min(until, at)
             if until < since:
                 continue
-            delta = momentum.move(self, (until - since).total_seconds())
-            (pos_deltas if delta > 0 else neg_deltas).append(delta)
+            seconds_passed = (until - since).total_seconds()
+            delta = momentum.move(self, seconds_passed)
+            (pos_deltas if momentum.delta > 0 else neg_deltas).append(delta)
         pos_delta = sum(pos_deltas)
         neg_delta = sum(neg_deltas)
-        return (
-            self.delta,
-            pos_delta,
-            neg_delta,
-            min(max(0, self.max - self.delta - neg_delta), pos_delta),
-            max(min(0, self.min - self.delta - pos_delta), neg_delta))
-            # if max/min is None, do not limit
+        pos_limit = max(self.max - self.delta - neg_delta, 0)
+        neg_limit = min(self.min - self.delta - pos_delta, 0)
+        return (pos_delta, pos_limit, neg_delta, neg_limit)
 
     def time_passed(self, at=None):
         """The timedelta object passed from :attr:`set_at`."""
