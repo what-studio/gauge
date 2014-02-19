@@ -206,7 +206,7 @@ def main(gauge, fps=30, padding=0):
             surf = None
             if do is not None:
                 try:
-                    do(disp.gauge, 1, False, at=at)
+                    do(disp.gauge, 5, False, at=at)
                 except ValueError:
                     surf = disp.surf
                     surf.fill(RED)

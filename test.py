@@ -6,7 +6,7 @@ import math
 from freezegun import freeze_time
 import pytest
 
-from gauge import Discrete, Gauge, Linear, now_or
+from gauge2 import Discrete, Gauge, Linear, now_or
 
 
 @contextmanager

@@ -5,183 +5,103 @@
 
     Deterministic gauge library.
 
-    :copyright: (c) 2013 by Heungsub Lee
+    :copyright: (c) 2013-2014 by Heungsub Lee
     :license: BSD, see LICENSE for more details.
 """
-from collections import namedtuple
-from datetime import datetime, timedelta
-import functools
+from datetime import datetime
+
+from blist import sortedlist
 
 
 POSITIVE = 0
 NEGATIVE = 1
+epoch = datetime.fromtimestamp(0)
+ADD = 1
+SUB = 0
 
 
 def now_or(at):
     return datetime.utcnow() if at is None else at
 
 
+def sort_key(tup):
+    return None if tup[0] is None else tup[0].timetuple()
+
+
 class Gauge(object):
 
-    max = None
     min = None
-    default_momentum = None
-    value_type = float
-
-    delta = 0
+    max = None
+    value = 0
     set_at = None
+    momenta = None
+    events = None
 
-    def __init__(self, value, limit=True, at=None):
-        if value is None:
-            value = self.max
-        #self.set(value, limit, at)
-        self.delta = value
+    def __init__(self, value, min=0, max=10, at=None):
+        self.min = min
+        self.max = max
+        self.value = value
         self.set_at = now_or(at)
-        self.momenta = []
-        if self.default_momentum is not None:
-            self.add_momentum(self.default_momentum)
+        self.momenta = sortedlist(key=sort_key)
+        self.events = sortedlist(key=sort_key)
 
-    def add_momentum(self, momentum, since=None, until=None):
-        self.momenta.append((momentum, since, until))
+    def inertia(self, velocity, since=None, until=None):
+        self.momenta.add((since, until, velocity))
+        self.events.add((since, ADD, velocity))
+        if until is not None:
+            self.events.add((until, SUB, velocity))
 
-    def set(self, value, limit=True, at=None):
-        """Sets as the given value.
+    def calc(self, alpha, velocities, duration):
+        value = alpha + sum(velocities) * duration.total_seconds()
+        return float(min(self.max, max(self.min, value)))
 
-        :param value: the value to set.
-        :param limit: checks if the value is in the range. Defaults to ``True``.
-        :param at: the datetime. Defaults to now.
-        """
+    def current(self, at=None):
         at = now_or(at)
-        return self.incr(value - self.current(at), limit, at)
+        alpha = self.value
+        velocities = []
+        prev_time = None
+        for time, method, velocity in self.events:
+            if time is None:
+                time = self.set_at
+            if at < time:
+                time = prev_time or self.set_at
+                break
+            if prev_time is not None:
+                alpha = self.calc(alpha, velocities, time - prev_time)
+            if method == ADD:
+                velocities.append(velocity)
+            elif method == SUB:
+                velocities.remove(velocity)
+            prev_time = time
+        return self.calc(alpha, velocities, at - time)
+
+    def velocity(self, at=None):
+        at = now_or(at)
+        velocities = []
+        for time, method, velocity in self.events:
+            if at < (time or self.set_at):
+                break
+            if method == ADD:
+                velocities.append(velocity)
+            elif method == SUB:
+                velocities.remove(velocity)
+        return sum(velocities)
 
     def incr(self, delta, limit=True, at=None):
-        """Increases the value by the given delta.
-
-        :param delta: the value to set.
-        :param limit: checks if the value is in the range. Defaults to ``True``.
-        :param at: the datetime. Defaults to now.
-        """
         at = now_or(at)
-        current = self.current(at)
-        next = current + delta
-        if limit:
-            if delta > 0 and next > self.max:
-                raise ValueError('The value to set is over the maximum')
-            elif delta < 0 and next < self.min:
-                raise ValueError('The value to set is under the minimum')
-        pos, neg = False, False
-        for momentum, since, until in self.momenta:
-            future = since is not None and at < since
-            past = until is not None and at > until
-            if future or past:
-                continue
-            if momentum.delta > 0:
-                pos = True
-            else:
-                neg = True
-        if current <= self.min and not pos or current >= self.max and not neg:
-            # go to be movable by momenta
-            self.set_at = at
-            self.delta = next
-        else:
-            self.delta += delta
-        #print next, self.set_at, self.delta
+        self.value = self.current(at) + delta
+        self.set_at = at
+        start = self.momenta.bisect_right((None,))
+        stop = self.momenta.bisect_left((at,))
+        del self.momenta[start:stop]
+        start = self.events.bisect_right((None,))
+        stop = self.events.bisect_left((at,))
+        del self.events[start:stop]
 
     def decr(self, delta, limit=True, at=None):
         """Decreases the value by the given delta."""
         return self.incr(-delta, limit, at)
 
-    def current(self, at=None):
-        """Calculates the current value."""
-        return self.value_type(self.delta + self.delta_moved(at))
-
-    def delta_moved(self, at=None):
-        """The delta moved by the momenta."""
-        pos_delta, pos_limit, neg_delta, neg_limit = self.stuffs(at)
-        return min(pos_delta, pos_limit) + max(neg_delta, neg_limit)
-
-    def stuffs(self, at=None):
+    def set(self, value, limit=True, at=None):
         at = now_or(at)
-        seconds = self.time_passed(at).total_seconds()
-        pos_deltas = []
-        neg_deltas = []
-        for momentum, since, until in self.momenta:
-            since = self.set_at if since is None else max(since, self.set_at)
-            until = at if until is None else min(until, at)
-            if until < since:
-                continue
-            seconds_passed = (until - since).total_seconds()
-            delta = momentum.move(self, seconds_passed)
-            (pos_deltas if momentum.delta > 0 else neg_deltas).append(delta)
-        pos_delta = sum(pos_deltas)
-        neg_delta = sum(neg_deltas)
-        pos_limit = max(self.max - self.delta - neg_delta, 0)
-        neg_limit = min(self.min - self.delta - pos_delta, 0)
-        return (pos_delta, pos_limit, neg_delta, neg_limit)
-
-    def time_passed(self, at=None):
-        """The timedelta object passed from :attr:`set_at`."""
-        at = now_or(at)
-        return at - self.set_at
-
-    def __eq__(self, other, at=None):
-        if isinstance(other, type(self)):
-            return self.__getstate__() == other.__getstate__()
-        elif isinstance(other, (int, float)):
-            return float(self.current(at)) == other
-        return False
-
-    def __repr__(self, at=None):
-        at = now_or(at)
-        current = self.current(at)
-        if self.min == 0:
-            fmt = '<{0} {1}/{2}>'
-        else:
-            fmt = '<{0} {1}>'
-        return fmt.format(type(self).__name__, current, self.max)
-
-
-class Momentum(namedtuple('Momentum', ['delta', 'interval'])):
-
-    normalize_ticks = float
-
-    def effects(self, gauge, at=None):
-        """Weather this momentum is applying to the gauge."""
-        current = gauge.current(at)
-        if self.delta > 0:
-            return current < gauge.max
-        else:
-            return current > gauge.min
-
-    def move(self, gauge, seconds):
-        ticks = self.normalize_ticks(seconds / self.interval)
-        delta = self.delta * ticks
-        return delta
-
-    def limit(self, gauge, value):
-        if self.delta > 0:
-            return min(gauge.max - gauge.delta, value)
-        else:
-            return max(gauge.min - gauge.delta, value)
-
-    def __gauge_repr_extra__(self, gauge, at=None):
-        pass
-
-    def __repr__(self):
-        return '<{0} {1}/{2}s>'.format(type(self).__name__, *self)
-
-
-class Linear(Momentum):
-
-    pass
-
-
-class Discrete(Momentum):
-
-    normalize_ticks = int
-
-    def move_in(self, gauge, at=None):
-        at = now_or(at)
-        if self.effects(gauge, at):
-            timedelta = gauge.time_passed(at)
-            return self.interval - (timedelta.total_seconds() % self.interval)
+        return self.incr(value - self.current(at), limit, at)
