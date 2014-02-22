@@ -15,7 +15,7 @@ assert version
 
 # use pytest instead
 def run_tests(self):
-    raise SystemExit(__import__('pytest').main([]))
+    raise SystemExit(__import__('pytest').main(['-xv']))
 test.run_tests = run_tests
 
 
@@ -39,4 +39,5 @@ setup(
                  'Topic :: Games/Entertainment'],
     install_requires=['blist'],
     tests_require=['pytest'],
+    test_suite='.',
 )
