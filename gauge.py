@@ -65,12 +65,12 @@ class Gauge(object):
         self.plan.add((since, ADD, momentum))
         if until is not None:
             self.plan.add((until, REMOVE, momentum))
-        self.determination = self.determine()
+        self.determination = None
         return momentum
 
     def remove_momentum(self, momentum):
         self.momenta.remove(momentum)
-        self.determination = self.determine()
+        self.determination = None
 
     def forget_past(self, value=None, at=None):
         at = now_or(at)
@@ -82,7 +82,7 @@ class Gauge(object):
         start = self.momenta.bisect_right(Momentum(0))
         stop = self.momenta.bisect_left(Momentum(0, until=at))
         del self.momenta[start:stop]
-        self.determination = self.determine()
+        self.determination = None
 
     def determine(self):
         determination = sortedlist(key=indexer(0))
@@ -167,6 +167,8 @@ class Gauge(object):
 
         :param at: the datetime. (default: now)
         """
+        if self.determination is None:
+            self.determination = self.determine()
         if not self.determination:
             return self.value
         at = now_or(at)
@@ -183,6 +185,8 @@ class Gauge(object):
         return value
 
     def velocity(self, at=None):
+        if self.determination is None:
+            self.determination = self.determine()
         if not self.determination:
             return 0
         at = now_or(at)
