@@ -50,6 +50,12 @@ class Gauge(object):
 
     @property
     def determination(self):
+        """Returns the cached determination. If there's no the cache, it
+        determines and caches that.
+
+        A determination is a sorted list of 2-dimensional points which take
+        times as x-values, gauge values as y-values.
+        """
         try:
             return self._determination
         except AttributeError:
@@ -58,6 +64,9 @@ class Gauge(object):
 
     @determination.deleter
     def determination(self):
+        """Clears the cached determination. If you touches the determination
+        at the next first time, that will be redetermined.
+        """
         try:
             del self._determination
         except AttributeError:
@@ -98,7 +107,8 @@ class Gauge(object):
         return (next_value - prev_value) / (next_time - prev_time)
 
     def incr(self, delta, limit=True, at=None):
-        """Increases the value by the given delta immediately.
+        """Increases the value by the given delta immediately. The
+        determination would be changed.
 
         :param delta: the value to increase.
         :param limit: checks if the value is in the range. (default: ``True``)
@@ -121,7 +131,8 @@ class Gauge(object):
         return value
 
     def decr(self, delta, limit=True, at=None):
-        """Decreases the value by the given delta immediately.
+        """Decreases the value by the given delta immediately. The
+        determination would be changed.
 
         :param delta: the value to decrease.
         :param limit: checks if the value is in the range. (default: ``True``)
@@ -132,7 +143,8 @@ class Gauge(object):
         return self.incr(-delta, limit, at)
 
     def set(self, value, limit=True, at=None):
-        """Sets the current value immediately.
+        """Sets the current value immediately. The determination would be
+        changed.
 
         :param value: the value to set.
         :param limit: checks if the value is in the range. (default: ``True``)
@@ -145,7 +157,15 @@ class Gauge(object):
 
     def add_momentum(self, velocity_or_momentum, since=None, until=None):
         """Adds a momentum. A momentum includes the velocity and the times to
-        start to affect and to stop to affect.
+        start to affect and to stop to affect. The determination would be
+        changed.
+
+        :param velocity_or_momentum: a :class:`Momentum` object or just a
+                                     number for the velocity.
+        :param since: if the first argument is a velocity, it is the time to
+                      start to affect the momentum. (default: ``None``)
+        :param until: if the first argument is a velocity, it is the time to
+                      finish to affect the momentum. (default: ``None``)
 
         :returns: a momentum object. Use this to remove the momentum by
                   :meth:`remove_momentum`.
@@ -163,7 +183,10 @@ class Gauge(object):
         return momentum
 
     def remove_momentum(self, momentum):
-        """Removes the given momentum."""
+        """Removes the given momentum. The determination would be changed.
+
+        :param momentum: the :class:`Momentum` object to remove.
+        """
         self.momenta.remove(momentum)
         del self.determination
 
