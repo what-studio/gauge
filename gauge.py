@@ -15,7 +15,7 @@ from blist import sortedlist
 
 
 __all__ = ['Gauge', 'Momentum']
-__version__ = '0.0.1'
+__version__ = '0.0.2'
 
 
 ADD = 1
