@@ -73,7 +73,7 @@ def test_permanent():
     assert list(g.determine()) == [(0, 0), (10, 10)]
     g = Gauge(12, 0, 10, at=0)
     g.add_momentum(-1)
-    assert list(g.determine()) == [(0, 12), (12, 0)]
+    assert list(g.determine()) == [(0, 12), (2, 10), (12, 0)]
     g = Gauge(5, 0, 10, at=0)
     g.add_momentum(+1, since=3)
     assert list(g.determine()) == [(3, 5), (8, 10)]
@@ -99,6 +99,12 @@ def test_life():
         assert life.current() == 90
 
 
+def test_no_momentum():
+    g = Gauge(1, max=10, at=0)
+    assert list(g.determine()) == [(0, 1)]
+    assert g.current() == 1
+
+
 def test_case1():
     g = Gauge(0, max=5, at=0)
     g.add_momentum(+1)
@@ -106,3 +112,26 @@ def test_case1():
     g.add_momentum(+1, since=5, until=7)
     assert list(g.determine()) == [
         (0, 0), (1, 1), (2, 0), (3, 0), (5, 2), (6.5, 5), (7, 5)]
+
+
+def test_case2():
+    g = Gauge(12, max=10, at=0)
+    g.add_momentum(+2, since=2, until=10)
+    g.add_momentum(-1, since=4, until=8)
+    assert list(g.determine()) == [
+        (2, 12), (4, 12), (6, 10), (8, 10), (10, 10)]
+
+
+def test_case3():
+    g = Gauge(0, max=10, at=0)
+    assert g.current(0) == 0
+    g.add_momentum(+1, since=0)
+    assert g.current(10) == 10
+    g.incr(3, limit=False, at=11)
+    assert g.current(11) == 13
+    g.add_momentum(-1, since=13)
+    assert g.current(13) == 13
+    assert g.current(14) == 12
+    assert g.current(15) == 11
+    assert g.current(16) == 10
+    assert g.current(17) == 10

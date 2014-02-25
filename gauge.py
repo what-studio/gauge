@@ -39,7 +39,6 @@ class Gauge(object):
 
     momenta = None
     plan = None
-    determination = None
 
     def __init__(self, value, min=0, max=10, at=None):
         self.min = min
@@ -48,6 +47,101 @@ class Gauge(object):
         self.set_at = now_or(at)
         self.momenta = sortedlist(key=indexer(2))
         self.plan = sortedlist(key=indexer(0))
+
+    @property
+    def determination(self):
+        try:
+            return self._determination
+        except AttributeError:
+            self._determination = self.determine()
+            return self._determination
+
+    @determination.deleter
+    def determination(self):
+        try:
+            del self._determination
+        except AttributeError:
+            pass
+
+    def current(self, at=None):
+        """Predicts the current value.
+
+        :param at: the time to observe. (default: now)
+        """
+        at = now_or(at)
+        x = self.determination.bisect_left((at,))
+        if x == 0:
+            return self.determination[0][1]
+        try:
+            next_time, next_value = self.determination[x]
+        except IndexError:
+            return self.determination[-1][1]
+        prev_time, prev_value = self.determination[x - 1]
+        t = float(at - prev_time) / (next_time - prev_time)
+        value = prev_value + t * (next_value - prev_value)
+        return value
+
+    def velocity(self, at=None):
+        """Predicts the current velocity.
+
+        :param at: the time to observe. (default: now)
+        """
+        at = now_or(at)
+        x = self.determination.bisect_left((at,))
+        if x == 0:
+            return 0
+        try:
+            next_time, next_value = self.determination[x]
+        except IndexError:
+            return 0
+        prev_time, prev_value = self.determination[x - 1]
+        return (next_value - prev_value) / (next_time - prev_time)
+
+    def incr(self, delta, limit=True, at=None):
+        """Increases the value by the given delta immediately.
+
+        :param delta: the value to increase.
+        :param limit: checks if the value is in the range. (default: ``True``)
+        :param at: the time to increase. (default: now)
+
+        :raises ValueError: the value is out of the range.
+        """
+        at = now_or(at)
+        value = self.current(at) + delta
+        if limit:
+            if delta > 0 and value > self.max:
+                raise ValueError(
+                    'The value to set is over the maximum ({0} > {1})'
+                    ''.format(value, self.max))
+            elif delta < 0 and value < self.min:
+                raise ValueError(
+                    'The value to set is under the minimum ({0} < {1})'
+                    ''.format(value, self.min))
+        self.forget_past(value, at)
+        return value
+
+    def decr(self, delta, limit=True, at=None):
+        """Decreases the value by the given delta immediately.
+
+        :param delta: the value to decrease.
+        :param limit: checks if the value is in the range. (default: ``True``)
+        :param at: the time to decrease. (default: now)
+
+        :raises ValueError: the value is out of the range.
+        """
+        return self.incr(-delta, limit, at)
+
+    def set(self, value, limit=True, at=None):
+        """Sets the current value immediately.
+
+        :param value: the value to set.
+        :param limit: checks if the value is in the range. (default: ``True``)
+        :param at: the time to set. (default: now)
+
+        :raises ValueError: the value is out of the range.
+        """
+        at = now_or(at)
+        return self.incr(value - self.current(at), limit, at)
 
     def add_momentum(self, velocity_or_momentum, since=None, until=None):
         """Adds a momentum. A momentum includes the velocity and the times to
@@ -65,31 +159,38 @@ class Gauge(object):
         self.plan.add((since, ADD, momentum))
         if until is not None:
             self.plan.add((until, REMOVE, momentum))
-        self.determination = None
+        del self.determination
         return momentum
 
     def remove_momentum(self, momentum):
+        """Removes the given momentum."""
         self.momenta.remove(momentum)
-        self.determination = None
+        del self.determination
 
     def forget_past(self, value=None, at=None):
+        """Discards the momenta which doesn't effect anymore.
+
+        :param value: the value to set coercively.
+        :param at: the time base. (default: now)
+        """
         at = now_or(at)
         if value is None:
             value = self.current(at)
         self.value = value
         self.set_at = at
         # forget past momenta
-        start = self.momenta.bisect_right(Momentum(0))
+        start = self.momenta.bisect_right(Momentum(0, until=None))
         stop = self.momenta.bisect_left(Momentum(0, until=at))
         del self.momenta[start:stop]
-        self.determination = None
+        del self.determination
 
     def determine(self):
         determination = sortedlist(key=indexer(0))
         velocities = []
         prev_time = None
-        x = 0
+        value = self.value
         total_velocity = 0
+        x = 0
         while True:
             try:
                 time, method, momentum = self.plan[x]
@@ -106,7 +207,6 @@ class Gauge(object):
                 time = float(max(self.set_at, time))
             if x == 0:
                 # at the first effective plan
-                value = self.value
                 determination.add((time, value))
             elif time != prev_time:
                 span = time - prev_time
@@ -137,8 +237,9 @@ class Gauge(object):
                 if limit is not None:
                     # the new value is out of the range
                     d = (limit - value) / total_velocity
-                    determination.add((prev_time + d, limit))
-                    value = limit
+                    if d != 0:
+                        determination.add((prev_time + d, limit))
+                        value = limit
                 else:
                     value = new_value
                 determination.add((time, value))
@@ -151,6 +252,22 @@ class Gauge(object):
             x += 1
         # have an infinite momentum
         total_velocity = sum(velocities)
+        if value > self.max:
+            limit = self.max
+            total_velocity = sum(v for v in velocities if v < 0)
+        elif value < self.min:
+            limit = self.min
+            total_velocity = sum(v for v in velocities if v > 0)
+        else:
+            limit = None
+            total_velocity = sum(velocities)
+        if limit is not None and total_velocity != 0:
+            # the previous value is out of the range
+            d = (limit - value) / total_velocity
+            prev_time += d
+            determination.add((prev_time, limit))
+            value = limit
+            total_velocity = sum(velocities)
         if value < self.max and total_velocity > 0:
             limit = self.max
         elif value > self.min and total_velocity < 0:
@@ -160,91 +277,17 @@ class Gauge(object):
         if limit is not None:
             d = (limit - value) / total_velocity
             determination.add((prev_time + d, limit))
+        if not determination:
+            determination.add((self.set_at, self.value))
         return determination
-
-    def current(self, at=None, debug=False):
-        """Calculates the current value.
-
-        :param at: the datetime. (default: now)
-        """
-        if self.determination is None:
-            self.determination = self.determine()
-        if not self.determination:
-            return self.value
-        at = now_or(at)
-        x = self.determination.bisect_left((at,))
-        if x == 0:
-            return self.determination[0][1]
-        try:
-            next_time, next_value = self.determination[x]
-        except IndexError:
-            return self.determination[-1][1]
-        prev_time, prev_value = self.determination[x - 1]
-        t = float(at - prev_time) / (next_time - prev_time)
-        value = prev_value + t * (next_value - prev_value)
-        return value
-
-    def velocity(self, at=None):
-        if self.determination is None:
-            self.determination = self.determine()
-        if not self.determination:
-            return 0
-        at = now_or(at)
-        x = self.determination.bisect_left((at,))
-        if x == 0:
-            return 0
-        try:
-            next_time, next_value = self.determination[x]
-        except IndexError:
-            return 0
-        prev_time, prev_value = self.determination[x - 1]
-        return (next_value - prev_value) / (next_time - prev_time)
-
-    def incr(self, delta, limit=True, at=None):
-        """Increases the value by the given delta.
-
-        :param delta: the value to increase.
-        :param limit: checks if the value is in the range. (default: ``True``)
-        :param at: the datetime. (default: now)
-
-        :raises ValueError: the value is out of the range.
-        """
-        at = now_or(at)
-        value = self.current(at) + delta
-        if limit:
-            if delta > 0 and value > self.max:
-                raise ValueError(
-                    'The value to set is over the maximum ({0} > {1})'
-                    ''.format(value, self.max))
-            elif delta < 0 and value < self.min:
-                raise ValueError(
-                    'The value to set is under the minimum ({0} < {1})'
-                    ''.format(value, self.min))
-        self.forget_past(value, at)
-        return value
-
-    def decr(self, delta, limit=True, at=None):
-        """Decreases the value by the given delta.
-
-        :param delta: the value to decrease.
-        :param limit: checks if the value is in the range. (default: ``True``)
-        :param at: the datetime. (default: now)
-
-        :raises ValueError: the value is out of the range.
-        """
-        return self.incr(-delta, limit, at)
-
-    def set(self, value, limit=True, at=None):
-        at = now_or(at)
-        return self.incr(value - self.current(at), limit, at)
 
     def __repr__(self, at=None):
         at = now_or(at)
         current = self.current(at)
         if self.min == 0:
-            fmt = '<{0} {1}/{2}>'
+            fmt = '<{0} {1:.2f}/{2}>'
         else:
-            fmt = '<{0} {1}>'
+            fmt = '<{0} {1:.2f}>'
         return fmt.format(type(self).__name__, current, self.max)
 
 
