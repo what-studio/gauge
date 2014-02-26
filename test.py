@@ -2,7 +2,9 @@
 from contextlib import contextmanager
 import time
 
-from gauge import Gauge
+import pytest
+
+from gauge import Gauge, Momentum
 
 
 @contextmanager
@@ -19,7 +21,7 @@ def test_in_range():
     g = Gauge(12, 0, 100, at=0)
     g.add_momentum(+1, since=1, until=6)
     g.add_momentum(-1, since=3, until=8)
-    assert list(g.determine()) == [(1, 12), (3, 14), (6, 14), (8, 12)]
+    assert list(g.determine()) == [(0, 12), (1, 12), (3, 14), (6, 14), (8, 12)]
 
 
 def test_over_max():
@@ -39,7 +41,7 @@ def test_over_max():
     g.add_momentum(+1, since=10, until=14)
     g.add_momentum(-1, since=13, until=16)
     assert list(g.determine()) == [
-        (1, 12), (3, 12), (5, 10), (6, 10), (8, 8),
+        (0, 12), (1, 12), (3, 12), (5, 10), (6, 10), (8, 8),
         (10, 8), (12, 10), (13, 10), (14, 10), (16, 8)]
 
 
@@ -60,7 +62,7 @@ def test_under_min():
     g.add_momentum(-1, since=10, until=14)
     g.add_momentum(+1, since=13, until=16)
     assert list(g.determine()) == [
-        (1, -2), (3, -2), (5, 0), (6, 0), (8, 2),
+        (0, -2), (1, -2), (3, -2), (5, 0), (6, 0), (8, 2),
         (10, 2), (12, 0), (13, 0), (14, 0), (16, 2)]
 
 
@@ -76,7 +78,7 @@ def test_permanent():
     assert list(g.determine()) == [(0, 12), (2, 10), (12, 0)]
     g = Gauge(5, 0, 10, at=0)
     g.add_momentum(+1, since=3)
-    assert list(g.determine()) == [(3, 5), (8, 10)]
+    assert list(g.determine()) == [(0, 5), (3, 5), (8, 10)]
     g = Gauge(5, 0, 10, at=0)
     g.add_momentum(+1, until=8)
     assert list(g.determine()) == [(0, 5), (5, 10), (8, 10)]
@@ -105,6 +107,16 @@ def test_no_momentum():
     assert g.current() == 1
 
 
+def test_limit():
+    g = Gauge(1, max=10)
+    with pytest.raises(ValueError):
+        g.set(11)
+    g.set(10)
+    assert g.current() == 10
+    g.set(11, limit=False)
+    assert g.current() == 11
+
+
 def test_case1():
     g = Gauge(0, max=5, at=0)
     g.add_momentum(+1)
@@ -119,7 +131,7 @@ def test_case2():
     g.add_momentum(+2, since=2, until=10)
     g.add_momentum(-1, since=4, until=8)
     assert list(g.determine()) == [
-        (2, 12), (4, 12), (6, 10), (8, 10), (10, 10)]
+        (0, 12), (2, 12), (4, 12), (6, 10), (8, 10), (10, 10)]
 
 
 def test_case3():

@@ -15,11 +15,12 @@ from blist import sortedlist
 
 
 __all__ = ['Gauge', 'Momentum']
-__version__ = '0.0.1'
+__version__ = '0.0.3'
 
 
-ADD = 1
-REMOVE = 0
+add = 1
+remove = 0
+inf = float('inf')
 
 
 def now_or(at):
@@ -72,39 +73,35 @@ class Gauge(object):
         except AttributeError:
             pass
 
+    def _current_value_and_velocity(self, at=None):
+        at = now_or(at)
+        x = self.determination.bisect_left((at,))
+        if x == 0:
+            return (self.determination[0][1], 0.)
+        try:
+            next_time, next_value = self.determination[x]
+        except IndexError:
+            return (self.determination[-1][1], 0.)
+        prev_time, prev_value = self.determination[x - 1]
+        t = float(at - prev_time) / (next_time - prev_time)
+        delta = next_value - prev_value
+        value = prev_value + t * delta
+        velocity = delta / (next_time - prev_time)
+        return (value, velocity)
+
     def current(self, at=None):
         """Predicts the current value.
 
         :param at: the time to observe. (default: now)
         """
-        at = now_or(at)
-        x = self.determination.bisect_left((at,))
-        if x == 0:
-            return self.determination[0][1]
-        try:
-            next_time, next_value = self.determination[x]
-        except IndexError:
-            return self.determination[-1][1]
-        prev_time, prev_value = self.determination[x - 1]
-        t = float(at - prev_time) / (next_time - prev_time)
-        value = prev_value + t * (next_value - prev_value)
-        return value
+        return self._current_value_and_velocity(at)[0]
 
     def velocity(self, at=None):
         """Predicts the current velocity.
 
         :param at: the time to observe. (default: now)
         """
-        at = now_or(at)
-        x = self.determination.bisect_left((at,))
-        if x == 0:
-            return 0
-        try:
-            next_time, next_value = self.determination[x]
-        except IndexError:
-            return 0
-        prev_time, prev_value = self.determination[x - 1]
-        return (next_value - prev_value) / (next_time - prev_time)
+        return self._current_value_and_velocity(at)[1]
 
     def incr(self, delta, limit=True, at=None):
         """Increases the value by the given delta immediately. The
@@ -176,9 +173,9 @@ class Gauge(object):
         else:
             momentum = Momentum(velocity_or_momentum, since, until)
         self.momenta.add(momentum)
-        self.plan.add((since, ADD, momentum))
+        self.plan.add((since, add, momentum))
         if until is not None:
-            self.plan.add((until, REMOVE, momentum))
+            self.plan.add((until, remove, momentum))
         del self.determination
         return momentum
 
@@ -208,31 +205,32 @@ class Gauge(object):
         del self.determination
 
     def determine(self):
+        """Determines the transformations from the time when the value set to
+        the farthest future.
+
+        :returns: a sorted list of the determination.
+        """
         determination = sortedlist(key=indexer(0))
+        # accumulated velocities and the sum of velocities
         velocities = []
-        prev_time = None
-        value = self.value
         total_velocity = 0
+        # variables not set
+        method = None
+        span = None
+        # default
+        time = self.set_at
+        value = self.value
+        # functions
+        deter = lambda time, value: determination.add((time, value))
+        time_to_reach = lambda goal: (goal - value) / total_velocity
+        # trivial variables
         x = 0
         while True:
-            try:
-                time, method, momentum = self.plan[x]
-            except IndexError:
-                break
-            if momentum not in self.momenta:
-                del self.plan[x]
-                # don't increase x
-                continue
-            # normalize time
-            if time is None:
-                time = self.set_at
+            if span is None:
+                # skip the first loop
+                pass
             else:
-                time = float(max(self.set_at, time))
-            if x == 0:
-                # at the first effective plan
-                determination.add((time, value))
-            elif time != prev_time:
-                span = time - prev_time
+                # calculate the change
                 if value > self.max:
                     limit = self.max
                     total_velocity = sum(v for v in velocities if v < 0)
@@ -244,11 +242,12 @@ class Gauge(object):
                     total_velocity = sum(velocities)
                 if limit is not None and total_velocity != 0:
                     # the previous value is out of the range
-                    d = (limit - value) / total_velocity
-                    if d < span:
-                        determination.add((prev_time + d, limit))
-                        value = limit
+                    d = time_to_reach(limit)
+                    if 0 < d < span:
                         span -= d
+                        prev_time += d
+                        value = limit
+                        deter(prev_time, value)
                         total_velocity = sum(velocities)
                 new_value = value + total_velocity * span
                 if new_value > self.max and total_velocity > 0:
@@ -257,51 +256,42 @@ class Gauge(object):
                     limit = self.min
                 else:
                     limit = None
-                if limit is not None:
-                    # the new value is out of the range
-                    d = (limit - value) / total_velocity
-                    if d != 0:
-                        determination.add((prev_time + d, limit))
-                        value = limit
-                else:
+                if limit is None:
                     value = new_value
-                determination.add((time, value))
-            # prepare next plan
-            if method == ADD:
+                else:
+                    # the new value is out of the range
+                    d = time_to_reach(limit)
+                    if 0 < d:
+                        value = limit
+                        deter(prev_time + d, value)
+            if span == inf:
+                # the final loop
+                break
+            elif span is None or span:
+                # determine the current point
+                deter(time, value)
+            # apply the current plan
+            if method == add:
                 velocities.append(momentum.velocity)
-            elif method == REMOVE:
+            elif method == remove:
                 velocities.remove(momentum.velocity)
+            # prepare the next iteration
             prev_time = time
+            try:
+                time, method, momentum = self.plan[x]
+            except IndexError:
+                span = inf
+                continue
+            if momentum not in self.momenta:
+                del self.plan[x]
+                continue
+            # normalize time
+            if time is None:
+                time = self.set_at
+            else:
+                time = float(max(self.set_at, time))
+            span = time - prev_time
             x += 1
-        # have an infinite momentum
-        total_velocity = sum(velocities)
-        if value > self.max:
-            limit = self.max
-            total_velocity = sum(v for v in velocities if v < 0)
-        elif value < self.min:
-            limit = self.min
-            total_velocity = sum(v for v in velocities if v > 0)
-        else:
-            limit = None
-            total_velocity = sum(velocities)
-        if limit is not None and total_velocity != 0:
-            # the previous value is out of the range
-            d = (limit - value) / total_velocity
-            prev_time += d
-            determination.add((prev_time, limit))
-            value = limit
-            total_velocity = sum(velocities)
-        if value < self.max and total_velocity > 0:
-            limit = self.max
-        elif value > self.min and total_velocity < 0:
-            limit = self.min
-        else:
-            limit = None
-        if limit is not None:
-            d = (limit - value) / total_velocity
-            determination.add((prev_time + d, limit))
-        if not determination:
-            determination.add((self.set_at, self.value))
         return determination
 
     def __repr__(self, at=None):
@@ -315,9 +305,19 @@ class Gauge(object):
 
 
 class Momentum(namedtuple('Momentum', ['velocity', 'since', 'until'])):
+    """A power of which increases or decreases the gauge continually between a
+    specific period.
+    """
 
     def __new__(cls, velocity, since=None, until=None):
+        velocity = float(velocity)
         return super(Momentum, cls).__new__(cls, velocity, since, until)
 
-    def __init__(self, velocity, since=None, until=None):
-        return super(Momentum, self).__init__(velocity, since, until)
+    def __repr__(self):
+        string = '<{0} {1:+.2f}/s'.format(type(self).__name__, self.velocity)
+        if self.since is not None or self.until is not None:
+            string += ' {0}~{1}'.format(
+                '' if self.since is None else self.since,
+                '' if self.until is None else self.until)
+        string += '>'
+        return string
