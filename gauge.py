@@ -15,7 +15,7 @@ from blist import sortedlist
 
 
 __all__ = ['Gauge', 'Momentum']
-__version__ = '0.0.3'
+__version__ = '0.0.4'
 
 
 add = 1
@@ -33,21 +33,33 @@ def indexer(x):
 
 class Gauge(object):
 
-    min = None
-    max = None
     value = 0
     set_at = None
-
     momenta = None
-    plan = None
 
-    def __init__(self, value, min=0, max=10, at=None):
-        self.min = min
-        self.max = max
+    def __init__(self, value, max, min=0, at=None):
+        self._max = max
+        self._min = min
         self.value = value
         self.set_at = now_or(at)
         self.momenta = sortedlist(key=indexer(2))
-        self.plan = sortedlist(key=indexer(0))
+        self._plan = sortedlist(key=indexer(0))
+
+    @property
+    def max(self):
+        return self._max
+
+    @max.setter
+    def max(self, max):
+        self.set_max(max)
+
+    @property
+    def min(self):
+        return self._min
+
+    @min.setter
+    def min(self, min):
+        self.set_min(min)
 
     @property
     def determination(self):
@@ -72,6 +84,32 @@ class Gauge(object):
             del self._determination
         except AttributeError:
             pass
+
+    def _set_limits(self, min=None, max=None, limit=True, at=None):
+        if limit:
+            at = now_or(at)
+            value = self.current(at)
+        if min is not None:
+            self._min = min
+        if max is not None:
+            self._max = max
+        if limit:
+            if max is not None and value > max:
+                limited = max
+            elif min is not None and value < min:
+                limited = min
+            else:
+                limited = None
+            if limited is not None:
+                self.forget_past(limited, at)
+                return
+        del self.determination
+
+    def set_max(self, max, limit=True, at=None):
+        self._set_limits(max=max, limit=limit, at=at)
+
+    def set_min(self, min, limit=True, at=None):
+        self._set_limits(min=min, limit=limit, at=at)
 
     def _current_value_and_velocity(self, at=None):
         at = now_or(at)
@@ -118,11 +156,11 @@ class Gauge(object):
         if limit:
             if delta > 0 and value > self.max:
                 raise ValueError(
-                    'The value to set is over the maximum ({0} > {1})'
+                    'The value to set is bigger than the maximum ({0} > {1})'
                     ''.format(value, self.max))
             elif delta < 0 and value < self.min:
                 raise ValueError(
-                    'The value to set is under the minimum ({0} < {1})'
+                    'The value to set is smaller than the minimum ({0} < {1})'
                     ''.format(value, self.min))
         self.forget_past(value, at)
         return value
@@ -173,9 +211,9 @@ class Gauge(object):
         else:
             momentum = Momentum(velocity_or_momentum, since, until)
         self.momenta.add(momentum)
-        self.plan.add((since, add, momentum))
+        self._plan.add((since, add, momentum))
         if until is not None:
-            self.plan.add((until, remove, momentum))
+            self._plan.add((until, remove, momentum))
         del self.determination
         return momentum
 
@@ -232,37 +270,37 @@ class Gauge(object):
             else:
                 # calculate the change
                 if value > self.max:
-                    limit = self.max
+                    limited = self.max
                     total_velocity = sum(v for v in velocities if v < 0)
                 elif value < self.min:
-                    limit = self.min
+                    limited = self.min
                     total_velocity = sum(v for v in velocities if v > 0)
                 else:
-                    limit = None
+                    limited = None
                     total_velocity = sum(velocities)
-                if limit is not None and total_velocity != 0:
+                if limited is not None and total_velocity != 0:
                     # the previous value is out of the range
-                    d = time_to_reach(limit)
+                    d = time_to_reach(limited)
                     if 0 < d < span:
                         span -= d
                         prev_time += d
-                        value = limit
+                        value = limited
                         deter(prev_time, value)
                         total_velocity = sum(velocities)
                 new_value = value + total_velocity * span
                 if new_value > self.max and total_velocity > 0:
-                    limit = self.max
+                    limited = self.max
                 elif new_value < self.min and total_velocity < 0:
-                    limit = self.min
+                    limited = self.min
                 else:
-                    limit = None
-                if limit is None:
+                    limited = None
+                if limited is None:
                     value = new_value
                 else:
                     # the new value is out of the range
-                    d = time_to_reach(limit)
+                    d = time_to_reach(limited)
                     if 0 < d:
-                        value = limit
+                        value = limited
                         deter(prev_time + d, value)
             if span == inf:
                 # the final loop
@@ -278,12 +316,12 @@ class Gauge(object):
             # prepare the next iteration
             prev_time = time
             try:
-                time, method, momentum = self.plan[x]
+                time, method, momentum = self._plan[x]
             except IndexError:
                 span = inf
                 continue
             if momentum not in self.momenta:
-                del self.plan[x]
+                del self._plan[x]
                 continue
             # normalize time
             if time is None:
@@ -294,14 +332,24 @@ class Gauge(object):
             x += 1
         return determination
 
+    def __getstate__(self):
+        return (self.value, self.set_at, self._max, self._min,
+                map(tuple, self.momenta))
+
+    def __setstate__(self, state):
+        value, set_at, max, min, momenta = state
+        self.__init__(value, max, min, set_at)
+        for momentum in momenta:
+            self.add_momentum(*momentum)
+
     def __repr__(self, at=None):
         at = now_or(at)
         current = self.current(at)
         if self.min == 0:
             fmt = '<{0} {1:.2f}/{2}>'
         else:
-            fmt = '<{0} {1:.2f}>'
-        return fmt.format(type(self).__name__, current, self.max)
+            fmt = '<{0} {1:.2f} between {3}~{2}>'
+        return fmt.format(type(self).__name__, current, self.max, self.min)
 
 
 class Momentum(namedtuple('Momentum', ['velocity', 'since', 'until'])):

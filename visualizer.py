@@ -154,7 +154,7 @@ class GaugeGraph(object):
             left = x * col
             if left > self.size[0]:
                 break
-            value = self.gauge.current(at + x - past, x == 0)
+            value = self.gauge.current(at + x - past)
             ratio = (1 - value / float(self.gauge.max)) / 2 + 0.25
             points.append((left, int(ratio * self.size[1])))
             x += 1
@@ -201,6 +201,14 @@ def main(gauge, fps=30, padding=0):
                         gauge.add_momentum(+10, at, later(4))
                     elif pressed[K_0]:
                         gauge.add_momentum(+10, at, later(2))
+                    elif pressed[K_p]:
+                        gauge.max += 10
+                    elif pressed[K_o]:
+                        gauge.max -= 10
+                    elif pressed[K_w]:
+                        gauge.min += 10
+                    elif pressed[K_q]:
+                        gauge.min -= 10
                     elif pressed[K_BACKQUOTE]:
                         gauge.forget_past(at=at)
                     elif pressed[K_SPACE]:
@@ -227,6 +235,6 @@ def main(gauge, fps=30, padding=0):
 
 
 if __name__ == '__main__':
-    g = Gauge(50, 0, 100)
+    g = Gauge(50, 100)
     g.add_momentum(+1)
     main(g, 5)
