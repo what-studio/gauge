@@ -90,23 +90,23 @@ def test_life():
     with t(0):
         life = Gauge(100, 100)
         life.add_momentum(-1)
-        assert life.current() == 100
+        assert life.get() == 100
     with t(1):
-        assert life.current() == 99
+        assert life.get() == 99
     with t(2):
-        assert life.current() == 98
+        assert life.get() == 98
     with t(10):
-        assert life.current() == 90
+        assert life.get() == 90
         life.incr(1)
-        assert life.current() == 91
+        assert life.get() == 91
     with t(11):
-        assert life.current() == 90
+        assert life.get() == 90
 
 
 def test_no_momentum():
     g = Gauge(1, 10, at=0)
     assert list(g.determination) == [(0, 1)]
-    assert g.current() == 1
+    assert g.get() == 1
 
 
 def test_limit():
@@ -114,9 +114,9 @@ def test_limit():
     with pytest.raises(ValueError):
         g.set(11)
     g.set(10)
-    assert g.current() == 10
+    assert g.get() == 10
     g.set(11, limit=False)
-    assert g.current() == 11
+    assert g.get() == 11
 
 
 def test_set_min_max():
@@ -139,6 +139,13 @@ def test_pickle():
     assert list(g2.determination) == [(0, 0), (5, 5), (7, 3), (14, 10)]
 
 
+def test_clear_momenta():
+    g = Gauge(0, 10, at=0)
+    g.add_momentum(+1)
+    g.clear_momenta(5)
+    assert list(g.determination) == [(5, 5)]
+
+
 def test_case1():
     g = Gauge(0, 5, at=0)
     g.add_momentum(+1)
@@ -158,17 +165,17 @@ def test_case2():
 
 def test_case3():
     g = Gauge(0, 10, at=0)
-    assert g.current(0) == 0
+    assert g.get(0) == 0
     g.add_momentum(+1, since=0)
-    assert g.current(10) == 10
+    assert g.get(10) == 10
     g.incr(3, limit=False, at=11)
-    assert g.current(11) == 13
+    assert g.get(11) == 13
     g.add_momentum(-1, since=13)
-    assert g.current(13) == 13
-    assert g.current(14) == 12
-    assert g.current(15) == 11
-    assert g.current(16) == 10
-    assert g.current(17) == 10
+    assert g.get(13) == 13
+    assert g.get(14) == 12
+    assert g.get(15) == 11
+    assert g.get(16) == 10
+    assert g.get(17) == 10
 
 
 def test_case4():
@@ -176,3 +183,8 @@ def test_case4():
     g.add_momentum(+1)
     g.add_momentum(+1)
     assert list(g.determination) == [(0, 0), (5, 10)]
+
+
+def test_deprecated_current():
+    g = Gauge(0, 10, at=0)
+    pytest.deprecated_call(g.current, 0)

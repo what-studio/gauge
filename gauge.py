@@ -10,12 +10,13 @@
 """
 from collections import namedtuple
 import time
+import warnings
 
 from blist import sortedlist
 
 
 __all__ = ['Gauge', 'Momentum']
-__version__ = '0.0.4'
+__version__ = '0.0.5'
 
 
 add = 1
@@ -88,7 +89,7 @@ class Gauge(object):
     def _set_limits(self, min=None, max=None, limit=True, at=None):
         if limit:
             at = now_or(at)
-            value = self.current(at)
+            value = self.get(at)
         if min is not None:
             self._min = min
         if max is not None:
@@ -127,7 +128,7 @@ class Gauge(object):
         velocity = delta / (next_time - prev_time)
         return (value, velocity)
 
-    def current(self, at=None):
+    def get(self, at=None):
         """Predicts the current value.
 
         :param at: the time to observe. (default: now)
@@ -152,7 +153,7 @@ class Gauge(object):
         :raises ValueError: the value is out of the range.
         """
         at = now_or(at)
-        value = self.current(at) + delta
+        value = self.get(at) + delta
         if limit:
             if delta > 0 and value > self.max:
                 raise ValueError(
@@ -188,7 +189,7 @@ class Gauge(object):
         :raises ValueError: the value is out of the range.
         """
         at = now_or(at)
-        return self.incr(value - self.current(at), limit, at)
+        return self.incr(value - self.get(at), limit, at)
 
     def add_momentum(self, velocity_or_momentum, since=None, until=None):
         """Adds a momentum. A momentum includes the velocity and the times to
@@ -225,6 +226,17 @@ class Gauge(object):
         self.momenta.remove(momentum)
         del self.determination
 
+    def clear_momenta(self, at=None):
+        """Removes all momenta. The value is set as the current value. The
+        determination would be changed.
+
+        :param at: the time base. (default: now)
+        """
+        at = now_or(at)
+        value = self.get(at)
+        del self.momenta[:]
+        self.set(value, False, at)
+
     def forget_past(self, value=None, at=None):
         """Discards the momenta which doesn't effect anymore.
 
@@ -233,7 +245,7 @@ class Gauge(object):
         """
         at = now_or(at)
         if value is None:
-            value = self.current(at)
+            value = self.get(at)
         self.value = value
         self.set_at = at
         # forget past momenta
@@ -316,12 +328,13 @@ class Gauge(object):
             # prepare the next iteration
             prev_time = time
             try:
-                time, method, momentum = self._plan[x]
+                while True:
+                    time, method, momentum = self._plan[x]
+                    if momentum in self.momenta:
+                        break
+                    del self._plan[x]
             except IndexError:
                 span = inf
-                continue
-            if momentum not in self.momenta:
-                del self._plan[x]
                 continue
             # normalize time
             if time is None:
@@ -344,12 +357,21 @@ class Gauge(object):
 
     def __repr__(self, at=None):
         at = now_or(at)
-        current = self.current(at)
+        value = self.get(at)
         if self.min == 0:
             fmt = '<{0} {1:.2f}/{2}>'
         else:
             fmt = '<{0} {1:.2f} between {3}~{2}>'
-        return fmt.format(type(self).__name__, current, self.max, self.min)
+        return fmt.format(type(self).__name__, value, self.max, self.min)
+
+    # deprecated features
+
+    def current(self, at=None):
+        # deprecated since v0.0.5
+        warnings.warn(DeprecationWarning('Use Gauge.get() instead'))
+        return self.get(at)
+
+    current.__doc__ = get.__doc__
 
 
 class Momentum(namedtuple('Momentum', ['velocity', 'since', 'until'])):
