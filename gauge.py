@@ -47,22 +47,6 @@ class Gauge(object):
         self._plan = sortedlist(key=indexer(0))
 
     @property
-    def max(self):
-        return self._max
-
-    @max.setter
-    def max(self, max):
-        self.set_max(max)
-
-    @property
-    def min(self):
-        return self._min
-
-    @min.setter
-    def min(self, min):
-        self.set_min(min)
-
-    @property
     def determination(self):
         """Returns the cached determination. If there's no the cache, it
         determines and caches that.
@@ -86,6 +70,22 @@ class Gauge(object):
         except AttributeError:
             pass
 
+    @property
+    def max(self):
+        return self._max
+
+    @max.setter
+    def max(self, max):
+        self.set_max(max)
+
+    @property
+    def min(self):
+        return self._min
+
+    @min.setter
+    def min(self, min):
+        self.set_min(min)
+
     def _set_limits(self, min=None, max=None, limit=True, at=None):
         if limit:
             at = now_or(at)
@@ -107,9 +107,23 @@ class Gauge(object):
         del self.determination
 
     def set_max(self, max, limit=True, at=None):
+        """Changes the maximum.
+
+        :param max: the value to set as the maximum.
+        :param limit: limits the current value to be below the new maximum.
+                      (default: ``True``)
+        :param at: the time to change. (default: now)
+        """
         self._set_limits(max=max, limit=limit, at=at)
 
     def set_min(self, min, limit=True, at=None):
+        """Changes the minimum.
+
+        :param min: the value to set as the minimum.
+        :param limit: limits the current value to be above the new minimum.
+                      (default: ``True``)
+        :param at: the time to change. (default: now)
+        """
         self._set_limits(min=min, limit=limit, at=at)
 
     def _current_value_and_velocity(self, at=None):
@@ -191,6 +205,23 @@ class Gauge(object):
         at = now_or(at)
         return self.incr(value - self.get(at), limit, at)
 
+    def when(self, value):
+        """When the gauge reaches to the goal value.
+
+        :param value: the goal value.
+
+        :raises ValueError: the gauge will not reach to the goal value.
+        """
+        if self.determination:
+            determination = self.determination
+            if determination[0][1] == value:
+                return determination[0][0]
+            for prev, next in zip(determination[:-1], determination[1:]):
+                if prev[1] < value <= next[1] or prev[1] > value >= next[1]:
+                    t = (value - prev[1]) / float(next[1] - prev[1])
+                    return prev[0] + (next[0] - prev[0]) * t
+        raise ValueError('The gauge will not reach to {0}'.format(value))
+
     def add_momentum(self, velocity_or_momentum, since=None, until=None):
         """Adds a momentum. A momentum includes the velocity and the times to
         start to affect and to stop to affect. The determination would be
@@ -236,6 +267,7 @@ class Gauge(object):
         value = self.get(at)
         del self.momenta[:]
         self.set(value, False, at)
+        return value
 
     def forget_past(self, value=None, at=None):
         """Discards the momenta which doesn't effect anymore.
@@ -253,6 +285,7 @@ class Gauge(object):
         stop = self.momenta.bisect_left(Momentum(0, until=at))
         del self.momenta[start:stop]
         del self.determination
+        return value
 
     def determine(self):
         """Determines the transformations from the time when the value set to

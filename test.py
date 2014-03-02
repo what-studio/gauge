@@ -146,6 +146,31 @@ def test_clear_momenta():
     assert list(g.determination) == [(5, 5)]
 
 
+def test_when():
+    g = Gauge(0, 10, at=0)
+    assert g.when(0) == 0
+    with pytest.raises(ValueError):
+        g.when(10)
+    g.add_momentum(+1)
+    assert g.when(10) == 10
+    g.add_momentum(+1, since=3, until=5)
+    assert g.when(10) == 8
+    g.add_momentum(-2, since=4, until=8)
+    assert g.when(0) == 0
+    assert g.when(1) == 1
+    assert g.when(2) == 2
+    assert g.when(3) == 3
+    assert g.when(4) == 3.5
+    assert g.when(5) == 4
+    assert g.when(6) == 12
+    assert g.when(7) == 13
+    assert g.when(8) == 14
+    assert g.when(9) == 15
+    assert g.when(10) == 16
+    with pytest.raises(ValueError):
+        g.when(11)
+
+
 def test_case1():
     g = Gauge(0, 5, at=0)
     g.add_momentum(+1)
