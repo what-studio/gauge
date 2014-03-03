@@ -1,4 +1,6 @@
+![Gauge Logo](artwork/logo.png)
+
 gauge
 =====
 
-Deterministic gauge library
+Deterministic linear gauge library.
