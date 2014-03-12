@@ -16,7 +16,7 @@ from blist import sortedlist
 
 
 __all__ = ['Gauge', 'Momentum']
-__version__ = '0.0.5'
+__version__ = '0.0.6'
 
 
 add = 1
@@ -403,7 +403,7 @@ class Gauge(object):
 
     def __setstate__(self, state):
         value, set_at, max, min, momenta = state
-        self.__init__(value, max, min, set_at)
+        self.__init__(value, max=max, min=min, at=set_at)
         for momentum in momenta:
             self.add_momentum(*momentum)
 
