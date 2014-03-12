@@ -143,7 +143,14 @@ def test_clear_momenta():
     g = Gauge(0, 10, at=0)
     g.add_momentum(+1)
     g.clear_momenta(5)
+    assert g.get(5) == 5
     assert list(g.determination) == [(5, 5)]
+    # clear momenta when the value is out of the range
+    g.add_momentum(+1)
+    g.set(15, limit=False, at=10)
+    g.clear_momenta(10)
+    assert g.get(10) == 15
+    assert list(g.determination) == [(10, 15)]
 
 
 def test_when():
