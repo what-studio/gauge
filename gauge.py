@@ -266,7 +266,7 @@ class Gauge(object):
         del self.determination
 
     def _coerce_and_remove_momenta(self, value=None, at=None,
-                                start=None, stop=None):
+                                   start=None, stop=None):
         """Coerces to set the value and removes the momenta between indexes of
         ``start`` and ``stop``.
 
@@ -322,6 +322,8 @@ class Gauge(object):
         # default
         time = self.set_at
         value = self.value
+        momentum = None
+        prev_time = None
         # functions
         deter = lambda time, value: determination.add((time, value))
         time_to_reach = lambda goal: (goal - value) / total_velocity
