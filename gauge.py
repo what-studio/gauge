@@ -89,7 +89,7 @@ class Gauge(object):
     def _set_limits(self, min=None, max=None, limit=True, at=None):
         if limit:
             at = now_or(at)
-            value = self.get(at)
+            value = self.get(at=at)
         if min is not None:
             self._min = min
         if max is not None:
@@ -102,7 +102,7 @@ class Gauge(object):
             else:
                 limited = None
             if limited is not None:
-                self.forget_past(limited, at)
+                self.forget_past(limited, at=at)
                 return
         del self.determination
 
@@ -167,7 +167,7 @@ class Gauge(object):
         :raises ValueError: the value is out of the range.
         """
         at = now_or(at)
-        value = self.get(at) + delta
+        value = self.get(at=at) + delta
         if limit:
             if delta > 0 and value > self.max:
                 raise ValueError(
@@ -177,7 +177,7 @@ class Gauge(object):
                 raise ValueError(
                     'The value to set is smaller than the minimum ({0} < {1})'
                     ''.format(value, self.min))
-        self.forget_past(value, at)
+        self.forget_past(value, at=at)
         return value
 
     def decr(self, delta, limit=True, at=None):
@@ -190,7 +190,7 @@ class Gauge(object):
 
         :raises ValueError: the value is out of the range.
         """
-        return self.incr(-delta, limit, at)
+        return self.incr(-delta, limit=limit, at=at)
 
     def set(self, value, limit=True, at=None):
         """Sets the current value immediately. The determination would be
@@ -203,7 +203,7 @@ class Gauge(object):
         :raises ValueError: the value is out of the range.
         """
         at = now_or(at)
-        return self.incr(value - self.get(at), limit, at)
+        return self.incr(value - self.get(at=at), limit=limit, at=at)
 
     def when(self, value):
         """When the gauge reaches to the goal value.
@@ -264,9 +264,9 @@ class Gauge(object):
         :param at: the time base. (default: now)
         """
         at = now_or(at)
-        value = self.get(at)
+        value = self.get(at=at)
         del self.momenta[:]
-        self.set(value, False, at)
+        self.set(value, limit=False, at=at)
         return value
 
     def forget_past(self, value=None, at=None):
@@ -277,7 +277,7 @@ class Gauge(object):
         """
         at = now_or(at)
         if value is None:
-            value = self.get(at)
+            value = self.get(at=at)
         self.value = value
         self.set_at = at
         # forget past momenta
@@ -384,13 +384,13 @@ class Gauge(object):
 
     def __setstate__(self, state):
         value, set_at, max, min, momenta = state
-        self.__init__(value, max, min, set_at)
+        self.__init__(value, max=max, min=min, at=set_at)
         for momentum in momenta:
             self.add_momentum(*momentum)
 
     def __repr__(self, at=None):
         at = now_or(at)
-        value = self.get(at)
+        value = self.get(at=at)
         if self.min == 0:
             fmt = '<{0} {1:.2f}/{2}>'
         else:
@@ -402,7 +402,7 @@ class Gauge(object):
     def current(self, at=None):
         # deprecated since v0.0.5
         warnings.warn(DeprecationWarning('Use Gauge.get() instead'))
-        return self.get(at)
+        return self.get(at=at)
 
     current.__doc__ = get.__doc__
 
