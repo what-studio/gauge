@@ -33,9 +33,17 @@ def indexer(x):
 
 
 class Gauge(object):
+    """Represents a gauge. A gauge has a value at any moment. It can be
+    modified by an user's adjustment or an effective momentum.
+    """
 
+    #: The value set by an user.
     value = 0
+
+    #: The time when the value was set.
     set_at = None
+
+    #: A sorted list of momenta. The items are :class:`Momentum` objects.
     momenta = None
 
     def __init__(self, value, max, min=0, at=None):
@@ -268,17 +276,35 @@ class Gauge(object):
         self.momenta.remove(momentum)
         del self.determination
 
-    def clear_momenta(self, at=None):
+    def _coerce_and_remove_momenta(self, value=None, at=None,
+                                   start=None, stop=None):
+        """Coerces to set the value and removes the momenta between indexes of
+        ``start`` and ``stop``.
+
+        :param value: the value to set coercively. (default: the current value)
+        :param at: the time to set. (default: now)
+        :param start: the starting index of momentum removal.
+                      (default: the first)
+        :param stop: the stopping index of momentum removal.
+                     (default: the last)
+        """
+        at = now_or(at)
+        if value is None:
+            value = self.get(at=at)
+        self.value = value
+        self.set_at = at
+        del self.momenta[start:stop]
+        del self.determination
+        return value
+
+    def clear_momenta(self, value=None, at=None):
         """Removes all momenta. The value is set as the current value. The
         determination would be changed.
 
+        :param value: the value to set coercively.
         :param at: the time base. (default: now)
         """
-        at = now_or(at)
-        value = self.get(at=at)
-        del self.momenta[:]
-        self.set(value, limit=False, at=at)
-        return value
+        return self._coerce_and_remove_momenta(value, at)
 
     def forget_past(self, value=None, at=None):
         """Discards the momenta which doesn't effect anymore.
@@ -287,16 +313,9 @@ class Gauge(object):
         :param at: the time base. (default: now)
         """
         at = now_or(at)
-        if value is None:
-            value = self.get(at=at)
-        self.value = value
-        self.set_at = at
-        # forget past momenta
         start = self.momenta.bisect_right(Momentum(0, until=None))
         stop = self.momenta.bisect_left(Momentum(0, until=at))
-        del self.momenta[start:stop]
-        del self.determination
-        return value
+        return self._coerce_and_remove_momenta(value, at, start, stop)
 
     def determine(self):
         """Determines the transformations from the time when the value set to
@@ -314,6 +333,8 @@ class Gauge(object):
         # default
         time = self.set_at
         value = self.value
+        momentum = None
+        prev_time = None
         # functions
         deter = lambda time, value: determination.add((time, value))
         time_to_reach = lambda goal: (goal - value) / total_velocity

@@ -142,15 +142,18 @@ def test_pickle():
 def test_clear_momenta():
     g = Gauge(0, 10, at=0)
     g.add_momentum(+1)
-    g.clear_momenta(5)
+    g.clear_momenta(at=5)
     assert g.get(5) == 5
     assert list(g.determination) == [(5, 5)]
     # clear momenta when the value is out of the range
     g.add_momentum(+1)
     g.set(15, limit=False, at=10)
-    g.clear_momenta(10)
+    g.clear_momenta(at=10)
     assert g.get(10) == 15
     assert list(g.determination) == [(10, 15)]
+    # coerce to set a value with Gauge.clear_momenta()
+    g.clear_momenta(100)
+    assert g.get() == 100
 
 
 def test_when():
