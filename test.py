@@ -220,3 +220,26 @@ def test_case4():
 def test_deprecated_current():
     g = Gauge(0, 10, at=0)
     pytest.deprecated_call(g.current, 0)
+
+
+def test_remove_momentum():
+    g = Gauge(0, 10, at=0)
+    m1 = g.add_momentum(+1)
+    m2 = g.add_momentum(Momentum(+1))
+    g.add_momentum(+2, since=10)
+    g.add_momentum(-3, until=100)
+    assert len(g.momenta) == 4
+    g.remove_momentum(m2)
+    assert len(g.momenta) == 3
+    assert m1 in g.momenta
+    assert m2 in g.momenta
+    g.remove_momentum(m2)
+    assert len(g.momenta) == 2
+    assert m1 not in g.momenta
+    assert m2 not in g.momenta
+    with pytest.raises(ValueError):
+        g.remove_momentum(+2)
+    g.remove_momentum(+2, since=10)
+    assert len(g.momenta) == 1
+    g.remove_momentum(Momentum(-3, until=100))
+    assert not g.momenta

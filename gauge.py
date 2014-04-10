@@ -16,7 +16,7 @@ from blist import sortedlist
 
 
 __all__ = ['Gauge', 'Momentum']
-__version__ = '0.0.6'
+__version__ = '0.0.7'
 
 
 add = 1
@@ -222,6 +222,15 @@ class Gauge(object):
                     return prev[0] + (next[0] - prev[0]) * t
         raise ValueError('The gauge will not reach to {0}'.format(value))
 
+    def _make_momentum(self, velocity_or_momentum, since=None, until=None):
+        if isinstance(velocity_or_momentum, Momentum):
+            assert since is until is None
+            momentum = velocity_or_momentum
+        else:
+            velocity = velocity_or_momentum
+            momentum = Momentum(velocity, since, until)
+        return momentum
+
     def add_momentum(self, velocity_or_momentum, since=None, until=None):
         """Adds a momentum. A momentum includes the velocity and the times to
         start to affect and to stop to affect. The determination would be
@@ -237,11 +246,7 @@ class Gauge(object):
         :returns: a momentum object. Use this to remove the momentum by
                   :meth:`remove_momentum`.
         """
-        if isinstance(velocity_or_momentum, Momentum):
-            assert since is until is None
-            momentum = velocity_or_momentum
-        else:
-            momentum = Momentum(velocity_or_momentum, since, until)
+        momentum = self._make_momentum(velocity_or_momentum, since, until)
         self.momenta.add(momentum)
         self._plan.add((since, add, momentum))
         if until is not None:
@@ -249,11 +254,17 @@ class Gauge(object):
         del self.determination
         return momentum
 
-    def remove_momentum(self, momentum):
+    def remove_momentum(self, velocity_or_momentum, since=None, until=None):
         """Removes the given momentum. The determination would be changed.
 
-        :param momentum: the :class:`Momentum` object to remove.
+        :param velocity_or_momentum: a :class:`Momentum` object or just a
+                                     number for the velocity.
+        :param since: if the first argument is a velocity, it is the time to
+                      start to affect the momentum. (default: ``None``)
+        :param until: if the first argument is a velocity, it is the time to
+                      finish to affect the momentum. (default: ``None``)
         """
+        momentum = self._make_momentum(velocity_or_momentum, since, until)
         self.momenta.remove(momentum)
         del self.determination
 
@@ -308,6 +319,8 @@ class Gauge(object):
         time_to_reach = lambda goal: (goal - value) / total_velocity
         # trivial variables
         x = 0
+        momentum = None
+        prev_time = None
         while True:
             if span is None:
                 # skip the first loop
