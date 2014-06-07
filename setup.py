@@ -38,7 +38,7 @@ setup(
                  'Programming Language :: Python :: Implementation :: CPython',
                  'Programming Language :: Python :: Implementation :: PyPy',
                  'Topic :: Games/Entertainment'],
-    install_requires=['sortedcontainer'],
+    install_requires=['sortedcontainers'],
     tests_require=['pytest'],
     test_suite='.',
 )
