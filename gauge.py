@@ -395,7 +395,6 @@ class Gauge(object):
             try:
                 while True:
                     time, method, momentum = self._plan[x]
-                    print momentum, self.momenta, momentum in self.momenta, '@'
                     if momentum in self.momenta:
                         break
                     del self._plan[x]
