@@ -8,15 +8,17 @@
     :copyright: (c) 2013-2014 by Heungsub Lee
     :license: BSD, see LICENSE for more details.
 """
+from bisect import bisect_left
 from collections import namedtuple
+from functools import total_ordering
 import time
 import warnings
 
-from blist import sortedlist
+from sortedcontainers import SortedList
 
 
 __all__ = ['Gauge', 'Momentum']
-__version__ = '0.0.8'
+__version__ = '0.0.9.dev'
 
 
 add = 1
@@ -26,10 +28,6 @@ inf = float('inf')
 
 def now_or(at):
     return time.time() if at is None else float(at)
-
-
-def indexer(x):
-    return lambda v: v[x]
 
 
 class Gauge(object):
@@ -51,8 +49,8 @@ class Gauge(object):
         self._min = min
         self.value = value
         self.set_at = now_or(at)
-        self.momenta = sortedlist(key=indexer(2))
-        self._plan = sortedlist(key=indexer(0))
+        self.momenta = Momenta()
+        self._plan = SortedList()
 
     @property
     def determination(self):
@@ -313,8 +311,8 @@ class Gauge(object):
         :param at: the time base. (default: now)
         """
         at = now_or(at)
-        start = self.momenta.bisect_right(Momentum(0, until=None))
-        stop = self.momenta.bisect_left(Momentum(0, until=at))
+        start = self.momenta.bisect_right(None)
+        stop = self.momenta.bisect_left(at)
         return self._coerce_and_remove_momenta(value, at, start, stop)
 
     def determine(self):
@@ -323,7 +321,7 @@ class Gauge(object):
 
         :returns: a sorted list of the determination.
         """
-        determination = sortedlist(key=indexer(0))
+        determination = SortedList()
         # accumulated velocities and the sum of velocities
         velocities = []
         total_velocity = 0
@@ -397,6 +395,7 @@ class Gauge(object):
             try:
                 while True:
                     time, method, momentum = self._plan[x]
+                    print momentum, self.momenta, momentum in self.momenta, '@'
                     if momentum in self.momenta:
                         break
                     del self._plan[x]
@@ -458,3 +457,72 @@ class Momentum(namedtuple('Momentum', ['velocity', 'since', 'until'])):
                 '' if self.until is None else self.until)
         string += '>'
         return string
+
+
+class Momenta(SortedList):
+
+    @total_ordering
+    class key(object):
+
+        def __init__(self, momentum):
+            self.momentum = momentum
+
+        def __eq__(self, other):
+            try:
+                return self.momentum.until == other.until
+            except AttributeError:
+                return self.momentum.until == other
+
+        def __lt__(self, other):
+            try:
+                return self.momentum.until < other.until
+            except AttributeError:
+                return self.momentum.until < other
+
+        def __iter__(self):
+            return iter(self.momentum)
+
+    def add(self, momentum):
+        return super(Momenta, self).add(self.key(momentum))
+
+    def remove(self, momentum):
+        if self._maxes is None:
+            raise ValueError
+        pos = bisect_left(self._maxes, self.key(momentum))
+        if pos == len(self._maxes):
+            raise ValueError
+        idx = bisect_left(self._lists[pos], self.key(momentum))
+        if self._lists[pos][idx].momentum == momentum:
+            self._delete(pos, idx)
+        else:
+            raise ValueError
+
+    def index(self, momentum):
+        return super(Momenta, self).index(self.key(momentum))
+
+    def __getitem__(self, idx):
+        return super(Momenta, self).__getitem__(idx).momentum
+
+    def __contains__(self, momentum):
+        if self._maxes is None:
+            return False
+        momentum_key = self.key(momentum)
+        pos = bisect_left(self._maxes, momentum)
+        if pos == len(self._maxes):
+            return False
+        l = self._lists[pos]
+        idx = bisect_left(l, momentum_key)
+        while l[idx] == momentum_key:
+            if l[idx].momentum == momentum:
+                return True
+            idx += 1
+        return False
+
+    def __iter__(self):
+        for key in super(Momenta, self).__iter__():
+            yield key.momentum
+
+    def __repr__(self):
+        return '{0}([{1}])'.format(
+            type(self).__name__,
+            ', '.join(repr(m) for m in self))

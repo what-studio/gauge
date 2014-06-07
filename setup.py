@@ -36,8 +36,9 @@ setup(
                  'Operating System :: OS Independent',
                  'Programming Language :: Python',
                  'Programming Language :: Python :: Implementation :: CPython',
+                 'Programming Language :: Python :: Implementation :: PyPy',
                  'Topic :: Games/Entertainment'],
-    install_requires=['blist'],
+    install_requires=['sortedcontainer'],
     tests_require=['pytest'],
     test_suite='.',
 )
