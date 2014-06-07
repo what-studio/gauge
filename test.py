@@ -36,8 +36,6 @@ def test_over_max():
     g = Gauge(12, 10, at=0)
     g.add_momentum(+1, since=0, until=4)
     g.add_momentum(-2, since=0, until=4)
-    print g.momenta
-    print list(g.momenta)
     assert list(g.determination) == [(0, 12), (1, 10), (4, 7)]
     g = Gauge(12, 10, at=0)
     g.add_momentum(+1, since=1, until=6)
