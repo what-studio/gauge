@@ -8,17 +8,15 @@
     :copyright: (c) 2013-2014 by Heungsub Lee
     :license: BSD, see LICENSE for more details.
 """
-from bisect import bisect_left
 from collections import namedtuple
-from functools import total_ordering
 import time
 import warnings
 
-from sortedcontainers import SortedList
+from sortedcontainers import SortedList, SortedListWithKey
 
 
 __all__ = ['Gauge', 'Momentum']
-__version__ = '0.0.9.dev'
+__version__ = '0.0.9'
 
 
 add = 1
@@ -49,7 +47,7 @@ class Gauge(object):
         self._min = min
         self.value = value
         self.set_at = now_or(at)
-        self.momenta = Momenta()
+        self.momenta = SortedListWithKey(key=lambda m: m[-1])  # sort by until
         self._plan = SortedList()
 
     @property
@@ -311,8 +309,8 @@ class Gauge(object):
         :param at: the time base. (default: now)
         """
         at = now_or(at)
-        start = self.momenta.bisect_right(None)
-        stop = self.momenta.bisect_left(at)
+        start = self.momenta.bisect_left((at,))
+        stop = self.momenta.bisect_right((None,))
         return self._coerce_and_remove_momenta(value, at, start, stop)
 
     def determine(self):
@@ -456,72 +454,3 @@ class Momentum(namedtuple('Momentum', ['velocity', 'since', 'until'])):
                 '' if self.until is None else self.until)
         string += '>'
         return string
-
-
-class Momenta(SortedList):
-
-    @total_ordering
-    class key(object):
-
-        def __init__(self, momentum):
-            self.momentum = momentum
-
-        def __eq__(self, other):
-            try:
-                return self.momentum.until == other.until
-            except AttributeError:
-                return self.momentum.until == other
-
-        def __lt__(self, other):
-            try:
-                return self.momentum.until < other.until
-            except AttributeError:
-                return self.momentum.until < other
-
-        def __iter__(self):
-            return iter(self.momentum)
-
-    def add(self, momentum):
-        return super(Momenta, self).add(self.key(momentum))
-
-    def remove(self, momentum):
-        if self._maxes is None:
-            raise ValueError
-        pos = bisect_left(self._maxes, self.key(momentum))
-        if pos == len(self._maxes):
-            raise ValueError
-        idx = bisect_left(self._lists[pos], self.key(momentum))
-        if self._lists[pos][idx].momentum == momentum:
-            self._delete(pos, idx)
-        else:
-            raise ValueError
-
-    def index(self, momentum):
-        return super(Momenta, self).index(self.key(momentum))
-
-    def __getitem__(self, idx):
-        return super(Momenta, self).__getitem__(idx).momentum
-
-    def __contains__(self, momentum):
-        if self._maxes is None:
-            return False
-        momentum_key = self.key(momentum)
-        pos = bisect_left(self._maxes, momentum)
-        if pos == len(self._maxes):
-            return False
-        l = self._lists[pos]
-        idx = bisect_left(l, momentum_key)
-        while l[idx] == momentum_key:
-            if l[idx].momentum == momentum:
-                return True
-            idx += 1
-        return False
-
-    def __iter__(self):
-        for key in super(Momenta, self).__iter__():
-            yield key.momentum
-
-    def __repr__(self):
-        return '{0}([{1}])'.format(
-            type(self).__name__,
-            ', '.join(repr(m) for m in self))
