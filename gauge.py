@@ -16,7 +16,7 @@ from sortedcontainers import SortedList, SortedListWithKey
 
 
 __all__ = ['Gauge', 'Momentum']
-__version__ = '0.0.9'
+__version__ = '0.0.10'
 
 
 add = 1
@@ -309,8 +309,8 @@ class Gauge(object):
         :param at: the time base. (default: now)
         """
         at = now_or(at)
-        start = self.momenta.bisect_left((at,))
-        stop = self.momenta.bisect_right((None,))
+        start = self.momenta.bisect_right((inf, inf, None))
+        stop = self.momenta.bisect_left((-inf, -inf, at))
         return self._coerce_and_remove_momenta(value, at, start, stop)
 
     def determine(self):

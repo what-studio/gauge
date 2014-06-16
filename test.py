@@ -261,3 +261,21 @@ def test_momenta_order():
     assert g.get(3) == 13
     assert g.get(4) == 18
     assert g.get(5) == 21
+
+
+def test_forget_past():
+    g = Gauge(0, 50, at=0)
+    g.add_momentum(+1, since=0, until=5)
+    g.add_momentum(0, since=0)
+    g.add_momentum(0, until=999)
+    assert g.get(0) == 0
+    assert g.get(1) == 1
+    assert g.get(2) == 2
+    assert g.get(3) == 3
+    assert g.get(4) == 4
+    assert g.get(5) == 5
+    assert g.get(10) == 5
+    assert g.get(20) == 5
+    assert len(g.momenta) == 3
+    g.forget_past(at=30)
+    assert len(g.momenta) == 2
