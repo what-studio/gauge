@@ -16,7 +16,7 @@ from sortedcontainers import SortedList, SortedListWithKey
 
 
 __all__ = ['Gauge', 'Momentum']
-__version__ = '0.0.10'
+__version__ = '0.0.11'
 
 
 add = 1
@@ -132,14 +132,19 @@ class Gauge(object):
 
     def _current_value_and_velocity(self, at=None):
         at = now_or(at)
-        x = self.determination.bisect_left((at,))
+        determination = self.determination
+        if len(determination) == 1:
+            # skip bisect_left() because it is expensive
+            x = 0
+        else:
+            x = determination.bisect_left((at,))
         if x == 0:
-            return (self.determination[0][1], 0.)
+            return (determination[0][1], 0.)
         try:
-            next_time, next_value = self.determination[x]
+            next_time, next_value = determination[x]
         except IndexError:
-            return (self.determination[-1][1], 0.)
-        prev_time, prev_value = self.determination[x - 1]
+            return (determination[-1][1], 0.)
+        prev_time, prev_value = determination[x - 1]
         t = float(at - prev_time) / (next_time - prev_time)
         delta = next_value - prev_value
         value = prev_value + t * delta
