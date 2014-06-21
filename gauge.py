@@ -16,12 +16,16 @@ from sortedcontainers import SortedList, SortedListWithKey
 
 
 __all__ = ['Gauge', 'Momentum']
-__version__ = '0.0.11'
+__version__ = '0.0.12'
 
 
 add = 1
 remove = 0
 inf = float('inf')
+
+
+def deprecate(message, *args, **kwargs):
+    warnings.warn(DeprecationWarning(message.format(*args, **kwargs)))
 
 
 def now_or(at):
@@ -90,15 +94,19 @@ class Gauge(object):
     def min(self, min):
         self.set_min(min)
 
-    def _set_limits(self, min=None, max=None, limit=True, at=None):
-        if limit:
+    def _set_limits(self, min=None, max=None, clamp=True, limit=None, at=None):
+        if limit is not None:
+            clamp = limit
+            # deprecated since v0.0.12
+            deprecate('Use clamp={0} instead of limit={0}', limit)
+        if clamp:
             at = now_or(at)
             value = self.get(at=at)
         if min is not None:
             self._min = min
         if max is not None:
             self._max = max
-        if limit:
+        if clamp:
             if max is not None and value > max:
                 limited = max
             elif min is not None and value < min:
@@ -110,25 +118,25 @@ class Gauge(object):
                 return
         del self.determination
 
-    def set_max(self, max, limit=True, at=None):
+    def set_max(self, max, clamp=True, limit=None, at=None):
         """Changes the maximum.
 
         :param max: the value to set as the maximum.
-        :param limit: limits the current value to be below the new maximum.
+        :param clamp: limits the current value to be below the new maximum.
                       (default: ``True``)
         :param at: the time to change. (default: now)
         """
-        self._set_limits(max=max, limit=limit, at=at)
+        self._set_limits(max=max, clamp=clamp, limit=limit, at=at)
 
-    def set_min(self, min, limit=True, at=None):
+    def set_min(self, min, clamp=True, limit=None, at=None):
         """Changes the minimum.
 
         :param min: the value to set as the minimum.
-        :param limit: limits the current value to be above the new minimum.
+        :param clamp: limits the current value to be above the new minimum.
                       (default: ``True``)
         :param at: the time to change. (default: now)
         """
-        self._set_limits(min=min, limit=limit, at=at)
+        self._set_limits(min=min, clamp=clamp, limit=limit, at=at)
 
     def _current_value_and_velocity(self, at=None):
         at = now_or(at)
@@ -165,7 +173,7 @@ class Gauge(object):
         """
         return self._current_value_and_velocity(at)[1]
 
-    def incr(self, delta, limit=True, at=None):
+    def incr(self, delta, over=False, clamp=False, limit=None, at=None):
         """Increases the value by the given delta immediately. The
         determination would be changed.
 
@@ -175,21 +183,35 @@ class Gauge(object):
 
         :raises ValueError: the value is out of the range.
         """
+        if limit is not None:
+            over = not limit
+            # deprecated since v0.0.12
+            deprecate('Use over={0} instead of limit={1}', over, limit)
         at = now_or(at)
-        value = self.get(at=at) + delta
-        if limit:
+        prev_value = self.get(at=at)
+        value = prev_value + delta
+        if over:
+            pass
+        elif clamp:
+            if delta > 0:
+                if prev_value > self.max:
+                    return prev_value
+                value = self.max
+            elif delta < 0:
+                if prev_value < self.min:
+                    return prev_value
+                value = self.min
+        else:
             if delta > 0 and value > self.max:
-                raise ValueError(
-                    'The value to set is bigger than the maximum ({0} > {1})'
-                    ''.format(value, self.max))
+                raise ValueError('The value to set is bigger than the '
+                                 'maximum ({0} > {1})'.format(value, self.max))
             elif delta < 0 and value < self.min:
-                raise ValueError(
-                    'The value to set is smaller than the minimum ({0} < {1})'
-                    ''.format(value, self.min))
+                raise ValueError('The value to set is smaller than the '
+                                 'minimum ({0} < {1})'.format(value, self.min))
         self.forget_past(value, at=at)
         return value
 
-    def decr(self, delta, limit=True, at=None):
+    def decr(self, delta, over=False, clamp=False, limit=None, at=None):
         """Decreases the value by the given delta immediately. The
         determination would be changed.
 
@@ -199,9 +221,9 @@ class Gauge(object):
 
         :raises ValueError: the value is out of the range.
         """
-        return self.incr(-delta, limit=limit, at=at)
+        return self.incr(-delta, over=over, clamp=clamp, limit=limit, at=at)
 
-    def set(self, value, limit=True, at=None):
+    def set(self, value, over=False, clamp=False, limit=None, at=None):
         """Sets the current value immediately. The determination would be
         changed.
 
@@ -212,7 +234,8 @@ class Gauge(object):
         :raises ValueError: the value is out of the range.
         """
         at = now_or(at)
-        return self.incr(value - self.get(at=at), limit=limit, at=at)
+        delta = value - self.get(at=at)
+        return self.incr(delta, over=over, clamp=clamp, limit=limit, at=at)
 
     def when(self, value):
         """When the gauge reaches to the goal value.
@@ -442,7 +465,7 @@ class Gauge(object):
 
     def current(self, at=None):
         # deprecated since v0.0.5
-        warnings.warn(DeprecationWarning('Use Gauge.get() instead'))
+        deprecate('Use Gauge.get() instead')
         return self.get(at=at)
 
     current.__doc__ = get.__doc__

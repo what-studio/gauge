@@ -18,6 +18,13 @@ def t(timestamp):
         time.time = orig_time
 
 
+def test_deprecations():
+    g = Gauge(0, 10, at=0)
+    pytest.deprecated_call(g.current, 0)
+    pytest.deprecated_call(g.set, 0, limit=True)
+    pytest.deprecated_call(g.set_max, 0, limit=True)
+
+
 def test_in_range():
     g = Gauge(12, 100, at=0)
     g.add_momentum(+1, since=1, until=6)
@@ -109,14 +116,24 @@ def test_no_momentum():
     assert g.get() == 1
 
 
-def test_limit():
+def test_over():
     g = Gauge(1, 10)
     with pytest.raises(ValueError):
         g.set(11)
     g.set(10)
     assert g.get() == 10
-    g.set(11, limit=False)
+    g.set(11, over=True)
     assert g.get() == 11
+
+
+def test_clamp():
+    g = Gauge(1, 10)
+    g.set(11, clamp=True)
+    assert g.get() == 10
+    g.incr(100, clamp=True)
+    assert g.get() == 10
+    g.decr(100, clamp=True)
+    assert g.get() == 0
 
 
 def test_set_min_max():
@@ -147,7 +164,7 @@ def test_clear_momenta():
     assert list(g.determination) == [(5, 5)]
     # clear momenta when the value is out of the range
     g.add_momentum(+1)
-    g.set(15, limit=False, at=10)
+    g.set(15, over=True, at=10)
     g.clear_momenta(at=10)
     assert g.get(10) == 15
     assert list(g.determination) == [(10, 15)]
@@ -211,7 +228,7 @@ def test_case3():
     assert g.get(0) == 0
     g.add_momentum(+1, since=0)
     assert g.get(10) == 10
-    g.incr(3, limit=False, at=11)
+    g.incr(3, over=True, at=11)
     assert g.get(11) == 13
     g.add_momentum(-1, since=13)
     assert g.get(13) == 13
@@ -226,11 +243,6 @@ def test_case4():
     g.add_momentum(+1)
     g.add_momentum(+1)
     assert list(g.determination) == [(0, 0), (5, 10)]
-
-
-def test_deprecated_current():
-    g = Gauge(0, 10, at=0)
-    pytest.deprecated_call(g.current, 0)
 
 
 def test_remove_momentum():
