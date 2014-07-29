@@ -181,6 +181,14 @@ def test_when():
         g.when(11)
 
 
+def test_since_gte_until():
+    g = Gauge(0, 10, at=0)
+    with pytest.raises(ValueError):
+        g.add_momentum(+1, since=1, until=1)
+    with pytest.raises(ValueError):
+        g.add_momentum(+1, since=2, until=1)
+
+
 def test_case1():
     g = Gauge(0, 5, at=0)
     g.add_momentum(+1)

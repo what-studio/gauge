@@ -249,7 +249,13 @@ class Gauge(object):
 
         :returns: a momentum object. Use this to remove the momentum by
                   :meth:`remove_momentum`.
+
+        :raises ValueError: `since` later than or same with `until`.
         """
+        if since is None or until is None or since < until:
+            pass
+        else:
+            raise ValueError('\'since\' should be earlier than \'until\'')
         momentum = self._make_momentum(velocity_or_momentum, since, until)
         self.momenta.add(momentum)
         self._plan.add((since, add, momentum))
