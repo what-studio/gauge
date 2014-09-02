@@ -16,7 +16,7 @@ from sortedcontainers import SortedList, SortedListWithKey
 
 
 __all__ = ['Gauge', 'Momentum']
-__version__ = '0.0.12'
+__version__ = '0.0.13'
 
 
 add = 1
@@ -193,14 +193,10 @@ class Gauge(object):
         if over:
             pass
         elif clamp:
-            if delta > 0:
-                if prev_value > self.max:
-                    return prev_value
-                value = self.max
-            elif delta < 0:
-                if prev_value < self.min:
-                    return prev_value
-                value = self.min
+            if delta > 0 and value > self.max:
+                value = max(prev_value, self.max)
+            elif delta < 0 and value < self.min:
+                value = min(prev_value, self.min)
         else:
             if delta > 0 and value > self.max:
                 raise ValueError('The value to set is bigger than the '
