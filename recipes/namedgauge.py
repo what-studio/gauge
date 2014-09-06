@@ -146,3 +146,18 @@ def test_multiple_momenta():
         g.remove_momentum(-1, since=1, until=11)
     g.remove_momentum(-1, since=1, until=11, name='bar')
     assert g.velocity(5) == -1
+
+
+def test_snap():
+    g = NamedGauge(50, 100, at=0)
+    g.add_momentum(-1)
+    g.add_momentum(+2, since=0, until=10, name='test')
+    assert g.get(5) == 55
+    assert g.get(10) == 60
+    assert g.get(20) == 50
+    g.incr(0, at=5)
+    assert g.get(5) == 55
+    g.update_momentum_by_name('test', velocity=+3, since=5)
+    assert g.get(5) == 55
+    assert g.get(10) == 65
+    assert g.get(20) == 55
