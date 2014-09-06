@@ -308,3 +308,13 @@ def test_forget_past():
     assert len(g.momenta) == 3
     g.forget_past(at=30)
     assert len(g.momenta) == 2
+
+
+def test_extensibility_of_make_momentum():
+    class MyGauge(Gauge):
+        def _make_momentum(self, *args):
+            args = args[::-1]
+            return super(MyGauge, self)._make_momentum(*args)
+    g = MyGauge(0, 10, at=0)
+    m = g.add_momentum(3, 2, 1)
+    assert m == (1, 2, 3)

@@ -153,11 +153,13 @@ def test_snap_momentum_by_name():
     g = NamedGauge(50, 100, at=0)
     g.add_momentum(-1)
     g.add_momentum(+2, since=0, until=10, name='test')
+    assert g.get(1) == 51
     assert g.get(5) == 55
     assert g.get(10) == 60
     assert g.get(20) == 50
     g.snap_momentum_by_name('test', +3, at=5)
-    assert g.get(5) == 55
+    assert g.get(1) == 55  # the past was forgotten.
+    assert g.get(5) == 55  # but the gauge remembers the effect from the past.
     assert g.get(10) == 65
     assert g.get(20) == 55
 
