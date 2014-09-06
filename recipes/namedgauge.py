@@ -31,7 +31,15 @@ class NamedGauge(Gauge):
         return momentum
 
     def get_momentum_by_name(self, name):
-        """Gets a momentum by the given name."""
+        """Gets a momentum by the given name.
+
+        :param name: the momentum name.
+
+        :returns: a momentum found.
+
+        :raises TypeError: `name` is ``None``.
+        :raises KeyError: failed to find a momentum named `name`.
+        """
         if name is None:
             raise TypeError('\'name\' should not be None')
         for momentum in self.momenta:
@@ -40,26 +48,38 @@ class NamedGauge(Gauge):
         raise KeyError('No such momentum named {0}'.format(name))
 
     def pop_momentum_by_name(self, name):
+        """Removes and returns a momentum by the given name.
+
+        :param name: the momentum name.
+
+        :returns: a momentum removed.
+
+        :raises TypeError: `name` is ``None``.
+        :raises KeyError: failed to find a momentum named `name`.
+        """
         momentum = self.get_momentum_by_name(name)
         self.remove_momentum(momentum)
         return momentum
 
     def update_momentum_by_name(self, name, **kwargs):
+        """Updates a momentum by the given name.
+
+        :param name: the momentum name.
+        :param velocity: (keyword-only) a new value for `velocity`.
+        :param since: (keyword-only) a new value for `since`.
+        :param until: (keyword-only) a new value for `until`.
+
+        :returns: a momentum updated.
+
+        :raises TypeError: `name` is ``None``.
+        :raises KeyError: failed to find a momentum named `name`.
+        """
         momentum = self.pop_momentum_by_name(name)
         velocity, since, until = momentum[:3]
-        try:
-            velocity = kwargs['velocity']
-        except KeyError:
-            pass
-        try:
-            since = kwargs['since']
-        except KeyError:
-            pass
-        try:
-            until = kwargs['until']
-        except KeyError:
-            pass
-        self.add_momentum(velocity, since, until, name)
+        velocity = kwargs.get('velocity', velocity)
+        since = kwargs.get('since', since)
+        until = kwargs.get('until', until)
+        return self.add_momentum(velocity, since, until, name)
 
 
 def test_basic():
