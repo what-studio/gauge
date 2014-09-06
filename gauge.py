@@ -16,7 +16,7 @@ from sortedcontainers import SortedList, SortedListWithKey
 
 
 __all__ = ['Gauge', 'Momentum']
-__version__ = '0.0.13'
+__version__ = '0.0.14'
 
 
 add = 1
