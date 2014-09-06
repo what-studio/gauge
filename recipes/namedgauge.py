@@ -1,14 +1,20 @@
 # -*- coding: utf-8 -*-
+"""A recipe to implement named gauge. Named gauge keeps momenta and their
+names. You can manipulate a specific momentum by the name you named.
+
+Test it by `py.test <http://pytest.org/>`_:
+
+.. sourcecode:: console
+
+   $ py.test recipes/namedgauge.py
+
+"""
 from collections import namedtuple
 
 from gauge import Gauge, Momentum
 
 
-_NamedMomentum = \
-    namedtuple('NamedMomentum', ['velocity', 'since', 'until', 'name'])
-
-
-class NamedMomentum(_NamedMomentum, Momentum):
+class NamedMomentum(namedtuple('_', 'velocity, since, until, name'), Momentum):
 
     pass
 
@@ -27,6 +33,9 @@ class NamedGauge(Gauge):
         return NamedMomentum(velocity, since, until, name)
 
     def get_momentum_by_name(self, name):
+        """Gets a momentum by the given name."""
+        if name is None:
+            raise TypeError('\'name\' should not be None')
         for momentum in self.momenta:
             if momentum.name == name:
                 return momentum
@@ -75,6 +84,19 @@ def test_named_momentum():
     g = NamedGauge(50, 100, at=0)
     m = g.add_momentum(+1, since=0, until=10)
     assert isinstance(m, NamedMomentum)
+
+
+def test_get_momentum_by_name():
+    import pytest
+    g = NamedGauge(50, 100, at=0)
+    g.add_momentum(+1, since=0, until=10)
+    g.add_momentum(+2, since=0, until=10)
+    g.add_momentum(+3, since=0, until=10, name='test')
+    with pytest.raises(TypeError):
+        g.get_momentum_by_name(None)
+    m = g.get_momentum_by_name('test')
+    assert m.velocity == +3
+    assert m.name == 'test'
 
 
 def test_pop_momentum_by_name():
