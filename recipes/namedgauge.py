@@ -11,7 +11,7 @@ Test it by `py.test <http://pytest.org/>`_:
 """
 from collections import namedtuple
 
-from gauge import Gauge, Momentum
+from gauge import Gauge, Momentum, now_or
 
 
 class NamedMomentum(namedtuple('_', 'velocity, since, until, name'), Momentum):
@@ -81,6 +81,22 @@ class NamedGauge(Gauge):
         until = kwargs.get('until', until)
         return self.add_momentum(velocity, since, until, name)
 
+    def snap_momentum_by_name(self, name, velocity, at=None):
+        """Changes the velocity of a momentum named `name`.
+
+        :param name: the momentum name.
+        :param velocity: a new velocity.
+        :param at: the time to snap. (default: now)
+
+        :returns: a momentum updated.
+
+        :raises TypeError: `name` is ``None``.
+        :raises KeyError: failed to find a momentum named `name`.
+        """
+        at = now_or(at)
+        self.incr(0, at=at)
+        return self.update_momentum_by_name(name, velocity=velocity, since=at)
+
 
 def test_basic():
     g = NamedGauge(50, 100, at=0)
@@ -133,6 +149,19 @@ def test_update_momentum_by_name():
     assert g.get(15) == 65
 
 
+def test_snap_momentum_by_name():
+    g = NamedGauge(50, 100, at=0)
+    g.add_momentum(-1)
+    g.add_momentum(+2, since=0, until=10, name='test')
+    assert g.get(5) == 55
+    assert g.get(10) == 60
+    assert g.get(20) == 50
+    g.snap_momentum_by_name('test', +3, at=5)
+    assert g.get(5) == 55
+    assert g.get(10) == 65
+    assert g.get(20) == 55
+
+
 def test_multiple_momenta():
     import pytest
     g = NamedGauge(50, 100, at=0)
@@ -146,18 +175,3 @@ def test_multiple_momenta():
         g.remove_momentum(-1, since=1, until=11)
     g.remove_momentum(-1, since=1, until=11, name='bar')
     assert g.velocity(5) == -1
-
-
-def test_snap():
-    g = NamedGauge(50, 100, at=0)
-    g.add_momentum(-1)
-    g.add_momentum(+2, since=0, until=10, name='test')
-    assert g.get(5) == 55
-    assert g.get(10) == 60
-    assert g.get(20) == 50
-    g.incr(0, at=5)
-    assert g.get(5) == 55
-    g.update_momentum_by_name('test', velocity=+3, since=5)
-    assert g.get(5) == 55
-    assert g.get(10) == 65
-    assert g.get(20) == 55
