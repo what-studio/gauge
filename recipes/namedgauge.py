@@ -25,12 +25,10 @@ class NamedGauge(Gauge):
                        since=None, until=None, name=None):
         base = super(NamedGauge, self)
         momentum = base._make_momentum(velocity_or_momentum, since, until)
-        velocity, since, until = momentum[:3]
-        try:
-            name = momentum.name
-        except AttributeError:
-            pass
-        return NamedMomentum(velocity, since, until, name)
+        if not isinstance(momentum, NamedMomentum):
+            velocity, since, until = momentum
+            momentum = NamedMomentum(velocity, since, until, name)
+        return momentum
 
     def get_momentum_by_name(self, name):
         """Gets a momentum by the given name."""
