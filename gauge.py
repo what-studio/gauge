@@ -16,7 +16,7 @@ from sortedcontainers import SortedList, SortedListWithKey
 
 
 __all__ = ['Gauge', 'Momentum']
-__version__ = '0.0.12'
+__version__ = '0.0.13'
 
 
 add = 1
@@ -51,7 +51,7 @@ class Gauge(object):
         self._min = min
         self.value = value
         self.set_at = now_or(at)
-        self.momenta = SortedListWithKey(key=lambda m: m[-1])  # sort by until
+        self.momenta = SortedListWithKey(key=lambda m: m[2])  # sort by until
         self._plan = SortedList()
 
     @property
@@ -255,18 +255,9 @@ class Gauge(object):
         raise ValueError('The gauge will not reach to {0}'.format(value))
 
     def _make_momentum(self, velocity_or_momentum, since=None, until=None):
-        if isinstance(velocity_or_momentum, Momentum):
-            assert since is until is None
-            momentum = velocity_or_momentum
-        else:
-            velocity = velocity_or_momentum
-            momentum = Momentum(velocity, since, until)
-        return momentum
+        """Makes a :class:`Momentum` object by the given arguments.
 
-    def add_momentum(self, velocity_or_momentum, since=None, until=None):
-        """Adds a momentum. A momentum includes the velocity and the times to
-        start to affect and to stop to affect. The determination would be
-        changed.
+        Override this if you want to use your own momentum class.
 
         :param velocity_or_momentum: a :class:`Momentum` object or just a
                                      number for the velocity.
@@ -275,16 +266,37 @@ class Gauge(object):
         :param until: if the first argument is a velocity, it is the time to
                       finish to affect the momentum. (default: ``None``)
 
-        :returns: a momentum object. Use this to remove the momentum by
-                  :meth:`remove_momentum`.
-
         :raises ValueError: `since` later than or same with `until`.
+        :raises TypeError: the first argument is a momentum, but other
+                           arguments passed.
         """
+        if isinstance(velocity_or_momentum, Momentum):
+            if not (since is until is None):
+                raise TypeError('Arguments behine the first argument as a '
+                                'momentum should be None')
+            momentum = velocity_or_momentum
+        else:
+            velocity = velocity_or_momentum
+            momentum = Momentum(velocity, since, until)
+        since, until = momentum.since, momentum.until
         if since is None or until is None or since < until:
             pass
         else:
             raise ValueError('\'since\' should be earlier than \'until\'')
-        momentum = self._make_momentum(velocity_or_momentum, since, until)
+        return momentum
+
+    def add_momentum(self, *args, **kwargs):
+        """Adds a momentum. A momentum includes the velocity and the times to
+        start to affect and to stop to affect. The determination would be
+        changed.
+
+        All arguments will be passed to :meth:`_make_momentum`.
+
+        :returns: a momentum object. Use this to remove the momentum by
+                  :meth:`remove_momentum`.
+        """
+        momentum = self._make_momentum(*args, **kwargs)
+        since, until = momentum.since, momentum.until
         self.momenta.add(momentum)
         self._plan.add((since, add, momentum))
         if until is not None:
@@ -292,18 +304,18 @@ class Gauge(object):
         del self.determination
         return momentum
 
-    def remove_momentum(self, velocity_or_momentum, since=None, until=None):
+    def remove_momentum(self, *args, **kwargs):
         """Removes the given momentum. The determination would be changed.
 
-        :param velocity_or_momentum: a :class:`Momentum` object or just a
-                                     number for the velocity.
-        :param since: if the first argument is a velocity, it is the time to
-                      start to affect the momentum. (default: ``None``)
-        :param until: if the first argument is a velocity, it is the time to
-                      finish to affect the momentum. (default: ``None``)
+        All arguments will be passed to :meth:`_make_momentum`.
+
+        :raises ValueError: the given momentum not in the gauge.
         """
-        momentum = self._make_momentum(velocity_or_momentum, since, until)
-        self.momenta.remove(momentum)
+        momentum = self._make_momentum(*args, **kwargs)
+        try:
+            self.momenta.remove(momentum)
+        except ValueError:
+            raise ValueError('{0} not in the gauge'.format(momentum))
         del self.determination
 
     def _coerce_and_remove_momenta(self, value=None, at=None,
