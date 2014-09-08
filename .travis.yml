@@ -3,5 +3,9 @@ python:
 - 2.6
 - 2.7
 - pypy
+install:
+- pip install coveralls
 script:
-- python setup.py test
+- coverage run --source=gauge setup.py test
+after_success:
+- coveralls
