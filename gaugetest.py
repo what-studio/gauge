@@ -2,6 +2,7 @@
 from contextlib import contextmanager
 import pickle
 import time
+import types
 
 import pytest
 
@@ -205,6 +206,23 @@ def test_when():
     assert g.when(10) == 16
     with pytest.raises(ValueError):
         g.when(11)
+
+
+def test_whenever():
+    g = Gauge(0, 10, at=0)
+    g.add_momentum(+1)
+    g.add_momentum(-2, since=3, until=4)
+    g.add_momentum(-2, since=5, until=6)
+    g.add_momentum(-2, since=7, until=8)
+    assert g.when(3) == 3
+    assert g.when(3, after=1) == 5
+    assert g.when(3, after=2) == 7
+    assert g.when(3, after=3) == 9
+    with pytest.raises(ValueError):
+        g.when(3, after=4)
+    whenever = g.whenever(3)
+    assert isinstance(whenever, types.GeneratorType)
+    assert list(whenever) == [3, 5, 7, 9]
 
 
 def test_since_gte_until():

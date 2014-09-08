@@ -33,7 +33,7 @@ def now_or(at):
 
 
 class Gauge(object):
-    """Represents a gauge. A gauge has a value at any moment. It can be
+    """Represents a gauge.  A gauge has a value at any moment.  It can be
     modified by an user's adjustment or an effective momentum.
     """
 
@@ -43,7 +43,7 @@ class Gauge(object):
     #: The time when the value was set.
     set_at = None
 
-    #: A sorted list of momenta. The items are :class:`Momentum` objects.
+    #: A sorted list of momenta.  The items are :class:`Momentum` objects.
     momenta = None
 
     def __init__(self, value, max, min=0, at=None):
@@ -56,7 +56,7 @@ class Gauge(object):
 
     @property
     def determination(self):
-        """Returns the cached determination. If there's no the cache, it
+        """Returns the cached determination.  If there's no the cache, it
         determines and caches that.
 
         A determination is a sorted list of 2-dimensional points which take
@@ -70,7 +70,7 @@ class Gauge(object):
 
     @determination.deleter
     def determination(self):
-        """Clears the cached determination. If you touches the determination
+        """Clears the cached determination.  If you touches the determination
         at the next first time, that will be redetermined.
         """
         try:
@@ -124,7 +124,7 @@ class Gauge(object):
         :param max: the value to set as the maximum.
         :param clamp: limits the current value to be below the new maximum.
                       (default: ``True``)
-        :param at: the time to change. (default: now)
+        :param at: the time to change.  (default: now)
         """
         self._set_limits(max=max, clamp=clamp, limit=limit, at=at)
 
@@ -134,7 +134,7 @@ class Gauge(object):
         :param min: the value to set as the minimum.
         :param clamp: limits the current value to be above the new minimum.
                       (default: ``True``)
-        :param at: the time to change. (default: now)
+        :param at: the time to change.  (default: now)
         """
         self._set_limits(min=min, clamp=clamp, limit=limit, at=at)
 
@@ -162,24 +162,24 @@ class Gauge(object):
     def get(self, at=None):
         """Predicts the current value.
 
-        :param at: the time to observe. (default: now)
+        :param at: the time to observe.  (default: now)
         """
         return self._current_value_and_velocity(at)[0]
 
     def velocity(self, at=None):
         """Predicts the current velocity.
 
-        :param at: the time to observe. (default: now)
+        :param at: the time to observe.  (default: now)
         """
         return self._current_value_and_velocity(at)[1]
 
     def incr(self, delta, over=False, clamp=False, limit=None, at=None):
-        """Increases the value by the given delta immediately. The
+        """Increases the value by the given delta immediately.  The
         determination would be changed.
 
         :param delta: the value to increase.
-        :param limit: checks if the value is in the range. (default: ``True``)
-        :param at: the time to increase. (default: now)
+        :param limit: checks if the value is in the range.  (default: ``True``)
+        :param at: the time to increase.  (default: now)
 
         :raises ValueError: the value is out of the range.
         """
@@ -208,24 +208,24 @@ class Gauge(object):
         return value
 
     def decr(self, delta, over=False, clamp=False, limit=None, at=None):
-        """Decreases the value by the given delta immediately. The
+        """Decreases the value by the given delta immediately.  The
         determination would be changed.
 
         :param delta: the value to decrease.
-        :param limit: checks if the value is in the range. (default: ``True``)
-        :param at: the time to decrease. (default: now)
+        :param limit: checks if the value is in the range.  (default: ``True``)
+        :param at: the time to decrease.  (default: now)
 
         :raises ValueError: the value is out of the range.
         """
         return self.incr(-delta, over=over, clamp=clamp, limit=limit, at=at)
 
     def set(self, value, over=False, clamp=False, limit=None, at=None):
-        """Sets the current value immediately. The determination would be
+        """Sets the current value immediately.  The determination would be
         changed.
 
         :param value: the value to set.
-        :param limit: checks if the value is in the range. (default: ``True``)
-        :param at: the time to set. (default: now)
+        :param limit: checks if the value is in the range.  (default: ``True``)
+        :param at: the time to set.  (default: now)
 
         :raises ValueError: the value is out of the range.
         """
@@ -233,22 +233,35 @@ class Gauge(object):
         delta = value - self.get(at=at)
         return self.incr(delta, over=over, clamp=clamp, limit=limit, at=at)
 
-    def when(self, value):
+    def when(self, value, after=0):
         """When the gauge reaches to the goal value.
 
         :param value: the goal value.
+        :param after: take (n+1)th time.  (default: 0)
 
         :raises ValueError: the gauge will not reach to the goal value.
+        """
+        x = 0
+        for x, at in enumerate(self.whenever(value)):
+            if x == after:
+                return at
+        form = 'The gauge will not reach to {0}' + \
+               (' more than {1} times' if x else '')
+        raise ValueError(form.format(value, x))
+
+    def whenever(self, value):
+        """Yields multiple times when the gauge reaches to the goal value.
+
+        :param value: the goal value.
         """
         if self.determination:
             determination = self.determination
             if determination[0][1] == value:
-                return determination[0][0]
+                yield determination[0][0]
             for prev, next in zip(determination[:-1], determination[1:]):
                 if prev[1] < value <= next[1] or prev[1] > value >= next[1]:
                     t = (value - prev[1]) / float(next[1] - prev[1])
-                    return prev[0] + (next[0] - prev[0]) * t
-        raise ValueError('The gauge will not reach to {0}'.format(value))
+                    yield prev[0] + (next[0] - prev[0]) * t
 
     def _make_momentum(self, velocity_or_momentum, since=None, until=None):
         """Makes a :class:`Momentum` object by the given arguments.
@@ -258,9 +271,9 @@ class Gauge(object):
         :param velocity_or_momentum: a :class:`Momentum` object or just a
                                      number for the velocity.
         :param since: if the first argument is a velocity, it is the time to
-                      start to affect the momentum. (default: ``None``)
+                      start to affect the momentum.  (default: ``None``)
         :param until: if the first argument is a velocity, it is the time to
-                      finish to affect the momentum. (default: ``None``)
+                      finish to affect the momentum.  (default: ``None``)
 
         :raises ValueError: `since` later than or same with `until`.
         :raises TypeError: the first argument is a momentum, but other
@@ -282,13 +295,13 @@ class Gauge(object):
         return momentum
 
     def add_momentum(self, *args, **kwargs):
-        """Adds a momentum. A momentum includes the velocity and the times to
-        start to affect and to stop to affect. The determination would be
+        """Adds a momentum.  A momentum includes the velocity and the times to
+        start to affect and to stop to affect.  The determination would be
         changed.
 
         All arguments will be passed to :meth:`_make_momentum`.
 
-        :returns: a momentum object. Use this to remove the momentum by
+        :returns: a momentum object.  Use this to remove the momentum by
                   :meth:`remove_momentum`.
         """
         momentum = self._make_momentum(*args, **kwargs)
@@ -301,7 +314,7 @@ class Gauge(object):
         return momentum
 
     def remove_momentum(self, *args, **kwargs):
-        """Removes the given momentum. The determination would be changed.
+        """Removes the given momentum.  The determination would be changed.
 
         All arguments will be passed to :meth:`_make_momentum`.
 
@@ -319,8 +332,9 @@ class Gauge(object):
         """Coerces to set the value and removes the momenta between indexes of
         ``start`` and ``stop``.
 
-        :param value: the value to set coercively. (default: the current value)
-        :param at: the time to set. (default: now)
+        :param value: the value to set coercively.  (default: the current
+                      value)
+        :param at: the time to set.  (default: now)
         :param start: the starting index of momentum removal.
                       (default: the first)
         :param stop: the stopping index of momentum removal.
@@ -336,11 +350,11 @@ class Gauge(object):
         return value
 
     def clear_momenta(self, value=None, at=None):
-        """Removes all momenta. The value is set as the current value. The
+        """Removes all momenta.  The value is set as the current value.  The
         determination would be changed.
 
         :param value: the value to set coercively.
-        :param at: the time base. (default: now)
+        :param at: the time base.  (default: now)
         """
         return self._coerce_and_remove_momenta(value, at)
 
@@ -348,7 +362,7 @@ class Gauge(object):
         """Discards the momenta which doesn't effect anymore.
 
         :param value: the value to set coercively.
-        :param at: the time base. (default: now)
+        :param at: the time base.  (default: now)
         """
         at = now_or(at)
         start = self.momenta.bisect_right((inf, inf, None))
