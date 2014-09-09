@@ -121,6 +121,10 @@ def test_over():
     g = Gauge(1, 10)
     with pytest.raises(ValueError):
         g.set(11)
+    with pytest.raises(ValueError):
+        g.incr(100)
+    with pytest.raises(ValueError):
+        g.decr(100)
     g.set(10)
     assert g.get() == 10
     g.set(11, over=True)
@@ -147,6 +151,22 @@ def test_clamp():
 
 
 def test_set_min_max():
+    # without momentum
+    g = Gauge(5, 10)
+    assert g.max == 10
+    assert g.min == 0
+    assert g.get() == 5
+    g.max = 100
+    g.min = 10
+    assert g.max == 100
+    assert g.min == 10
+    assert g.get() == 10
+    g.min = 0
+    g.max = 5
+    assert g.max == 5
+    assert g.min == 0
+    assert g.get() == 5
+    # with momentum
     g = Gauge(5, 10, at=0)
     g.add_momentum(+1)
     assert list(g.determination) == [(0, 5), (5, 10)]
@@ -164,6 +184,16 @@ def test_pickle():
     data = pickle.dumps(g)
     g2 = pickle.loads(data)
     assert list(g2.determination) == [(0, 0), (5, 5), (7, 3), (14, 10)]
+
+
+def test_make_momentum():
+    g = Gauge(0, 10, at=0)
+    m = g.add_momentum(+1)
+    assert isinstance(m, Momentum)
+    with pytest.raises(TypeError):
+        g.add_momentum(m, since=1)
+    with pytest.raises(TypeError):
+        g.add_momentum(m, until=2)
 
 
 def test_clear_momenta():
@@ -231,6 +261,15 @@ def test_since_gte_until():
         g.add_momentum(+1, since=1, until=1)
     with pytest.raises(ValueError):
         g.add_momentum(+1, since=2, until=1)
+
+
+def test_repr():
+    g = Gauge(0, 10, at=0)
+    assert repr(g) == '<Gauge 0.00/10>'
+    g.set_min(-10, at=0)
+    assert repr(g) == '<Gauge 0.00 between -10~10>'
+    m = Momentum(+100, since=10, until=20)
+    assert repr(m) == '<Momentum +100.00/s 10~20>'
 
 
 def test_case1():

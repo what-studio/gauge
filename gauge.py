@@ -477,11 +477,9 @@ class Gauge(object):
     def __repr__(self, at=None):
         at = now_or(at)
         value = self.get(at=at)
-        if self.min == 0:
-            fmt = '<{0} {1:.2f}/{2}>'
-        else:
-            fmt = '<{0} {1:.2f} between {3}~{2}>'
-        return fmt.format(type(self).__name__, value, self.max, self.min)
+        form = '<{0} {1:.2f}'
+        form += '/{2}>' if self.min == 0 else ' between {3}~{2}>'
+        return form.format(type(self).__name__, value, self.max, self.min)
 
     # deprecated features
 
