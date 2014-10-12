@@ -160,11 +160,15 @@ def test_set_min_max():
     g.min = 10
     assert g.max == 100
     assert g.min == 10
+    assert g.get() == 5
+    g.set_min(10, clamp=True)
     assert g.get() == 10
     g.min = 0
     g.max = 5
     assert g.max == 5
     assert g.min == 0
+    assert g.get() == 10
+    g.set_max(5, clamp=True)
     assert g.get() == 5
     # with momentum
     g = Gauge(5, 10, at=0)
@@ -172,7 +176,7 @@ def test_set_min_max():
     assert list(g.determination) == [(0, 5), (5, 10)]
     g.set_max(50, at=0)
     assert list(g.determination) == [(0, 5), (45, 50)]
-    g.set_min(40, at=0)
+    g.set_min(40, clamp=True, at=0)
     assert list(g.determination) == [(0, 40), (10, 50)]
 
 

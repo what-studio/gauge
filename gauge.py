@@ -94,7 +94,8 @@ class Gauge(object):
     def min(self, min):
         self.set_min(min)
 
-    def _set_limits(self, min=None, max=None, clamp=True, limit=None, at=None):
+    def _set_limits(self, min=None, max=None,
+                    clamp=False, limit=None, at=None):
         if limit is not None:
             clamp = limit
             # deprecated since v0.0.12
@@ -118,7 +119,7 @@ class Gauge(object):
                 return
         del self.determination
 
-    def set_max(self, max, clamp=True, limit=None, at=None):
+    def set_max(self, max, clamp=False, limit=None, at=None):
         """Changes the maximum.
 
         :param max: the value to set as the maximum.
@@ -128,7 +129,7 @@ class Gauge(object):
         """
         self._set_limits(max=max, clamp=clamp, limit=limit, at=at)
 
-    def set_min(self, min, clamp=True, limit=None, at=None):
+    def set_min(self, min, clamp=False, limit=None, at=None):
         """Changes the minimum.
 
         :param min: the value to set as the minimum.
