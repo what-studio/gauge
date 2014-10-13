@@ -9,6 +9,7 @@
     :license: BSD, see LICENSE for more details.
 """
 from collections import namedtuple
+import math
 import time
 import warnings
 
@@ -401,7 +402,7 @@ class Gauge(object):
                           since=self.set_at, until=None)
 
     def determine2(self):
-        determination = []
+        determination = SortedList()
         velocities = []
         velocity = 0
         value = self.value
@@ -417,7 +418,9 @@ class Gauge(object):
         import click
         print
         def deter(at, value, ctx):
-            determination.append((at, value))
+            if determination and determination[-1][0] == at:
+                return
+            determination.add((at, value))
             click.secho(' => {0:.0f}: {1} ({2})'
                         ''.format(at, value, ctx), fg='green')
         def calc_velocity():
@@ -437,7 +440,10 @@ class Gauge(object):
             return {None: None, HEAD: head, FOOT: foot}[bound]
         def repr_seg(seg):
             return '{0:.0f}{1:+.0f}/s in {2}~{3}'.format(*seg)
+        deter(prev_time, value, 'init')
         for at, method, momentum in self._plan:
+            if at is None:
+                at = self.set_at
             click.echo('{0} bound={1} overlapped={2}'.format(
                 click.style(' {0} '.format(at), fg='cyan', reverse=True),
                 click.style(str(bound), fg='cyan' if bound else ''),
@@ -511,7 +517,7 @@ class Gauge(object):
                         overlapped = True
                         velocity = calc_velocity()
                     break
-            if at != prev_time:
+            if at is not None and at != prev_time:
                 value += velocity * (at - prev_time)
                 deter(at, value, 'normal')
             # prepare the next iteration
@@ -522,9 +528,20 @@ class Gauge(object):
             prev_time = at
             velocity = calc_velocity()
         if velocity:
-            finalized_at = min(head_until, foot_until)
-            value += velocity * (finalized_at - prev_time)
-            deter(finalized_at, value, 'final')
+            finalized_at = min(or_inf(head.until), or_inf(foot.until))
+            if math.isinf(finalized_at):
+                seg = Segment(value, velocity, prev_time, None)
+                for boundary in [head, foot]:
+                    print seg, boundary
+                    try:
+                        intersection = seg.intersect(boundary)
+                    except ValueError:
+                        continue
+                    deter(intersection[0], intersection[1], 'final.inter')
+                    break
+            else:
+                value += velocity * (finalized_at - prev_time)
+                deter(finalized_at, value, 'final')
         return determination
 
     def determine(self):
@@ -533,6 +550,7 @@ class Gauge(object):
 
         :returns: a sorted list of the determination.
         """
+        # return self.determine2()
         determination = SortedList()
         # accumulated velocities and the sum of velocities
         velocities = []
@@ -672,16 +690,35 @@ class Momentum(namedtuple('Momentum', ['velocity', 'since', 'until'])):
 class Segment(namedtuple('Segment', ['value', 'velocity', 'since', 'until'])):
 
     def get(self, at):
-        if self.since is None or self.until is None:
+        if self.since is None:
             assert self.velocity == 0
             return self.value
-        elif not self.since <= at <= self.until:
+        elif not self.since <= at <= or_inf(self.until):
             raise ValueError('Out of range')
         return self.value + self.velocity * (at - self.since)
 
     def final(self):
         return self.get(self.until)
 
+    def intersect(self, seg):
+        # y-intercepts
+        y_intercept = (self.value - self.velocity * self.since)
+        seg_y_intercept = (seg.value - seg.velocity * seg.since)
+        try:
+            at = (seg_y_intercept - y_intercept) / \
+                 (self.velocity - seg.velocity)
+        except ZeroDivisionError:
+            raise ValueError('Parallel segment')
+        since = max(self.since, seg.since)
+        until = min(or_inf(self.until), or_inf(seg.until))
+        if since <= at <= until:
+            pass
+        else:
+            raise ValueError('Intersection not in the range')
+        value = self.get(at)
+        return (at, value)
+
+        '''
     @staticmethod
     def _intersect(line1, line2):
         x_diff = (line1[0][0] - line1[1][0], line2[0][0] - line2[1][0])
@@ -694,8 +731,6 @@ class Segment(namedtuple('Segment', ['value', 'velocity', 'since', 'until'])):
         x = det(d, x_diff) / div
         y = det(d, y_diff) / div
         return (x, y)
-
-    def intersect(self, seg):
         f = lambda x1, x2: x2 if x1 is None else x1
         line1 = ((f(self.since, seg.since), self.value),
                  (f(self.until, seg.until), self.final()))
@@ -709,3 +744,4 @@ class Segment(namedtuple('Segment', ['value', 'velocity', 'since', 'until'])):
         else:
             raise ValueError('No intersection')
         return (at, value)
+        '''
