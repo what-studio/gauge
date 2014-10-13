@@ -24,6 +24,8 @@ ADD = 1
 REMOVE = 0
 HEAD = 'HEAD'
 FOOT = 'FOOT'
+AT = 0
+VALUE = 1
 
 
 inf = float('inf')
@@ -161,11 +163,11 @@ class Gauge(object):
         else:
             x = determination.bisect_left((at,))
         if x == 0:
-            return (determination[0][1], 0.)
+            return (determination[0][VALUE], 0.)
         try:
             next_time, next_value = determination[x]
         except IndexError:
-            return (determination[-1][1], 0.)
+            return (determination[-1][VALUE], 0.)
         prev_time, prev_value = determination[x - 1]
         t = float(at - prev_time) / (next_time - prev_time)
         delta = next_value - prev_value
@@ -178,14 +180,16 @@ class Gauge(object):
 
         :param at: the time to observe.  (default: now)
         """
-        return self._current_value_and_velocity(at)[0]
+        value, velocity = self._current_value_and_velocity(at)
+        return value
 
     def velocity(self, at=None):
         """Predicts the current velocity.
 
         :param at: the time to observe.  (default: now)
         """
-        return self._current_value_and_velocity(at)[1]
+        value, velocity = self._current_value_and_velocity(at)
+        return velocity
 
     def incr(self, delta, over=False, clamp=False, limit=None, at=None):
         """Increases the value by the given delta immediately.  The
@@ -270,12 +274,20 @@ class Gauge(object):
         """
         if self.determination:
             determination = self.determination
-            if determination[0][1] == value:
-                yield determination[0][0]
+            first_time, first_value = determination[0]
+            if first_value == value:
+                yield first_time
             for prev, next in zip(determination[:-1], determination[1:]):
-                if prev[1] < value <= next[1] or prev[1] > value >= next[1]:
-                    t = (value - prev[1]) / float(next[1] - prev[1])
-                    yield prev[0] + (next[0] - prev[0]) * t
+                prev_time, prev_value = prev
+                next_time, next_value = next
+                if prev_value < value <= next_value:
+                    pass
+                elif prev_value > value >= next_value:
+                    pass
+                else:
+                    continue
+                t = (value - prev_value) / float(next_value - prev_value)
+                yield prev_time + (next_time - prev_time) * t
 
     def _make_momentum(self, velocity_or_momentum, since=None, until=None):
         """Makes a :class:`Momentum` object by the given arguments.
@@ -418,7 +430,7 @@ class Gauge(object):
         import click
         print
         def deter(at, value, ctx):
-            if determination and determination[-1][0] == at:
+            if determination and determination[-1][AT] == at:
                 return
             determination.add((at, value))
             click.secho(' => {0:.0f}: {1} ({2})'
@@ -482,7 +494,7 @@ class Gauge(object):
                             intersection = seg.intersect(boundary)
                         except ValueError:
                             continue
-                        if intersection[0] != prev_time:
+                        if intersection[AT] != prev_time:
                             prev_time, value = intersection
                             del intersection
                             deter(prev_time, value, 'inter')
@@ -536,9 +548,9 @@ class Gauge(object):
                         intersection = seg.intersect(boundary)
                     except ValueError:
                         continue
-                    if intersection[0] == seg.since:
+                    if intersection[AT] == seg.since:
                         continue
-                    deter(intersection[0], intersection[1], 'final.inter')
+                    deter(intersection[AT], intersection[VALUE], 'final.inter')
                     break
             else:
                 value += velocity * (finalized_at - prev_time)
@@ -718,31 +730,3 @@ class Segment(namedtuple('Segment', ['value', 'velocity', 'since', 'until'])):
             raise ValueError('Intersection not in the range')
         value = self.get(at)
         return (at, value)
-
-        '''
-    @staticmethod
-    def _intersect(line1, line2):
-        x_diff = (line1[0][0] - line1[1][0], line2[0][0] - line2[1][0])
-        y_diff = (line1[0][1] - line1[1][1], line2[0][1] - line2[1][1])
-        det = lambda a, b: a[0] * b[1] - a[1] * b[0]
-        div = det(x_diff, y_diff)
-        if div == 0:
-            raise ValueError('No intersection')
-        d = (det(*line1), det(*line2))
-        x = det(d, x_diff) / div
-        y = det(d, y_diff) / div
-        return (x, y)
-        f = lambda x1, x2: x2 if x1 is None else x1
-        line1 = ((f(self.since, seg.since), self.value),
-                 (f(self.until, seg.until), self.final()))
-        line2 = ((f(seg.since, self.since), seg.value),
-                 (f(seg.until, self.until), seg.final()))
-        at, value = self._intersect(line1, line2)
-        since = max(line1[0][0], line2[0][0])
-        until = min(line1[1][0], line2[1][0])
-        if since <= at <= until:
-            pass
-        else:
-            raise ValueError('No intersection')
-        return (at, value)
-        '''
