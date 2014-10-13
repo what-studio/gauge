@@ -537,6 +537,8 @@ class Gauge(object):
                         intersection = seg.intersect(boundary)
                     except ValueError:
                         continue
+                    if intersection[0] == seg.since:
+                        continue
                     deter(intersection[0], intersection[1], 'final.inter')
                     break
             else:
