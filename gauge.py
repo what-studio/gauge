@@ -532,7 +532,6 @@ class Gauge(object):
             if math.isinf(finalized_at):
                 seg = Segment(value, velocity, prev_time, None)
                 for boundary in [head, foot]:
-                    print seg, boundary
                     try:
                         intersection = seg.intersect(boundary)
                     except ValueError:
@@ -552,7 +551,7 @@ class Gauge(object):
 
         :returns: a sorted list of the determination.
         """
-        # return self.determine2()
+        return self.determine2()
         determination = SortedList()
         # accumulated velocities and the sum of velocities
         velocities = []
