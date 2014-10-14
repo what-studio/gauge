@@ -11,7 +11,7 @@
 from collections import namedtuple
 import math
 import operator
-import time
+from time import time as now
 import warnings
 
 from sortedcontainers import SortedList, SortedListWithKey
@@ -37,7 +37,7 @@ def deprecate(message, *args, **kwargs):
 
 
 def now_or(at):
-    return time.time() if at is None else float(at)
+    return now() if at is None else float(at)
 
 
 def or_inf(at):
@@ -427,12 +427,12 @@ class Gauge(object):
         head = next(head_segs)
         foot = next(foot_segs)
         from click import echo, secho, style
-        def deter(at, value, ctx):
-            if determination and determination[-1][AT] == at:
+        def deter(time, value, ctx):
+            if determination and determination[-1][AT] == time:
                 return
-            determination.add((at, value))
+            determination.add((time, value))
             if debug:
-                secho(' => {0:.2f}: {1:.2f} ({2})'.format(at, value, ctx),
+                secho(' => {0:.2f}: {1:.2f} ({2})'.format(time, value, ctx),
                       fg='green')
         def calc_velocity():
             if bound == HEAD:
@@ -454,12 +454,11 @@ class Gauge(object):
         if debug:
             print
         deter(prev_time, value, 'init')
-        for x, (at, method, momentum) in enumerate(self._plan):
-            if at is None:
-                at = self.set_at
+        for x, (time, method, momentum) in enumerate(self._plan):
+            time = max(time, self.set_at)
             if debug:
                 echo('{0} {1:+.2f} {2} {3}'.format(
-                     style(' {0} '.format(at), 'cyan', reverse=True),
+                     style(' {0} '.format(time), 'cyan', reverse=True),
                      velocity,
                      style(bound or '', 'cyan' if bound else ''),
                      style('overlapped' if overlapped else '',
@@ -468,7 +467,7 @@ class Gauge(object):
                 next_time = self._plan[x + 1][0]
             except IndexError:
                 next_time = None
-            while prev_time < at:
+            while prev_time < time:
                 # choose bounds
                 head_until = or_inf(head.until)
                 if head_until <= prev_time:
@@ -486,7 +485,7 @@ class Gauge(object):
                     if cmp(velocity, boundary.velocity):
                         bound, overlapped = None, False
                 # current segment
-                seg = Segment(value, velocity, prev_time, at)
+                seg = Segment(value, velocity, prev_time, time)
                 if debug:
                     echo('    {0} between {1} and {2} {3} {4}'.format(
                          style(repr_seg(seg), 'red'),
@@ -523,13 +522,13 @@ class Gauge(object):
                     # release from bound
                     bound_until = or_inf(boundary.until)
                     if prev_time < bound_until:
-                        bound_until_ = min(bound_until, at)
+                        bound_until_ = min(bound_until, time)
                         prev_time, value = bound_until_, seg.get(bound_until_)
                         deter(bound_until_, value, 'release')
                         continue
                         # case4 requires
                         # case6 doesn't require
-                        if bound_until < at:
+                        if bound_until < time:
                             bound, overlapped = None, False
                             continue
                     break
@@ -544,20 +543,20 @@ class Gauge(object):
                         overlapped = True
                         velocity = calc_velocity()
                     break
-            if at is not None and at != prev_time:
-                value += velocity * (at - prev_time)
-                deter(at, value, 'normal')
+            if time is not None and time != prev_time:
+                value += velocity * (time - prev_time)
+                deter(time, value, 'normal')
             # prepare the next iteration
             if method == ADD:
                 velocities.append(momentum.velocity)
             elif method == REMOVE:
                 velocities.remove(momentum.velocity)
-            if at != next_time:
-                prev_time = at
+            if time != next_time:
+                prev_time = time
             velocity = calc_velocity()
         if velocity:
-            finalized_at = min(or_inf(head.until), or_inf(foot.until))
-            if math.isinf(finalized_at):
+            final_time = min(or_inf(head.until), or_inf(foot.until))
+            if math.isinf(final_time):
                 seg = Segment(value, velocity, prev_time, None)
                 for boundary in [head, foot]:
                     try:
@@ -569,8 +568,8 @@ class Gauge(object):
                     deter(intersection[AT], intersection[VALUE], 'final.inter')
                     break
             else:
-                value += velocity * (finalized_at - prev_time)
-                deter(finalized_at, value, 'final')
+                value += velocity * (final_time - prev_time)
+                deter(final_time, value, 'final')
         return determination
 
     def determine(self):
