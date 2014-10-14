@@ -10,6 +10,7 @@
 """
 from collections import namedtuple
 import math
+import operator
 import time
 import warnings
 
@@ -413,7 +414,7 @@ class Gauge(object):
             yield Segment(value=value, velocity=0,
                           since=self.set_at, until=None)
 
-    def determine2(self):
+    def determine2(self, debug=False):
         determination = SortedList()
         velocities = []
         velocity = 0
@@ -421,20 +422,18 @@ class Gauge(object):
         prev_time = self.set_at
         bound = None
         overlapped = False
-        head_graph = self.walk_segs(self.max)
-        foot_graph = self.walk_segs(self.min)
-        # head_graph = self.g([(0, 15), (4, 11), (6, 13)])
-        # head_graph = self.g([(0, 15), (5, 10)])
-        head = next(head_graph)
-        foot = next(foot_graph)
-        import click
-        print
+        head_segs = self.walk_segs(self.max)
+        foot_segs = self.walk_segs(self.min)
+        head = next(head_segs)
+        foot = next(foot_segs)
+        from click import echo, secho, style
         def deter(at, value, ctx):
             if determination and determination[-1][AT] == at:
                 return
             determination.add((at, value))
-            click.secho(' => {0:.0f}: {1} ({2})'
-                        ''.format(at, value, ctx), fg='green')
+            if debug:
+                secho(' => {0:.2f}: {1:.2f} ({2})'.format(at, value, ctx),
+                      fg='green')
         def calc_velocity():
             if bound == HEAD:
                 if overlapped:
@@ -451,43 +450,59 @@ class Gauge(object):
         def get_boundary(bound):
             return {None: None, HEAD: head, FOOT: foot}[bound]
         def repr_seg(seg):
-            return '{0:.0f}{1:+.0f}/s in {2}~{3}'.format(*seg)
+            return '{0:.2f}{1:+.2f}/s in {2}~{3}'.format(*seg)
+        if debug:
+            print
         deter(prev_time, value, 'init')
-        for at, method, momentum in self._plan:
+        for x, (at, method, momentum) in enumerate(self._plan):
             if at is None:
                 at = self.set_at
-            click.echo('{0} bound={1} overlapped={2}'.format(
-                click.style(' {0} '.format(at), fg='cyan', reverse=True),
-                click.style(str(bound), fg='cyan' if bound else ''),
-                click.style(str(overlapped), fg='cyan' if overlapped else '')))
+            if debug:
+                echo('{0} {1:+.2f} {2} {3}'.format(
+                     style(' {0} '.format(at), 'cyan', reverse=True),
+                     velocity,
+                     style(bound or '', 'cyan' if bound else ''),
+                     style('overlapped' if overlapped else '',
+                           'cyan' if overlapped else '')))
+            try:
+                next_time = self._plan[x + 1][0]
+            except IndexError:
+                next_time = None
             while prev_time < at:
                 # choose bounds
                 head_until = or_inf(head.until)
-                if head_until < prev_time:
-                    head = next(head_graph)
+                if head_until <= prev_time:
+                    head = next(head_segs)
                     continue
                 foot_until = or_inf(foot.until)
-                if foot_until < prev_time:
-                    foot = next(foot_graph)
+                if foot_until <= prev_time:
+                    foot = next(foot_segs)
                     continue
+                velocity = calc_velocity()
+                # still bound?
+                if bound is not None and overlapped:
+                    cmp = operator.lt if bound == HEAD else operator.gt
+                    boundary = get_boundary(bound)
+                    if cmp(velocity, boundary.velocity):
+                        bound, overlapped = None, False
                 # current segment
                 seg = Segment(value, velocity, prev_time, at)
-                click.echo('    {0} under {1} bound={2} overlapped={3}'.format(
-                    click.style(repr_seg(seg), fg='red'),
-                    click.style(repr_seg(head), fg='red'),
-                    click.style(str(bound), fg='cyan' if bound else ''),
-                    click.style(str(overlapped),
-                                fg='cyan' if overlapped else '')))
+                if debug:
+                    echo('    {0} between {1} and {2} {3} {4}'.format(
+                         style(repr_seg(seg), 'red'),
+                         style(repr_seg(head), 'red'),
+                         style(repr_seg(foot), 'red'),
+                         style(bound or '', 'cyan' if bound else ''),
+                         style('overlapped' if overlapped else '',
+                               'cyan' if overlapped else '')))
                 if bound is None:
                     if value > head.get(prev_time):
                         # over the head
                         bound, overlapped = HEAD, False
-                        velocity = calc_velocity()
                         break
                     elif value < foot.get(prev_time):
                         # under the foot
                         bound, overlapped = FOOT, False
-                        velocity = calc_velocity()
                         break
                     for bound_, boundary in [(HEAD, head), (FOOT, foot)]:
                         try:
@@ -507,15 +522,15 @@ class Gauge(object):
                 if overlapped:
                     # release from bound
                     bound_until = or_inf(boundary.until)
-                    bound_until_ = clamp(bound_until, prev_time, at)
-                    if bound_until_ != prev_time:
+                    if prev_time < bound_until:
+                        bound_until_ = min(bound_until, at)
                         prev_time, value = bound_until_, seg.get(bound_until_)
                         deter(bound_until_, value, 'release')
-                        # prev_time, value = \
-                        #     deter(bound_until_, seg.get(bound_until_))
+                        continue
+                        # case4 requires
+                        # case6 doesn't require
                         if bound_until < at:
                             bound, overlapped = None, False
-                            velocity = calc_velocity()
                             continue
                     break
                 else:
@@ -537,7 +552,8 @@ class Gauge(object):
                 velocities.append(momentum.velocity)
             elif method == REMOVE:
                 velocities.remove(momentum.velocity)
-            prev_time = at
+            if at != next_time:
+                prev_time = at
             velocity = calc_velocity()
         if velocity:
             finalized_at = min(or_inf(head.until), or_inf(foot.until))

@@ -9,7 +9,7 @@ g.add_momentum(-1, since=3, until=8)
 def test_case1():
     g.max = Gauge(15, 15, at=0)
     g.max.add_momentum(-1, until=5)
-    assert g.determine2() == [
+    assert g.determine2(debug=True) == [
         (0, 12),
         (1, 12),
         (2, 13),
@@ -23,7 +23,7 @@ def test_case1():
 def test_case1_():
     g = Gauge(15, 15, at=0)
     g.add_momentum(-1, until=5)
-    assert g.determine2() == [
+    assert g.determine2(debug=True) == [
         (0, 15),
         (5, 10),
     ]
@@ -33,7 +33,7 @@ def test_case2():
     g.max = Gauge(15, 15, at=0)
     g.max.add_momentum(-1, until=4)
     g.max.add_momentum(+1, since=4, until=6)
-    assert g.determine2() == [
+    assert g.determine2(debug=True) == [
         (0, 12),
         (1, 12),
         (2, 13),
@@ -46,7 +46,7 @@ def test_case2():
 
 def test_case3():
     g.set_max(10, at=0)
-    assert g.determine2() == [
+    assert g.determine2(debug=True) == [
         (0, 12),
         (1, 12),
         (3, 12),
@@ -55,7 +55,7 @@ def test_case3():
         (8, 8),
     ]
     g.set_max(Gauge(10, 100, at=0), at=0)
-    assert g.determine2() == [
+    assert g.determine2(debug=True) == [
         (0, 12),
         (1, 12),
         (3, 12),
@@ -68,7 +68,7 @@ def test_case3():
 def test_case4():
     g.max = Gauge(15, 15, at=0)
     g.max.add_momentum(-1)
-    assert g.determine2() == [
+    assert g.determine2(debug=True) == [
         (0, 12),
         (1, 12),
         (2, 13),
@@ -82,9 +82,22 @@ def test_case4():
 def test_case4_():
     g = Gauge(15, 15, at=0)
     g.add_momentum(-1)
-    assert g.determine2() == g.determine()
+    assert g.determine2(debug=True) == g.determine()
 
 
 def test_case5():
     g = Gauge(0, 10, at=0)
-    assert g.determine2() == [(0, 0)]
+    assert g.determine2(debug=True) == [(0, 0)]
+
+
+def test_case6():
+    head = Gauge(5, 5, at=0)
+    head.add_momentum(-0.4, since=0, until=5)
+    foot = Gauge(0, 5, at=0)
+    foot.add_momentum(+0.4, since=0, until=5)
+    g = Gauge(0, head, foot, at=0)
+    g.add_momentum(+2.5, since=0, until=2)
+    g.add_momentum(-2.5, since=2, until=4)
+    g.add_momentum(+2.5, since=4, until=6)
+    g.determine2(debug=True)
+    assert 0
