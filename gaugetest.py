@@ -40,7 +40,7 @@ def test_over_max():
     assert list(g.determination) == [(0, 8), (2, 10), (4, 10)]
     g = Gauge(12, 10, at=0)
     g.add_momentum(-1, since=0, until=4)
-    assert list(g.determination) == [(0, 12), (4, 8)]
+    assert list(g.determination) == [(0, 12), (2, 10), (4, 8)]
     g = Gauge(12, 10, at=0)
     g.add_momentum(+1, since=0, until=4)
     g.add_momentum(-2, since=0, until=4)
