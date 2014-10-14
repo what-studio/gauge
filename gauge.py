@@ -10,7 +10,7 @@
 """
 from collections import namedtuple
 import math
-import operator
+from operator import gt, lt
 from time import time as now
 import warnings
 
@@ -488,7 +488,7 @@ class Gauge(object):
                 velocity = calc_velocity()
                 # still bound?
                 if bound is not None and overlapped:
-                    cmp = operator.lt if bound == HEAD else operator.gt
+                    cmp = lt if bound == HEAD else gt
                     boundary = get_boundary(bound)
                     if cmp(velocity, boundary.velocity):
                         bound, overlapped = None, False
@@ -566,8 +566,9 @@ class Gauge(object):
         if velocity:
             final_time = min(or_inf(head.until), or_inf(foot.until))
             if math.isinf(final_time):
+                velocity = calc_velocity()
                 seg = Segment(value, velocity, prev_time, None)
-                for boundary in [head, foot]:
+                for boundary, cmp in [(head, lt), (foot, gt)]:
                     try:
                         intersection = seg.intersect(boundary)
                     except ValueError:
@@ -575,7 +576,6 @@ class Gauge(object):
                     if intersection[AT] == seg.since:
                         continue
                     deter(intersection[AT], intersection[VALUE], 'final.inter')
-                    break
             else:
                 value += velocity * (final_time - prev_time)
                 deter(final_time, value, 'final')
