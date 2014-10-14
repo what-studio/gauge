@@ -454,6 +454,12 @@ class Gauge(object):
         if debug:
             print
         deter(prev_time, value, 'init')
+        if value > head.guess(prev_time):
+            # over the head
+            bound, overlapped = HEAD, False
+        elif value < foot.guess(prev_time):
+            # under the foot
+            bound, overlapped = FOOT, False
         for x, (time, method, momentum) in enumerate(self._plan):
             if momentum not in self.momenta:
                 continue
@@ -545,6 +551,7 @@ class Gauge(object):
                         overlapped = True
                         velocity = calc_velocity()
                     break
+            # should check if time is not None?
             if time is not None and time != prev_time:
                 value += velocity * (time - prev_time)
                 deter(time, value, 'normal')
