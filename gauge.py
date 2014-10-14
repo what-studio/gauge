@@ -496,11 +496,11 @@ class Gauge(object):
                          style('overlapped' if overlapped else '',
                                'cyan' if overlapped else '')))
                 if bound is None:
-                    if value > head.get(prev_time):
+                    if value > head.guess(prev_time):
                         # over the head
                         bound, overlapped = HEAD, False
                         break
-                    elif value < foot.get(prev_time):
+                    elif value < foot.guess(prev_time):
                         # under the foot
                         bound, overlapped = FOOT, False
                         break
@@ -717,14 +717,20 @@ class Momentum(namedtuple('Momentum', ['velocity', 'since', 'until'])):
 
 
 class Segment(namedtuple('Segment', ['value', 'velocity', 'since', 'until'])):
+    # `since` cannot be None, but `until` can.
 
     def get(self, at):
-        if self.since is None:
-            assert self.velocity == 0
-            return self.value
-        elif not self.since <= at <= or_inf(self.until):
+        if not self.since <= at <= or_inf(self.until):
             raise ValueError('Out of range')
         return self.value + self.velocity * (at - self.since)
+
+    def guess(self, at):
+        if at < self.since:
+            return self.value
+        elif self.until is not None and self.until < at:
+            return self.final()
+        else:
+            return self.get(at)
 
     def final(self):
         return self.get(self.until)
