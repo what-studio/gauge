@@ -455,6 +455,8 @@ class Gauge(object):
             print
         deter(prev_time, value, 'init')
         for x, (time, method, momentum) in enumerate(self._plan):
+            if momentum not in self.momenta:
+                continue
             time = max(time, self.set_at)
             if debug:
                 echo('{0} {1:+.2f} {2} {3}'.format(

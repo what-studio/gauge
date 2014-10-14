@@ -6,17 +6,17 @@ import types
 
 import pytest
 
+import gauge
 from gauge import Gauge, Momentum
 
 
 @contextmanager
 def t(timestamp):
-    orig_time = time.time
-    time.time = lambda: float(timestamp)
+    gauge.now = lambda: float(timestamp)
     try:
         yield
     finally:
-        time.time = orig_time
+        gauge.now = time.time
 
 
 def test_deprecations():
@@ -61,7 +61,7 @@ def test_under_min():
     assert list(g.determination) == [(0, 2), (2, 0), (4, 0)]
     g = Gauge(-2, 10, at=0)
     g.add_momentum(+1, since=0, until=4)
-    assert list(g.determination) == [(0, -2), (2, 0), (4, 2)]
+    assert list(g.determination) == [(0, -2), (4, 2)]
     g = Gauge(-2, 10, at=0)
     g.add_momentum(-1, since=0, until=4)
     g.add_momentum(+2, since=0, until=4)
