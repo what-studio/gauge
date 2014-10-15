@@ -480,7 +480,7 @@ class Gauge(object):
                 if out_of_bound(seg, boundary):
                     bound, overlapped = boundary, False
                     break
-            first = True
+            first = True  # first iteration marker
             while since < until:
                 if first:
                     # first iteration doesn't require to choose boundaries
