@@ -9,7 +9,6 @@
     :license: BSD, see LICENSE for more details.
 """
 from collections import namedtuple
-import math
 import operator
 from time import time as now
 import warnings
@@ -38,10 +37,6 @@ def deprecate(message, *args, **kwargs):
 
 def now_or(at):
     return now() if at is None else float(at)
-
-
-def or_inf(at):
-    return inf if at is None else at
 
 
 def clamp(x, min_, max_):
@@ -401,18 +396,15 @@ class Gauge(object):
     def walk_segs(self, number_or_gauge):
         if isinstance(number_or_gauge, Gauge):
             determination = number_or_gauge.determine()
-            # t, v = determination[0]
-            # yield Segment(value=v, velocity=0, since=None, until=t)
             for (t1, v1), (t2, v2) in zip(determination[:-1],
                                           determination[1:]):
                 velocity = (v2 - v1) / (t2 - t1)
-                yield Segment(value=v1, velocity=velocity, since=t1, until=t2)
-            t, v = determination[-1]
-            yield Segment(value=v, velocity=0, since=t, until=None)
+                yield Segment(v1, velocity, since=t1, until=t2)
+            time, value = determination[-1]
+            yield Segment(value, 0, since=time, until=inf)
         else:
             value = number_or_gauge
-            yield Segment(value=value, velocity=0,
-                          since=self.set_at, until=None)
+            yield Segment(value, 0, since=self.set_at, until=inf)
 
     def determine2(self, debug=False):
         determination = SortedList()
@@ -425,6 +417,7 @@ class Gauge(object):
         # boundaries
         ceil = Boundary(self.walk_segs(self.max), operator.lt)
         floor = Boundary(self.walk_segs(self.min), operator.gt)
+        boundaries = [ceil, floor]
         # from click import echo, secho, style
         # def repr_seg(seg):
         #     return '{0:.2f}{1:+.2f}/s in {2}~{3}'.format(*seg)
@@ -447,9 +440,9 @@ class Gauge(object):
                 return bound.best(sum(velocities), bound.seg.velocity)
             else:
                 return sum(v for v in velocities if bound.cmp(v, 0))
-        def out_of_bound(seg, boundary):
-            boundary_value = boundary.seg.guess(seg.since)
-            return boundary.cmp_inv(seg.value, boundary_value)
+        # def out_of_bound(seg, boundary):
+        #     boundary_value = boundary.seg.guess(seg.since)
+        #     return boundary.cmp_inv(seg.value, boundary_value)
         def deter_intersection(seg, boundary):
             intersection = seg.intersect(boundary.seg)
             if intersection[AT] == seg.since:
@@ -462,7 +455,7 @@ class Gauge(object):
         for time, method, momentum in self._plan:
             if momentum not in self.momenta:
                 continue
-            # normalize time
+            # normalize time.
             until = max(time, self.set_at)
             seg = Segment(value, velocity, since, until)
             # if debug:
@@ -472,29 +465,28 @@ class Gauge(object):
             #          style({ceil: 'ceil', floor: 'floor', None: ''}[bound],
             #                'cyan'),
             #          style('overlapped' if overlapped else '', 'cyan')))
-            # skip past boundaries
-            for boundary in [ceil, floor]:
-                while or_inf(boundary.seg.until) <= since:
+            # skip past boundaries.
+            for boundary in boundaries:
+                while boundary.seg.until <= since:
                     boundary.walk()
-            for boundary in [ceil, floor]:
-                if out_of_bound(seg, boundary):
+            # check if out of bound.
+            for boundary in boundaries:
+                boundary_value = boundary.seg.guess(seg.since)
+                if boundary.cmp_inv(seg.value, boundary_value):
                     bound, overlapped = boundary, False
                     break
             first = True  # first iteration marker
             while since < until:
                 if first:
-                    # first iteration doesn't require to choose boundaries
                     first = False
                 else:
-                    # choose next boundaries
-                    ceil_until = or_inf(ceil.seg.until)
-                    floor_until = or_inf(floor.seg.until)
-                    if ceil_until >= until and floor_until >= until:
+                    # stop iteration if all boundaries have been proceeded.
+                    if all(b.seg.until >= until for b in boundaries):
                         break
-                    if ceil_until < until:
-                        ceil.walk()
-                    if floor_until < until:
-                        floor.walk()
+                    # choose next boundaries.
+                    for boundary in boundaries:
+                        if boundary.seg.until < until:
+                            boundary.walk()
                 # current segment
                 velocity = calc_velocity()
                 seg = Segment(value, velocity, since, until)
@@ -512,11 +504,13 @@ class Gauge(object):
                 #          style('overlapped' if overlapped else '',
                 #                'cyan' if overlapped else '')))
                 if bound is None:
-                    for boundary in [ceil, floor]:
+                    for boundary in boundaries:
+                        # FIXME: really not required?
                         # check if out of bound
-                        if out_of_bound(seg, boundary):
-                            bound, overlapped = boundary, False
-                            break
+                        # if out_of_bound(seg, boundary):
+                        #     bound, overlapped = boundary, False
+                        #     break
+                        ############################################
                         # check if there's the intersection between the current
                         # segment and boundary
                         try:
@@ -528,11 +522,9 @@ class Gauge(object):
                             break
                 elif overlapped:
                     # release from bound
-                    bound_until = or_inf(bound.seg.until)
-                    if since < bound_until:
-                        bound_until = min(bound_until, until)
-                        # released
-                        since, value = deter(bound_until, seg.get(bound_until))
+                    bound_until = min(bound.seg.until, until)
+                    # released
+                    since, value = deter(bound_until, seg.get(bound_until))
                 else:
                     # returned to safe zone
                     try:
@@ -540,31 +532,25 @@ class Gauge(object):
                             deter_intersection(seg, bound)
                     except ValueError:
                         pass
+            # determine the last node in the current itreration
             velocity = calc_velocity()
-            value = calc_value(until)
-            deter(until, value, 'normal')
+            since, value = deter(until, calc_value(until), 'normal')
             # prepare the next iteration
             if method == ADD:
                 velocities.append(momentum.velocity)
             elif method == REMOVE:
                 velocities.remove(momentum.velocity)
-            since = until
-        # finalize
-        final_time = min(or_inf(ceil.seg.until), or_inf(floor.seg.until))
-        if math.isinf(final_time):
-            for boundary in [ceil, floor]:
-                velocity = calc_velocity()
-                if not velocity:
-                    break
-                seg = Segment(value, velocity, since, None)
-                try:
-                    since, value, bound, overlapped = \
-                        deter_intersection(seg, boundary)
-                except ValueError:
-                    pass
-        else:
-            value = calc_value(final_time)
-            deter(final_time, value, 'final')
+        # determine the final nodes
+        for boundary in boundaries:
+            velocity = calc_velocity()
+            if not velocity:
+                break
+            seg = Segment(value, velocity, since, inf)
+            try:
+                since, value, bound, overlapped = \
+                    deter_intersection(seg, boundary)
+            except ValueError:
+                pass
         return determination
 
     def determine(self):
@@ -714,7 +700,7 @@ class Segment(namedtuple('Segment', ['value', 'velocity', 'since', 'until'])):
     # `since` cannot be None, but `until` can.
 
     def get(self, at):
-        if not self.since <= at <= or_inf(self.until):
+        if not self.since <= at <= self.until:
             raise ValueError('Out of range')
         return self.value + self.velocity * (at - self.since)
 
@@ -739,7 +725,7 @@ class Segment(namedtuple('Segment', ['value', 'velocity', 'since', 'until'])):
         except ZeroDivisionError:
             raise ValueError('Parallel segment')
         since = max(self.since, seg.since)
-        until = min(or_inf(self.until), or_inf(seg.until))
+        until = min(self.until, seg.until)
         if since <= at <= until:
             pass
         else:
