@@ -396,10 +396,10 @@ class Gauge(object):
     def walk_segs(self, number_or_gauge):
         if isinstance(number_or_gauge, Gauge):
             determination = number_or_gauge.determine()
-            for (t1, v1), (t2, v2) in zip(determination[:-1],
-                                          determination[1:]):
-                velocity = (v2 - v1) / (t2 - t1)
-                yield Segment(v1, velocity, since=t1, until=t2)
+            zipped_determination = zip(determination[:-1], determination[1:])
+            for (time1, value1), (time2, value2) in zipped_determination:
+                velocity = (value2 - value1) / (time2 - time1)
+                yield Segment(value1, velocity, since=time1, until=time2)
             time, value = determination[-1]
             yield Segment(value, 0, since=time, until=inf)
         else:
@@ -457,7 +457,6 @@ class Gauge(object):
                 continue
             # normalize time.
             until = max(time, self.set_at)
-            seg = Segment(value, velocity, since, until)
             # if debug:
             #     echo('{0} {1:+.2f} {2} {3}'.format(
             #          style(' {0} '.format(time), 'cyan', reverse=True),
@@ -471,8 +470,8 @@ class Gauge(object):
                     boundary.walk()
             # check if out of bound.
             for boundary in boundaries:
-                boundary_value = boundary.seg.guess(seg.since)
-                if boundary.cmp_inv(seg.value, boundary_value):
+                boundary_value = boundary.seg.guess(since)
+                if boundary.cmp_inv(value, boundary_value):
                     bound, overlapped = boundary, False
                     break
             first = True  # first iteration marker
@@ -489,7 +488,7 @@ class Gauge(object):
                             boundary.walk()
                 # current segment
                 velocity = calc_velocity()
-                seg = Segment(value, velocity, since, until)
+                seg = Segment(value, velocity, since=since, until=until)
                 # still bound?
                 if bound is not None and overlapped:
                     if bound.cmp(velocity, bound.seg.velocity):
@@ -545,7 +544,7 @@ class Gauge(object):
             velocity = calc_velocity()
             if not velocity:
                 break
-            seg = Segment(value, velocity, since, inf)
+            seg = Segment(value, velocity, since=since, until=inf)
             try:
                 since, value, bound, overlapped = \
                     deter_intersection(seg, boundary)
