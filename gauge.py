@@ -416,20 +416,21 @@ class Gauge(object):
 
     def determine2(self, debug=False):
         determination = SortedList()
-        ceil = Boundary(self.walk_segs(self.max), operator.lt)
-        floor = Boundary(self.walk_segs(self.min), operator.gt)
-        # which boundary the current segment bound to
-        bound = None
-        overlapped = False
-        prev_time = self.set_at
-        value = self.value
         velocities = []
         velocity = 0
+        since = self.set_at
+        value = self.value
+        bound = None
+        overlapped = False
+        # boundaries
+        ceil = Boundary(self.walk_segs(self.max), operator.lt)
+        floor = Boundary(self.walk_segs(self.min), operator.gt)
         # from click import echo, secho, style
         # def repr_seg(seg):
         #     return '{0:.2f}{1:+.2f}/s in {2}~{3}'.format(*seg)
         def deter(time, value, ctx=None):
             if determination and determination[-1][AT] == time:
+                # already determined
                 pass
             else:
                 determination.add((time, value))
@@ -438,7 +439,7 @@ class Gauge(object):
                 #           ''.format(time, value, ctx), fg='green')
             return time, value
         def calc_value(time):
-            return value + velocity * (time - prev_time)
+            return value + velocity * (time - since)
         def calc_velocity():
             if bound is None:
                 return sum(velocities)
@@ -457,13 +458,13 @@ class Gauge(object):
             return intersection[AT], intersection[VALUE], boundary, True
         # if debug:
         #     print
-        deter(prev_time, value, 'init')
+        deter(since, value, 'init')
         for time, method, momentum in self._plan:
             if momentum not in self.momenta:
                 continue
             # normalize time
-            time = max(time, self.set_at)
-            seg = Segment(value, velocity, prev_time, time)
+            until = max(time, self.set_at)
+            seg = Segment(value, velocity, since, until)
             # if debug:
             #     echo('{0} {1:+.2f} {2} {3}'.format(
             #          style(' {0} '.format(time), 'cyan', reverse=True),
@@ -473,14 +474,14 @@ class Gauge(object):
             #          style('overlapped' if overlapped else '', 'cyan')))
             # skip past boundaries
             for boundary in [ceil, floor]:
-                while or_inf(boundary.seg.until) <= prev_time:
+                while or_inf(boundary.seg.until) <= since:
                     boundary.walk()
             for boundary in [ceil, floor]:
                 if out_of_bound(seg, boundary):
                     bound, overlapped = boundary, False
                     break
             first = True
-            while prev_time < time:
+            while since < until:
                 if first:
                     # first iteration doesn't require to choose boundaries
                     first = False
@@ -488,15 +489,15 @@ class Gauge(object):
                     # choose next boundaries
                     ceil_until = or_inf(ceil.seg.until)
                     floor_until = or_inf(floor.seg.until)
-                    if ceil_until >= time and floor_until >= time:
+                    if ceil_until >= until and floor_until >= until:
                         break
-                    if ceil_until < time:
+                    if ceil_until < until:
                         ceil.walk()
-                    if floor_until < time:
+                    if floor_until < until:
                         floor.walk()
                 # current segment
                 velocity = calc_velocity()
-                seg = Segment(value, velocity, prev_time, time)
+                seg = Segment(value, velocity, since, until)
                 # still bound?
                 if bound is not None and overlapped:
                     if bound.cmp(velocity, bound.seg.velocity):
@@ -519,7 +520,7 @@ class Gauge(object):
                         # check if there's the intersection between the current
                         # segment and boundary
                         try:
-                            prev_time, value, bound, overlapped = \
+                            since, value, bound, overlapped = \
                                 deter_intersection(seg, boundary)
                         except ValueError:
                             pass
@@ -528,26 +529,26 @@ class Gauge(object):
                 elif overlapped:
                     # release from bound
                     bound_until = or_inf(bound.seg.until)
-                    if prev_time < bound_until:
-                        bound_until = min(bound_until, time)
-                        prev_time, value = \
-                            deter(bound_until, seg.get(bound_until))  # release
+                    if since < bound_until:
+                        bound_until = min(bound_until, until)
+                        # released
+                        since, value = deter(bound_until, seg.get(bound_until))
                 else:
                     # returned to safe zone
                     try:
-                        prev_time, value, bound, overlapped = \
+                        since, value, bound, overlapped = \
                             deter_intersection(seg, bound)
                     except ValueError:
                         pass
             velocity = calc_velocity()
-            value = calc_value(time)
-            deter(time, value, 'normal')
+            value = calc_value(until)
+            deter(until, value, 'normal')
             # prepare the next iteration
             if method == ADD:
                 velocities.append(momentum.velocity)
             elif method == REMOVE:
                 velocities.remove(momentum.velocity)
-            prev_time = time
+            since = until
         # finalize
         final_time = min(or_inf(ceil.seg.until), or_inf(floor.seg.until))
         if math.isinf(final_time):
@@ -555,9 +556,9 @@ class Gauge(object):
                 velocity = calc_velocity()
                 if not velocity:
                     break
-                seg = Segment(value, velocity, prev_time, None)
+                seg = Segment(value, velocity, since, None)
                 try:
-                    prev_time, value, bound, overlapped = \
+                    since, value, bound, overlapped = \
                         deter_intersection(seg, boundary)
                 except ValueError:
                     pass
