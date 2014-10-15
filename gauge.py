@@ -468,11 +468,10 @@ class Gauge(object):
                     # first iteration doesn't require to choose boundaries
                     first = False
                     for boundary in [ceil, floor]:
+                        # FIXME: duplicated code
                         boundary_value = boundary.seg.guess(prev_time)
-                        if boundary.cmp_eq(value, boundary_value):
-                            continue
-                        bound, overlapped = boundary, False
-                        break
+                        if boundary.cmp_inv(value, boundary_value):
+                            bound, overlapped = boundary, False
                 else:
                     # choose next boundaries
                     head_until = or_inf(ceil.seg.until)
@@ -540,24 +539,26 @@ class Gauge(object):
             elif method == REMOVE:
                 velocities.remove(momentum.velocity)
             prev_time = time
-        velocity = calc_velocity()
-        if velocity:
-            final_time = min(or_inf(ceil.seg.until), or_inf(floor.seg.until))
-            if math.isinf(final_time):
-                for boundary in [ceil, floor]:
-                    seg = Segment(value, velocity, prev_time, None)
-                    try:
-                        intersection = seg.intersect(boundary.seg)
-                    except ValueError:
-                        continue
-                    if intersection[AT] == seg.since:
-                        continue
-                    deter(*intersection)  # final.inter
-                    bound, overlapped = boundary, True
-                    velocity = calc_velocity()
-            else:
-                value = calc_value(final_time)
-                deter(final_time, value, 'final')
+        # finalize
+        final_time = min(or_inf(ceil.seg.until), or_inf(floor.seg.until))
+        if math.isinf(final_time):
+            for boundary in [ceil, floor]:
+                velocity = calc_velocity()
+                if velocity == 0:
+                    break
+                seg = Segment(value, velocity, prev_time, None)
+                # FIXME: duplicated code
+                try:
+                    intersection = seg.intersect(boundary.seg)
+                except ValueError:
+                    continue
+                if intersection[AT] == seg.since:
+                    continue
+                deter(*intersection)  # final.inter
+                bound, overlapped = boundary, True
+        else:
+            value = calc_value(final_time)
+            deter(final_time, value, 'final')
         return determination
 
     def determine(self):
