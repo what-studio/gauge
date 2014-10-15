@@ -476,17 +476,19 @@ class Gauge(object):
                 head = next(head_segs)
             while or_inf(foot.until) <= prev_time:
                 foot = next(foot_segs)
-            second = False
+            first = True
             while prev_time < time:
-                # choose bounds
-                if second:
+                if first:
+                    # first iteration doesn't require to choose boundaries
+                    first = False
+                else:
+                    # choose next boundaries
                     if min(or_inf(head.until), or_inf(foot.until)) >= time:
                         break
                     if or_inf(head.until) < time:
                         head = next(head_segs)
                     if or_inf(foot.until) < time:
                         foot = next(foot_segs)
-                second = True
                 velocity = calc_velocity()
                 # still bound?
                 if bound is not None and overlapped:
@@ -508,11 +510,11 @@ class Gauge(object):
                     if value > head.guess(prev_time):
                         # over the head
                         bound, overlapped = HEAD, False
-                        break
+                        continue
                     elif value < foot.guess(prev_time):
                         # under the foot
                         bound, overlapped = FOOT, False
-                        break
+                        continue
                     for bound_, boundary in [(HEAD, head), (FOOT, foot)]:
                         try:
                             intersection = seg.intersect(boundary)
@@ -523,7 +525,6 @@ class Gauge(object):
                             del intersection
                             deter(prev_time, value, 'inter')
                             bound, overlapped = bound_, True
-                            velocity = calc_velocity()
                             break
                     del bound_, boundary
                     continue  # should choose next boundary
@@ -540,7 +541,7 @@ class Gauge(object):
                         deter(bound_until_, value_, 'release')
                         prev_time, value = bound_until_, value_
                         continue
-                    break
+                    continue
                 else:
                     try:
                         intersection = seg.intersect(boundary)
@@ -550,8 +551,8 @@ class Gauge(object):
                         prev_time, value = intersection
                         deter(prev_time, value, 'in-bound')
                         overlapped = True
-                        velocity = calc_velocity()
-                    break
+                    continue
+            velocity = calc_velocity()
             # should check if time is not None?
             if time is not None and time != prev_time:
                 value += velocity * (time - prev_time)
@@ -562,12 +563,11 @@ class Gauge(object):
             elif method == REMOVE:
                 velocities.remove(momentum.velocity)
             prev_time = time
-            velocity = calc_velocity()
+        velocity = calc_velocity()
         if velocity:
             final_time = min(or_inf(head.until), or_inf(foot.until))
             if math.isinf(final_time):
                 for bound_, boundary in [(HEAD, head), (FOOT, foot)]:
-                    velocity = calc_velocity()
                     seg = Segment(value, velocity, prev_time, None)
                     try:
                         intersection = seg.intersect(boundary)
@@ -577,6 +577,7 @@ class Gauge(object):
                         continue
                     deter(intersection[AT], intersection[VALUE], 'final.inter')
                     bound, overlapped = bound_, True
+                    velocity = calc_velocity()
             else:
                 value += velocity * (final_time - prev_time)
                 deter(final_time, value, 'final')
