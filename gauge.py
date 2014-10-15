@@ -422,10 +422,8 @@ class Gauge(object):
         prev_time = self.set_at
         bound = None
         overlapped = False
-        head_segs = self.walk_segs(self.max)
-        foot_segs = self.walk_segs(self.min)
-        head = next(head_segs)
-        foot = next(foot_segs)
+        head = Boundary(self.walk_segs(self.max))
+        foot = Boundary(self.walk_segs(self.min))
         from click import echo, secho, style
         def deter(time, value, ctx):
             if determination and determination[-1][AT] == time:
@@ -438,27 +436,27 @@ class Gauge(object):
         def calc_velocity():
             if bound == HEAD:
                 if overlapped:
-                    return min(sum(velocities), head.velocity)
+                    return min(sum(velocities), head.seg.velocity)
                 else:
                     return sum(v for v in velocities if v < 0)
             elif bound == FOOT:
                 if overlapped:
-                    return max(sum(velocities), foot.velocity)
+                    return max(sum(velocities), foot.seg.velocity)
                 else:
                     return sum(v for v in velocities if v > 0)
             else:
                 return sum(velocities)
         def get_boundary(bound):
-            return {None: None, HEAD: head, FOOT: foot}[bound]
+            return {None: None, HEAD: head.seg, FOOT: foot.seg}[bound]
         def repr_seg(seg):
             return '{0:.2f}{1:+.2f}/s in {2}~{3}'.format(*seg)
         if debug:
             print
         deter(prev_time, value, 'init')
-        if value > head.guess(prev_time):
+        if value > head.seg.guess(prev_time):
             # over the head
             bound, overlapped = HEAD, False
-        elif value < foot.guess(prev_time):
+        elif value < foot.seg.guess(prev_time):
             # under the foot
             bound, overlapped = FOOT, False
         for time, method, momentum in self._plan:
@@ -472,10 +470,8 @@ class Gauge(object):
                      style(bound or '', 'cyan' if bound else ''),
                      style('overlapped' if overlapped else '',
                            'cyan' if overlapped else '')))
-            while or_inf(head.until) <= prev_time:
-                head = next(head_segs)
-            while or_inf(foot.until) <= prev_time:
-                foot = next(foot_segs)
+            head.walk_for(lambda: or_inf(head.seg.until) <= prev_time)
+            foot.walk_for(lambda: or_inf(foot.seg.until) <= prev_time)
             first = True
             while prev_time < time:
                 if first:
@@ -483,12 +479,12 @@ class Gauge(object):
                     first = False
                 else:
                     # choose next boundaries
-                    if min(or_inf(head.until), or_inf(foot.until)) >= time:
+                    if min(or_inf(head.seg.until), or_inf(foot.seg.until)) >= time:
                         break
-                    if or_inf(head.until) < time:
-                        head = next(head_segs)
-                    if or_inf(foot.until) < time:
-                        foot = next(foot_segs)
+                    if or_inf(head.seg.until) < time:
+                        head.walk()
+                    if or_inf(foot.seg.until) < time:
+                        foot.walk()
                 velocity = calc_velocity()
                 # still bound?
                 if bound is not None and overlapped:
@@ -501,21 +497,21 @@ class Gauge(object):
                 if debug:
                     echo('    {0} between {1} and {2} {3} {4}'.format(
                          style(repr_seg(seg), 'red'),
-                         style(repr_seg(head), 'red'),
-                         style(repr_seg(foot), 'red'),
+                         style(repr_seg(head.seg), 'red'),
+                         style(repr_seg(foot.seg), 'red'),
                          style(bound or '', 'cyan' if bound else ''),
                          style('overlapped' if overlapped else '',
                                'cyan' if overlapped else '')))
                 if bound is None:
-                    if value > head.guess(prev_time):
+                    if value > head.seg.guess(prev_time):
                         # over the head
                         bound, overlapped = HEAD, False
                         continue
-                    elif value < foot.guess(prev_time):
+                    elif value < foot.seg.guess(prev_time):
                         # under the foot
                         bound, overlapped = FOOT, False
                         continue
-                    for bound_, boundary in [(HEAD, head), (FOOT, foot)]:
+                    for bound_, boundary in [(HEAD, head.seg), (FOOT, foot.seg)]:
                         try:
                             intersection = seg.intersect(boundary)
                         except ValueError:
@@ -565,9 +561,9 @@ class Gauge(object):
             prev_time = time
         velocity = calc_velocity()
         if velocity:
-            final_time = min(or_inf(head.until), or_inf(foot.until))
+            final_time = min(or_inf(head.seg.until), or_inf(foot.seg.until))
             if math.isinf(final_time):
-                for bound_, boundary in [(HEAD, head), (FOOT, foot)]:
+                for bound_, boundary in [(HEAD, head.seg), (FOOT, foot.seg)]:
                     seg = Segment(value, velocity, prev_time, None)
                     try:
                         intersection = seg.intersect(boundary)
@@ -762,3 +758,20 @@ class Segment(namedtuple('Segment', ['value', 'velocity', 'since', 'until'])):
             raise ValueError('Intersection not in the range')
         value = self.get(at)
         return (at, value)
+
+
+class Boundary(object):
+
+    seg = None
+    segs_iter = None
+
+    def __init__(self, segs_iter):
+        self.segs_iter = segs_iter
+        self.walk()
+
+    def walk(self):
+        self.seg = next(self.segs_iter)
+
+    def walk_for(self, predicate):
+        while predicate():
+            self.walk()
