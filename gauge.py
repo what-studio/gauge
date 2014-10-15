@@ -472,16 +472,21 @@ class Gauge(object):
                      style(bound or '', 'cyan' if bound else ''),
                      style('overlapped' if overlapped else '',
                            'cyan' if overlapped else '')))
+            while or_inf(head.until) <= prev_time:
+                head = next(head_segs)
+            while or_inf(foot.until) <= prev_time:
+                foot = next(foot_segs)
+            second = False
             while prev_time < time:
                 # choose bounds
-                head_until = or_inf(head.until)
-                if head_until <= prev_time:
-                    head = next(head_segs)
-                    continue
-                foot_until = or_inf(foot.until)
-                if foot_until <= prev_time:
-                    foot = next(foot_segs)
-                    continue
+                if second:
+                    if min(or_inf(head.until), or_inf(foot.until)) >= time:
+                        break
+                    if or_inf(head.until) < time:
+                        head = next(head_segs)
+                    if or_inf(foot.until) < time:
+                        foot = next(foot_segs)
+                second = True
                 velocity = calc_velocity()
                 # still bound?
                 if bound is not None and overlapped:
@@ -521,7 +526,7 @@ class Gauge(object):
                             velocity = calc_velocity()
                             break
                     del bound_, boundary
-                    break
+                    continue  # should choose next boundary
                 boundary = get_boundary(bound)
                 if overlapped:
                     # release from bound

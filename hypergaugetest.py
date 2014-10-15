@@ -91,13 +91,25 @@ def test_case5():
 
 
 def test_case6():
-    head = Gauge(5, 5, at=0)
-    head.add_momentum(-0.4, since=0, until=5)
-    foot = Gauge(0, 5, at=0)
-    foot.add_momentum(+0.4, since=0, until=5)
-    g = Gauge(0, head, foot, at=0)
-    g.add_momentum(+2.5, since=0, until=2)
-    g.add_momentum(-2.5, since=2, until=4)
-    g.add_momentum(+2.5, since=4, until=6)
-    g.determine2(debug=True)
-    assert 0
+    head = Gauge(10, 10, at=0)
+    head.add_momentum(-1, since=0, until=4)
+    head.add_momentum(+1, since=6, until=7)
+    foot = Gauge(0, 10, at=0)
+    foot.add_momentum(+1, since=1, until=6)
+    foot.add_momentum(-1, since=6, until=8)
+    g = Gauge(5, head, foot, at=0)
+    g.add_momentum(+1, since=0, until=3)
+    g.add_momentum(-1, since=3, until=6)
+    g.add_momentum(+1, since=6, until=9)
+    g.add_momentum(-1, since=9, until=12)
+    assert g.determine2(debug=True) == [
+        (0, 5),
+        (2.5, 7.5),
+        (3, 7),
+        (4, 6),
+        (5.5, 4.5),
+        (6, 5),
+        (8, 7),
+        (9, 7),
+        (12, 4),
+    ]
