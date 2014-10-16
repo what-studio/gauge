@@ -507,3 +507,21 @@ def test_zigzag_hypergauge():
     assert g.determine() == [
         (0, 1), (1, 2), (2, 1), (3.5, 2.5), (4, 2), (5.5, 0.5), (6, 1),
         (7.5, 2.5), (8, 2), (9, 3), (10, 2), (11.5, 0.5), (12, 1)]
+
+
+def test_thick_zigzag_hypergauge():
+    ceil = Gauge(3, 5, 3, at=0)
+    floor = Gauge(2, 2, 0, at=0)
+    g = Gauge(2, ceil, floor, at=0)
+    for x in xrange(5):
+        ceil.add_momentum(+1, since=x * 4, until=x * 4 + 2)
+        ceil.add_momentum(-1, since=x * 4 + 2, until=x * 4 + 4)
+        floor.add_momentum(-1, since=x * 4, until=x * 4 + 2)
+        floor.add_momentum(+1, since=x * 4 + 2, until=x * 4 + 4)
+    for x in xrange(4):
+        t = sum(y * 2 for y in xrange(x + 1))
+        g.add_momentum(+1, since=t, until=t + (x + 1))
+        g.add_momentum(-1, since=t + (x + 1), until=t + 2 * (x + 1))
+    assert g.determine() == [
+        (0, 2), (1, 3), (2, 2), (3.5, 3.5), (4, 3), (6, 1), (8, 3), (9, 4),
+        (11.5, 1.5), (12, 2), (14.5, 4.5), (16, 3), (18.5, 0.5), (20, 2)]

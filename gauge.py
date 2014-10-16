@@ -465,19 +465,21 @@ class Gauge(object):
                 if boundary.cmp_inv(value, boundary_value):
                     bound, overlapped = boundary, False
                     break
+            # variables to control the loop
             first = True  # first iteration marker
+            again = False
             while since < until:
                 if first:
                     first = False
+                elif again:
+                    again = False
                 else:
                     # stop iteration if all boundaries have been proceeded.
                     if all(b.seg.until >= until for b in boundaries):
                         break
                     # choose next boundaries.
                     for boundary in boundaries:
-                        if boundary.seg.since < since < boundary.seg.until:
-                            continue
-                        elif boundary.seg.until < until:
+                        if boundary.seg.until < until:
                             boundary.walk()
                 # current segment
                 velocity = calc_velocity()
@@ -511,6 +513,7 @@ class Gauge(object):
                         except ValueError:
                             pass
                         else:
+                            again = True
                             break
                 elif overlapped:
                     # release from bound
