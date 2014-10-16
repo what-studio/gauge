@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from contextlib import contextmanager
+import operator
 import pickle
 import time
 import types
@@ -7,7 +8,7 @@ import types
 import pytest
 
 import gauge
-from gauge import Gauge, Momentum
+from gauge import Boundary, Gauge, Momentum, Segment, inf
 
 
 @contextmanager
@@ -257,6 +258,14 @@ def test_whenever():
     whenever = g.whenever(3)
     assert isinstance(whenever, types.GeneratorType)
     assert list(whenever) == [3, 5, 7, 9]
+    # inverse
+    g = Gauge(10, 10, at=0)
+    g.add_momentum(-1)
+    g.add_momentum(+2, since=3, until=4)
+    g.add_momentum(+2, since=5, until=6)
+    g.add_momentum(+2, since=7, until=8)
+    assert g.when(7) == 3
+    assert g.when(7, after=1) == 5
 
 
 def test_since_gte_until():
@@ -379,6 +388,62 @@ def test_extensibility_of_make_momentum():
     g = MyGauge(0, 10, at=0)
     m = g.add_momentum(3, 2, 1)
     assert m == (1, 2, 3)
+
+
+def test_segment():
+    seg = Segment(0, +1, since=0, until=10)
+    assert seg.get(0) == 0
+    assert seg.get(5) == 5
+    with pytest.raises(ValueError):
+        seg.get(-1)
+    with pytest.raises(ValueError):
+        seg.get(11)
+    assert seg.guess(-1) == 0
+    assert seg.guess(11) == 10
+    assert seg.intersect(Segment(5, 0, since=0, until=10)) == (5, 5)
+    assert seg.intersect(Segment(10, 0, since=0, until=10)) == (10, 10)
+    assert seg.intersect(Segment(5, 0, since=0, until=inf)) == (5, 5)
+    with pytest.raises(ValueError):
+        seg.intersect(Segment(15, 0, since=0, until=10))
+    with pytest.raises(ValueError):
+        seg.intersect(Segment(5, 0, since=6, until=10))
+    with pytest.raises(ValueError):
+        seg.intersect(Segment(5, 0, since=-inf, until=inf))
+    seg = Segment(0, +1, since=0, until=inf)
+    assert seg.get(100) == 100
+    assert seg.get(100000) == 100000
+
+
+def test_boundary():
+    # walk
+    segs = [Segment(0, 0, since=0, until=10),
+            Segment(0, +1, since=10, until=20),
+            Segment(10, -1, since=20, until=30)]
+    boundary = Boundary(iter(segs))
+    assert boundary.seg is segs[0]
+    boundary.walk()
+    assert boundary.seg is segs[1]
+    boundary.walk()
+    assert boundary.seg is segs[2]
+    with pytest.raises(StopIteration):
+        boundary.walk()
+    # cmp
+    assert boundary.cmp(1, 2)
+    assert not boundary.cmp(2, 1)
+    assert boundary.cmp_eq(1, 2)
+    assert boundary.cmp_eq(1, 1)
+    assert not boundary.cmp_eq(2, 1)
+    assert boundary.cmp_inv(2, 1)
+    assert not boundary.cmp_inv(1, 2)
+    assert not boundary.cmp_inv(1, 1)
+    # best
+    zero_seg = Segment(0, 0, 0, 0)
+    ceil = Boundary(iter([zero_seg]), operator.lt)
+    floor = Boundary(iter([zero_seg]), operator.gt)
+    assert ceil.best is min
+    assert floor.best is max
+    assert ceil.best_inv(xrange(10)) == 9
+    assert floor.best_inv(xrange(10)) == 0
 
 
 def test_unidirectional_hypergauge():

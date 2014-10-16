@@ -20,10 +20,8 @@ __all__ = ['Gauge', 'Momentum']
 __version__ = '0.1.0'
 
 
-ADD = 1
-REMOVE = 0
-ceil = 'ceil'
-floor = 'floor'
+ADD = +1
+REMOVE = -1
 AT = 0
 VALUE = 1
 
@@ -37,10 +35,6 @@ def deprecate(message, *args, **kwargs):
 
 def now_or(at):
     return now() if at is None else float(at)
-
-
-def clamp(x, min_, max_):
-    return max(min(x, max_), min_)
 
 
 class Gauge(object):
@@ -165,9 +159,9 @@ class Gauge(object):
         except IndexError:
             return (determination[-1][VALUE], 0.)
         prev_time, prev_value = determination[x - 1]
-        t = float(at - prev_time) / (next_time - prev_time)
+        time = float(at - prev_time) / (next_time - prev_time)
         delta = next_value - prev_value
-        value = prev_value + t * delta
+        value = prev_value + time * delta
         velocity = delta / (next_time - prev_time)
         return (value, velocity)
 
@@ -273,17 +267,12 @@ class Gauge(object):
             first_time, first_value = determination[0]
             if first_value == value:
                 yield first_time
-            for prev, next in zip(determination[:-1], determination[1:]):
-                prev_time, prev_value = prev
-                next_time, next_value = next
-                if prev_value < value <= next_value:
-                    pass
-                elif prev_value > value >= next_value:
-                    pass
-                else:
+            zipped_determination = zip(determination[:-1], determination[1:])
+            for (time1, value1), (time2, value2) in zipped_determination:
+                if not (value1 < value <= value2 or value1 > value >= value2):
                     continue
-                t = (value - prev_value) / float(next_value - prev_value)
-                yield prev_time + (next_time - prev_time) * t
+                time = (value - value1) / float(value2 - value1)
+                yield time1 + (time2 - time1) * time
 
     def _make_momentum(self, velocity_or_momentum, since=None, until=None):
         """Makes a :class:`Momentum` object by the given arguments.
@@ -406,8 +395,13 @@ class Gauge(object):
             value = number_or_gauge
             yield Segment(value, 0, since=self.set_at, until=inf)
 
-    def determine2(self, debug=False):
-        determination = SortedList()
+    def determine(self, debug=False):
+        """Determines the transformations from the time when the value set to
+        the farthest future.
+
+        :returns: a sorted list of the determination.
+        """
+        determination = SortedList()  # will be returned
         velocities = []
         velocity = 0
         since = self.set_at
@@ -552,13 +546,12 @@ class Gauge(object):
                 pass
         return determination
 
-    def determine(self):
+    def determine_old(self):
         """Determines the transformations from the time when the value set to
         the farthest future.
 
         :returns: a sorted list of the determination.
         """
-        return self.determine2()
         determination = SortedList()
         # accumulated velocities and the sum of velocities
         velocities = []
@@ -706,13 +699,10 @@ class Segment(namedtuple('Segment', ['value', 'velocity', 'since', 'until'])):
     def guess(self, at):
         if at < self.since:
             return self.value
-        elif self.until is not None and self.until < at:
-            return self.final()
+        elif self.until < at:
+            return self.get(self.until)
         else:
             return self.get(at)
-
-    def final(self):
-        return self.get(self.until)
 
     def intersect(self, seg):
         # y-intercepts
