@@ -421,7 +421,7 @@ class Gauge(object):
                 pass
             else:
                 determination.add((time, value))
-                # if debug and ctx is not None:
+                # if debug:
                 #     secho(' => {0:.2f}: {1:.2f} ({2})'
                 #           ''.format(time, value, ctx), fg='green')
             return time, value
@@ -430,13 +430,10 @@ class Gauge(object):
         def calc_velocity():
             if bound is None:
                 return sum(velocities)
-            if overlapped:
+            elif overlapped:
                 return bound.best(sum(velocities), bound.seg.velocity)
             else:
                 return sum(v for v in velocities if bound.cmp(v, 0))
-        # def out_of_bound(seg, boundary):
-        #     boundary_value = boundary.seg.guess(seg.since)
-        #     return boundary.cmp_inv(seg.value, boundary_value)
         def deter_intersection(seg, boundary):
             intersection = seg.intersect(boundary.seg)
             if intersection[AT] == seg.since:
@@ -478,7 +475,9 @@ class Gauge(object):
                         break
                     # choose next boundaries.
                     for boundary in boundaries:
-                        if boundary.seg.until < until:
+                        if boundary.seg.since < since < boundary.seg.until:
+                            continue
+                        elif boundary.seg.until < until:
                             boundary.walk()
                 # current segment
                 velocity = calc_velocity()
@@ -517,7 +516,8 @@ class Gauge(object):
                     # release from bound
                     bound_until = min(bound.seg.until, until)
                     # released
-                    since, value = deter(bound_until, seg.get(bound_until))
+                    since, value = deter(bound_until, seg.get(bound_until),
+                                         'released')
                 else:
                     # returned to safe zone
                     try:

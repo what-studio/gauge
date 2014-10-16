@@ -492,18 +492,18 @@ def test_hypergauge():
 
 
 def test_zigzag_hypergauge():
-    pytest.skip()
-    ceil = Gauge(1, 2, at=0)
-    floor = Gauge(0, 0, -1, at=0)
-    g = Gauge(0, ceil, floor, at=0)
-    for x in xrange(10):
-        ceil.add_momentum(+1, since=x * 4, until=x * 4 + 2)
-        ceil.add_momentum(-1, since=x * 4 + 2, until=x * 4 + 4)
-        floor.add_momentum(-1, since=x * 4, until=x * 4 + 2)
-        floor.add_momentum(+1, since=x * 4 + 2, until=x * 4 + 4)
+    ceil = Gauge(2, 3, 2, at=0)
+    floor = Gauge(1, 1, 0, at=0)
+    g = Gauge(1, ceil, floor, at=0)
+    for x in xrange(6):
+        ceil.add_momentum(+1, since=x * 2, until=x * 2 + 1)
+        ceil.add_momentum(-1, since=x * 2 + 1, until=x * 2 + 2)
+        floor.add_momentum(-1, since=x * 2, until=x * 2 + 1)
+        floor.add_momentum(+1, since=x * 2 + 1, until=x * 2 + 2)
+    for x in xrange(3):
         t = sum(y * 2 for y in xrange(x + 1))
         g.add_momentum(+1, since=t, until=t + (x + 1))
         g.add_momentum(-1, since=t + (x + 1), until=t + 2 * (x + 1))
     assert g.determine() == [
-        (0, 0), (1, 1), (2, 0), (3.5, 1.5), (4, 1), (6, -1), (8, 1), (9, 2),
-        (11.5, -0.5), (12, 0), (14.5, 2.5), (16, 1), (18.5, -1.5), (20, 0)]
+        (0, 1), (1, 2), (2, 1), (3.5, 2.5), (4, 2), (5.5, 0.5), (6, 1),
+        (7.5, 2.5), (8, 2), (9, 3), (10, 2), (11.5, 0.5), (12, 1)]
