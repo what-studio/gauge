@@ -446,7 +446,7 @@ def test_boundary():
     assert floor.best_inv(xrange(10)) == 0
 
 
-def test_unidirectional_hypergauge():
+def test_hypergauge():
     g = Gauge(12, 100, at=0)
     g.add_momentum(+1, since=1, until=6)
     g.add_momentum(-1, since=3, until=8)
@@ -474,9 +474,7 @@ def test_unidirectional_hypergauge():
     g.max.add_momentum(-1)
     assert g.determine() == [
         (0, 12), (1, 12), (2, 13), (3, 12), (6, 9), (8, 7), (15, 0)]
-
-
-def test_bidirectional_hypergauge():
+    # case 5
     ceil = Gauge(10, 10, at=0)
     ceil.add_momentum(-1, since=0, until=4)
     ceil.add_momentum(+1, since=6, until=7)
@@ -489,5 +487,23 @@ def test_bidirectional_hypergauge():
     g.add_momentum(+1, since=6, until=9)
     g.add_momentum(-1, since=9, until=12)
     assert g.determine() == [
-        (0, 5), (2.5, 7.5), (3, 7), (4, 6), (5.5, 4.5),
-        (6, 5), (8, 7), (9, 7), (12, 4)]
+        (0, 5), (2.5, 7.5), (3, 7), (4, 6), (5.5, 4.5), (6, 5), (8, 7),
+        (9, 7), (12, 4)]
+
+
+def test_zigzag_hypergauge():
+    pytest.skip()
+    ceil = Gauge(1, 2, at=0)
+    floor = Gauge(0, 0, -1, at=0)
+    g = Gauge(0, ceil, floor, at=0)
+    for x in xrange(10):
+        ceil.add_momentum(+1, since=x * 4, until=x * 4 + 2)
+        ceil.add_momentum(-1, since=x * 4 + 2, until=x * 4 + 4)
+        floor.add_momentum(-1, since=x * 4, until=x * 4 + 2)
+        floor.add_momentum(+1, since=x * 4 + 2, until=x * 4 + 4)
+        t = sum(y * 2 for y in xrange(x + 1))
+        g.add_momentum(+1, since=t, until=t + (x + 1))
+        g.add_momentum(-1, since=t + (x + 1), until=t + 2 * (x + 1))
+    assert g.determine() == [
+        (0, 0), (1, 1), (2, 0), (3.5, 1.5), (4, 1), (6, -1), (8, 1), (9, 2),
+        (11.5, -0.5), (12, 0), (14.5, 2.5), (16, 1), (18.5, -1.5), (20, 0)]
