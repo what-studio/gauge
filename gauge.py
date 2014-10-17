@@ -9,6 +9,7 @@
     :license: BSD, see LICENSE for more details.
 """
 from collections import namedtuple
+from itertools import chain
 import operator
 from time import time as now
 import warnings
@@ -442,9 +443,9 @@ class Gauge(object):
             return intersection[AT], intersection[VALUE], boundary, True
         # if debug:
         #     print
-        deter(since, value, 'init')
-        for time, method, momentum in self._plan:
-            if momentum not in self.momenta:
+        plan = chain([(self.set_at, None, None)], self._plan)
+        for time, method, momentum in plan:
+            if momentum is not None and momentum not in self.momenta:
                 continue
             # normalize time.
             until = max(time, self.set_at)
@@ -532,7 +533,9 @@ class Gauge(object):
             velocity = calc_velocity()
             since, value = deter(until, calc_value(until), 'normal')
             # prepare the next iteration
-            if method == ADD:
+            if method is None:
+                pass
+            elif method == ADD:
                 velocities.append(momentum.velocity)
             elif method == REMOVE:
                 velocities.remove(momentum.velocity)
