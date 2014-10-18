@@ -20,6 +20,11 @@ def t(timestamp):
         gauge.now = time.time
 
 
+def round_determination(determination, precision=0):
+    return [(round(time, precision), round(value, precision))
+            for time, value in determination]
+
+
 def test_deprecations():
     g = Gauge(0, 10, at=0)
     pytest.deprecated_call(g.current, 0)
@@ -86,6 +91,7 @@ def test_permanent():
     assert list(g.determination) == [(0, 0), (10, 10)]
     g = Gauge(12, 10, at=0)
     g.add_momentum(-1)
+    g.determine(True)
     assert list(g.determination) == [(0, 12), (2, 10), (12, 0)]
     g = Gauge(5, 10, at=0)
     g.add_momentum(+1, since=3)
@@ -390,6 +396,12 @@ def test_extensibility_of_make_momentum():
     assert m == (1, 2, 3)
 
 
+def test_just_one_momentum():
+    g = Gauge(5, 10, at=0)
+    g.add_momentum(+0.1, until=100)
+    assert g.determine() == [(0, 5), (50, 10), (100, 10)]
+
+
 def test_segment():
     seg = Segment(0, +1, since=0, until=10)
     assert seg.get(0) == 0
@@ -492,14 +504,13 @@ def test_hypergauge():
 
 
 def test_zigzag_hypergauge():
-    ceil = Gauge(2, 3, 2, at=0)
-    floor = Gauge(1, 1, 0, at=0)
-    g = Gauge(1, ceil, floor, at=0)
+    # case 1
+    g = Gauge(1, Gauge(2, 3, 2, at=0), Gauge(1, 1, 0, at=0), at=0)
     for x in xrange(6):
-        ceil.add_momentum(+1, since=x * 2, until=x * 2 + 1)
-        ceil.add_momentum(-1, since=x * 2 + 1, until=x * 2 + 2)
-        floor.add_momentum(-1, since=x * 2, until=x * 2 + 1)
-        floor.add_momentum(+1, since=x * 2 + 1, until=x * 2 + 2)
+        g.max.add_momentum(+1, since=x * 2, until=x * 2 + 1)
+        g.max.add_momentum(-1, since=x * 2 + 1, until=x * 2 + 2)
+        g.min.add_momentum(-1, since=x * 2, until=x * 2 + 1)
+        g.min.add_momentum(+1, since=x * 2 + 1, until=x * 2 + 2)
     for x in xrange(3):
         t = sum(y * 2 for y in xrange(x + 1))
         g.add_momentum(+1, since=t, until=t + (x + 1))
@@ -507,17 +518,13 @@ def test_zigzag_hypergauge():
     assert g.determine() == [
         (0, 1), (1, 2), (2, 1), (3.5, 2.5), (4, 2), (5.5, 0.5), (6, 1),
         (7.5, 2.5), (8, 2), (9, 3), (10, 2), (11.5, 0.5), (12, 1)]
-
-
-def test_thick_zigzag_hypergauge():
-    ceil = Gauge(3, 5, 3, at=0)
-    floor = Gauge(2, 2, 0, at=0)
-    g = Gauge(2, ceil, floor, at=0)
+    # case 2
+    g = Gauge(2, Gauge(3, 5, 3, at=0), Gauge(2, 2, 0, at=0), at=0)
     for x in xrange(5):
-        ceil.add_momentum(+1, since=x * 4, until=x * 4 + 2)
-        ceil.add_momentum(-1, since=x * 4 + 2, until=x * 4 + 4)
-        floor.add_momentum(-1, since=x * 4, until=x * 4 + 2)
-        floor.add_momentum(+1, since=x * 4 + 2, until=x * 4 + 4)
+        g.max.add_momentum(+1, since=x * 4, until=x * 4 + 2)
+        g.max.add_momentum(-1, since=x * 4 + 2, until=x * 4 + 4)
+        g.min.add_momentum(-1, since=x * 4, until=x * 4 + 2)
+        g.min.add_momentum(+1, since=x * 4 + 2, until=x * 4 + 4)
     for x in xrange(4):
         t = sum(y * 2 for y in xrange(x + 1))
         g.add_momentum(+1, since=t, until=t + (x + 1))
@@ -525,3 +532,32 @@ def test_thick_zigzag_hypergauge():
     assert g.determine() == [
         (0, 2), (1, 3), (2, 2), (3.5, 3.5), (4, 3), (6, 1), (8, 3), (9, 4),
         (11.5, 1.5), (12, 2), (14.5, 4.5), (16, 3), (18.5, 0.5), (20, 2)]
+
+
+def test_hyper_hypergauge():
+    # same with a hyper-gauge in :func:`test_zigzag_hypergauge`.
+    g = Gauge(1, Gauge(2, 3, 2, at=0), Gauge(1, 1, 0, at=0), at=0)
+    for x in xrange(6):
+        g.max.add_momentum(+1, since=x * 2, until=x * 2 + 1)
+        g.max.add_momentum(-1, since=x * 2 + 1, until=x * 2 + 2)
+        g.min.add_momentum(-1, since=x * 2, until=x * 2 + 1)
+        g.min.add_momentum(+1, since=x * 2 + 1, until=x * 2 + 2)
+    for x in xrange(3):
+        t = sum(y * 2 for y in xrange(x + 1))
+        g.add_momentum(+1, since=t, until=t + (x + 1))
+        g.add_momentum(-1, since=t + (x + 1), until=t + 2 * (x + 1))
+    # bug `g` is also a ceil of another gauge.
+    gg = Gauge(1, g, at=0)
+    gg.add_momentum(+0.5)
+    assert round_determination(gg.determine(), precision=2) == [
+        (0, 1), (1.33, 1.67), (2, 1), (4, 2), (5.5, 0.5), (9.5, 2.5),
+        (10, 2), (11.5, 0.5), (12.5, 1)]
+
+
+def test_just_one_momentum_in_hyper_gauge():
+    g = Gauge(5, Gauge(5, 10, at=0), Gauge(5, 10, at=0), at=0)
+    g.max.add_momentum(+1)
+    g.min.add_momentum(-1)
+    assert g.determine() == [(0, 5)]
+    g.add_momentum(+0.1, until=100)
+    assert g.determine() == [(0, 5), (50, 10), (100, 10)]

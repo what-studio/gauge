@@ -10,6 +10,7 @@
 """
 from collections import namedtuple
 from itertools import chain
+import math
 import operator
 from time import time as now
 import warnings
@@ -23,7 +24,7 @@ __version__ = '0.1.0'
 
 ADD = +1
 REMOVE = -1
-AT = 0
+TIME = 0
 VALUE = 1
 
 
@@ -34,14 +35,25 @@ def deprecate(message, *args, **kwargs):
     warnings.warn(DeprecationWarning(message.format(*args, **kwargs)))
 
 
-def now_or(at):
-    return now() if at is None else float(at)
+def now_or(time):
+    return now() if time is None else float(time)
+
+
+def inf_or(num):
+    return +inf if num is None else num
+
+
+def neginf_or(num):
+    return -inf if num is None else num
 
 
 class Gauge(object):
     """Represents a gauge.  A gauge has a value at any moment.  It can be
     modified by an user's adjustment or an effective momentum.
     """
+
+    #: The base time and value.
+    base = (None, 0)
 
     #: The value set by an user.
     value = 0
@@ -58,7 +70,7 @@ class Gauge(object):
         self.value = value
         self.set_at = now_or(at)
         self.momenta = SortedListWithKey(key=lambda m: m[2])  # sort by until
-        self._plan = SortedList()
+        self._events = SortedList()
 
     @property
     def determination(self):
@@ -321,9 +333,9 @@ class Gauge(object):
         momentum = self._make_momentum(*args, **kwargs)
         since, until = momentum.since, momentum.until
         self.momenta.add(momentum)
-        self._plan.add((since, ADD, momentum))
+        self._events.add((neginf_or(since), ADD, momentum))
         if until is not None:
-            self._plan.add((until, REMOVE, momentum))
+            self._events.add((inf_or(until), REMOVE, momentum))
         del self.determination
         return momentum
 
@@ -379,7 +391,7 @@ class Gauge(object):
         :param at: the time base.  (default: now)
         """
         at = now_or(at)
-        start = self.momenta.bisect_right((inf, inf, None))
+        start = self.momenta.bisect_right((+inf, +inf, None))
         stop = self.momenta.bisect_left((-inf, -inf, at))
         return self._coerce_and_remove_momenta(value, at, start, stop)
 
@@ -391,10 +403,18 @@ class Gauge(object):
                 velocity = (value2 - value1) / (time2 - time1)
                 yield Segment(value1, velocity, since=time1, until=time2)
             time, value = determination[-1]
-            yield Segment(value, 0, since=time, until=inf)
+            yield Segment(value, 0, since=time, until=+inf)
         else:
             value = number_or_gauge
-            yield Segment(value, 0, since=self.set_at, until=inf)
+            yield Segment(value, 0, since=self.set_at, until=+inf)
+
+    def walk_events(self):
+        yield (self.set_at, None, None)
+        time = +inf
+        for time, method, momentum in self._events:
+            yield time, method, momentum
+        if time != +inf:
+            yield (+inf, None, None)
 
     def determine(self, debug=False):
         """Determines the transformations from the time when the value set to
@@ -413,18 +433,18 @@ class Gauge(object):
         ceil = Boundary(self.walk_segs(self.max), operator.lt)
         floor = Boundary(self.walk_segs(self.min), operator.gt)
         boundaries = [ceil, floor]
-        # from click import echo, secho, style
-        # def repr_seg(seg):
-        #     return '{0:.2f}{1:+.2f}/s in {2}~{3}'.format(*seg)
+        from click import echo, secho, style
+        def repr_seg(seg):
+            return '{0:.2f}{1:+.2f}/s in {2}~{3}'.format(*seg)
         def deter(time, value, ctx=None):
-            if determination and determination[-1][AT] == time:
+            if determination and determination[-1][TIME] == time:
                 # already determined
                 pass
             else:
                 determination.add((time, value))
-                # if debug:
-                #     secho(' => {0:.2f}: {1:.2f} ({2})'
-                #           ''.format(time, value, ctx), fg='green')
+                if debug:
+                    secho(' => {0:.2f}: {1:.2f} ({2})'
+                          ''.format(time, value, ctx), fg='green')
             return time, value
         def calc_value(time):
             return value + velocity * (time - since)
@@ -435,27 +455,31 @@ class Gauge(object):
                 return bound.best(sum(velocities), bound.seg.velocity)
             else:
                 return sum(v for v in velocities if bound.cmp(v, 0))
-        def deter_intersection(seg, boundary):
+        def deter_intersection(seg, boundary, ctx=None):
             intersection = seg.intersect(boundary.seg)
-            if intersection[AT] == seg.since:
+            if intersection[TIME] == seg.since:
                 raise ValueError
-            deter(*intersection)  # inter
-            return intersection[AT], intersection[VALUE], boundary, True
-        # if debug:
-        #     print
-        plan = chain([(self.set_at, None, None)], self._plan)
-        for time, method, momentum in plan:
+            # deter(*intersection)  # inter
+            deter(intersection[TIME], intersection[VALUE], ctx)
+            return intersection[TIME], intersection[VALUE], boundary, True
+        if debug:
+            print
+        for time, method, momentum in self.walk_events():
+            if debug:
+                print time, method, momentum
             if momentum is not None and momentum not in self.momenta:
                 continue
             # normalize time.
             until = max(time, self.set_at)
-            # if debug:
-            #     echo('{0} {1:+.2f} {2} {3}'.format(
-            #          style(' {0} '.format(time), 'cyan', reverse=True),
-            #          velocity,
-            #          style({ceil: 'ceil', floor: 'floor', None: ''}[bound],
-            #                'cyan'),
-            #          style('overlapped' if overlapped else '', 'cyan')))
+            velocity = calc_velocity()
+            if debug:
+                echo('{0} {1:+.2f} {2} {3}'.format(
+                     style(' {0}({1}) '.format(until, time),
+                           'cyan', reverse=True),
+                     velocity,
+                     style({ceil: 'ceil', floor: 'floor', None: ''}[bound],
+                           'cyan'),
+                     style('overlapped' if overlapped else '', 'cyan')))
             # skip past boundaries.
             for boundary in boundaries:
                 while boundary.seg.until <= since:
@@ -489,49 +513,37 @@ class Gauge(object):
                 if bound is not None and overlapped:
                     if bound.cmp(velocity, bound.seg.velocity):
                         bound, overlapped = None, False
-                # if debug:
-                #     echo('    {0} between {1} and {2} {3} {4}'.format(
-                #          style(repr_seg(seg), 'red'),
-                #          style(repr_seg(ceil.seg), 'red'),
-                #          style(repr_seg(floor.seg), 'red'),
-                #          style({ceil: 'ceil', floor: 'floor', None: ''}
-                #                [bound], 'cyan'),
-                #          style('overlapped' if overlapped else '',
-                #                'cyan' if overlapped else '')))
-                if bound is None:
-                    for boundary in boundaries:
-                        # FIXME: really not required?
-                        # check if out of bound
-                        # if out_of_bound(seg, boundary):
-                        #     bound, overlapped = boundary, False
-                        #     break
-                        ############################################
-                        # check if there's the intersection between the current
-                        # segment and boundary
-                        try:
-                            since, value, bound, overlapped = \
-                                deter_intersection(seg, boundary)
-                        except ValueError:
-                            pass
-                        else:
-                            again = True
-                            break
-                elif overlapped:
+                if debug:
+                    echo('    {0} between {1} and {2} {3} {4}'.format(
+                         style(repr_seg(seg), 'red'),
+                         style(repr_seg(ceil.seg), 'red'),
+                         style(repr_seg(floor.seg), 'red'),
+                         style({ceil: 'ceil', floor: 'floor', None: ''}
+                               [bound], 'cyan'),
+                         style('overlapped' if overlapped else '',
+                               'cyan' if overlapped else '')))
+                if overlapped:
                     # release from bound
                     bound_until = min(bound.seg.until, until)
+                    if bound_until == +inf:
+                        break
                     # released
                     since, value = deter(bound_until, seg.get(bound_until),
                                          'released')
-                else:
-                    # returned to safe zone
+                    continue
+                for boundary in (boundaries if bound is None else [bound]):
                     try:
                         since, value, bound, overlapped = \
-                            deter_intersection(seg, bound)
+                            deter_intersection(seg, boundary, 'inter')
                     except ValueError:
                         pass
+                    else:
+                        again = True
+                        break
             # determine the last node in the current itreration
             velocity = calc_velocity()
-            since, value = deter(until, calc_value(until), 'normal')
+            if until != +inf:
+                since, value = deter(until, calc_value(until), 'normal')
             # prepare the next iteration
             if method is None:
                 pass
@@ -539,17 +551,6 @@ class Gauge(object):
                 velocities.append(momentum.velocity)
             elif method == REMOVE:
                 velocities.remove(momentum.velocity)
-        # determine the final nodes
-        for boundary in boundaries:
-            velocity = calc_velocity()
-            if not velocity:
-                break
-            seg = Segment(value, velocity, since=since, until=inf)
-            try:
-                since, value, bound, overlapped = \
-                    deter_intersection(seg, boundary)
-            except ValueError:
-                pass
         return determination
 
     def __getstate__(self):
@@ -571,6 +572,30 @@ class Gauge(object):
 
     # deprecated features
 
+    @property
+    def set_at(self):
+        # deprecated since v0.1.0
+        deprecate('Get Gauge.base[0] instead')
+        return self.base[TIME]
+
+    @set_at.setter
+    def set_at(self, time):
+        # deprecated since v0.1.0
+        deprecate('Update Gauge.base instead')
+        self.base = (time, self.base[VALUE])
+
+    @property
+    def value(self):
+        # deprecated since v0.1.0
+        deprecate('Get Gauge.base[1] instead')
+        return self.base[VALUE]
+
+    @value.setter
+    def value(self, value):
+        # deprecated since v0.1.0
+        deprecate('Update Gauge.base instead')
+        self.base = (self.base[TIME], value)
+
     def current(self, at=None):
         # deprecated since v0.0.5
         deprecate('Use Gauge.get() instead')
@@ -584,7 +609,6 @@ class Momentum(namedtuple('Momentum', ['velocity', 'since', 'until'])):
     specific period.
     """
 
-    # XXX: is better since=-inf, until=inf ?
     def __new__(cls, velocity, since=None, until=None):
         velocity = float(velocity)
         return super(Momentum, cls).__new__(cls, velocity, since, until)
@@ -620,18 +644,18 @@ class Segment(namedtuple('Segment', ['value', 'velocity', 'since', 'until'])):
         y_intercept = (self.value - self.velocity * self.since)
         seg_y_intercept = (seg.value - seg.velocity * seg.since)
         try:
-            at = (seg_y_intercept - y_intercept) / \
-                 (self.velocity - seg.velocity)
+            time = (seg_y_intercept - y_intercept) / \
+                   (self.velocity - seg.velocity)
         except ZeroDivisionError:
             raise ValueError('Parallel segment')
         since = max(self.since, seg.since)
         until = min(self.until, seg.until)
-        if since <= at <= until:
+        if since <= time <= until:
             pass
         else:
             raise ValueError('Intersection not in the range')
-        value = self.get(at)
-        return (at, value)
+        value = self.get(time)
+        return (time, value)
 
 
 class Boundary(object):
