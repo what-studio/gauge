@@ -7,6 +7,7 @@
 
     :copyright: (c) 2013-2014 by Heungsub Lee
     :license: BSD, see LICENSE for more details.
+
 """
 from collections import namedtuple
 import operator
@@ -17,13 +18,16 @@ from sortedcontainers import SortedList, SortedListWithKey
 
 
 __all__ = ['Gauge', 'Momentum']
-__version__ = '0.1.0'
+__version__ = '0.1.0.dev'
 
 
-ADD = +1
-REMOVE = -1
+# indices
 TIME = 0
 VALUE = 1
+
+# events
+ADD = +1
+REMOVE = -1
 
 
 inf = float('inf')
@@ -57,10 +61,9 @@ class Gauge(object):
     momenta = None
 
     def __init__(self, value, max, min=0, at=None):
-        self._max = max
-        self._min = min
         self.base = (now_or(at), value)
         self.momenta = SortedListWithKey(key=lambda m: m[2])  # sort by until
+        self._max, self._min = max, min
         self._events = SortedList()
 
     @property
@@ -430,15 +433,11 @@ class Gauge(object):
         since, value = self.base
         velocities = []
         velocity = 0
-        # boundaries
+        bound = None
+        overlapped = False
         ceil = Boundary(self.walk_segs(self.max), operator.lt)
         floor = Boundary(self.walk_segs(self.min), operator.gt)
         boundaries = [ceil, floor]
-        bound = None
-        overlapped = False
-        # calculators
-        def calc_value(time):
-            return value + velocity * (time - since)
         def calc_velocity():
             if bound is None:
                 return sum(velocities)
@@ -453,10 +452,10 @@ class Gauge(object):
         for time, method, momentum in self.walk_events():
             if momentum is not None and momentum not in self.momenta:
                 continue
-            # Normalize time.
+            # normalize time.
             until = max(time, self.base[TIME])
             velocity = calc_velocity()
-            # Check if the value is out of bound.
+            # check if the value is out of bound.
             for boundary in boundaries:
                 boundary_value = boundary.seg.guess(since)
                 if boundary.cmp_inv(value, boundary_value):
@@ -502,16 +501,16 @@ class Gauge(object):
                     if intersection[TIME] == seg.since:
                         continue
                     since, value = intersection
-                    yield (since, value)
                     bound, overlapped = boundary, True
-                    # iterate with same boundaries again.
-                    again = True
+                    again = True  # iterate with same boundaries again.
+                    yield (since, value)
                     break
             if until == +inf:
                 break
             # determine the last node in the current itreration.
             velocity = calc_velocity()
-            since, value = (until, calc_value(until))
+            value += velocity * (until - since)
+            since = until
             yield (since, value)
             # prepare the next iteration.
             if method == ADD:
@@ -538,7 +537,6 @@ class Gauge(object):
         """
         at = now_or(at)
         value = self.get(at=at)
-        form = '<{0} {1:.2f}'
         hyper = False
         limit_reprs = []
         for limit in [self.max, self.min]:
@@ -547,6 +545,7 @@ class Gauge(object):
                 limit_reprs.append('{0!r}'.format(limit))
             else:
                 limit_reprs.append('{0:.2f}'.format(limit))
+        form = '<{0} {1:.2f}'
         if not hyper and self.min == 0:
             form += '/{2}>'
         else:
