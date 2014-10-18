@@ -91,7 +91,7 @@ def test_permanent():
     assert list(g.determination) == [(0, 0), (10, 10)]
     g = Gauge(12, 10, at=0)
     g.add_momentum(-1)
-    g.determine(True)
+    g.determine()
     assert list(g.determination) == [(0, 12), (2, 10), (12, 0)]
     g = Gauge(5, 10, at=0)
     g.add_momentum(+1, since=3)
@@ -501,6 +501,13 @@ def test_hypergauge():
     assert g.determine() == [
         (0, 5), (2.5, 7.5), (3, 7), (4, 6), (5.5, 4.5), (6, 5), (8, 7),
         (9, 7), (12, 4)]
+    # case 6: just one momentum
+    g = Gauge(5, Gauge(5, 10, at=0), Gauge(5, 10, at=0), at=0)
+    g.max.add_momentum(+1)
+    g.min.add_momentum(-1)
+    assert g.determine() == [(0, 5)]
+    g.add_momentum(+0.1, until=100)
+    assert g.determine() == [(0, 5), (50, 10), (100, 10)]
 
 
 def test_zigzag_hypergauge():
@@ -552,12 +559,3 @@ def test_hyper_hypergauge():
     assert round_determination(gg.determine(), precision=2) == [
         (0, 1), (1.33, 1.67), (2, 1), (4, 2), (5.5, 0.5), (9.5, 2.5),
         (10, 2), (11.5, 0.5), (12.5, 1)]
-
-
-def test_just_one_momentum_in_hyper_gauge():
-    g = Gauge(5, Gauge(5, 10, at=0), Gauge(5, 10, at=0), at=0)
-    g.max.add_momentum(+1)
-    g.min.add_momentum(-1)
-    assert g.determine() == [(0, 5)]
-    g.add_momentum(+0.1, until=100)
-    assert g.determine() == [(0, 5), (50, 10), (100, 10)]
