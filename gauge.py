@@ -131,18 +131,19 @@ class Gauge(object):
         return self._get_limit(self.min, at=at)
 
     def _set_limits(self, min=None, max=None, clamp=False, at=None):
-        if clamp:
-            at = now_or(at)
-            value = self.get(at=at)
         if min is not None:
             self._min = min
         if max is not None:
             self._max = max
         if clamp:
-            if max is not None and value > max:
-                limited = max
-            elif min is not None and value < min:
-                limited = min
+            at = now_or(at)
+            value = self.get(at=at)
+            max_ = value if max is None else self._get_limit(max, at=at)
+            min_ = value if min is None else self._get_limit(min, at=at)
+            if value > max_:
+                limited = max_
+            elif value < min_:
+                limited = min_
             else:
                 limited = None
             if limited is not None:

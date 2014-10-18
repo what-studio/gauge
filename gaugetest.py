@@ -31,6 +31,10 @@ def test_deprecations():
     # removed since v0.1.0
     # pytest.deprecated_call(g.set, 0, limit=True)
     # pytest.deprecated_call(g.set_max, 0, limit=True)
+    pytest.deprecated_call(Gauge.value.fget, g)
+    pytest.deprecated_call(Gauge.value.fset, g, 10)
+    pytest.deprecated_call(Gauge.set_at.fget, g)
+    pytest.deprecated_call(Gauge.set_at.fset, g, 10)
 
 
 def test_in_range():
@@ -169,6 +173,8 @@ def test_set_min_max():
     assert g.min == 10
     assert g.get() == 5
     g.set_min(10, clamp=True)
+    assert g.get() == 10
+    g.set_min(5, clamp=True)  # to test meaningless clamping
     assert g.get() == 10
     g.min = 0
     g.max = 5
