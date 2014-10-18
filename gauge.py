@@ -415,22 +415,21 @@ class Gauge(object):
         :returns: a sorted list of the determination.
         """
         determination = SortedList()  # will be returned
+        since, value = self.base
         velocities = []
         velocity = 0
-        since = self.set_at
-        value = self.value
-        bound = None
-        overlapped = False
         # boundaries
         ceil = Boundary(self.walk_segs(self.max), operator.lt)
         floor = Boundary(self.walk_segs(self.min), operator.gt)
         boundaries = [ceil, floor]
+        bound = None
+        overlapped = False
         from click import echo, secho, style
         def repr_seg(seg):
             return '{0:.2f}{1:+.2f}/s in {2}~{3}'.format(*seg)
         def deter(time, value, ctx=None):
             if determination and determination[-1][TIME] == time:
-                # already determined
+                # already determined.
                 pass
             else:
                 determination.add((time, value))
@@ -447,23 +446,24 @@ class Gauge(object):
                 return bound.best(sum(velocities), bound.seg.velocity)
             else:
                 return sum(v for v in velocities if bound.cmp(v, 0))
-        def deter_intersection(seg, boundary, ctx=None):
-            intersection = seg.intersect(boundary.seg)
-            if intersection[TIME] == seg.since:
-                raise ValueError
-            # deter(*intersection)  # inter
-            deter(intersection[TIME], intersection[VALUE], ctx)
-            return intersection[TIME], intersection[VALUE], boundary, True
         if debug:
             print
+        # skip past boundaries.
+        for boundary in boundaries:
+            while boundary.seg.until <= since:
+                boundary.walk()
         for time, method, momentum in self.walk_events():
-            if debug:
-                print time, method, momentum
             if momentum is not None and momentum not in self.momenta:
                 continue
-            # normalize time.
+            # Normalize time.
             until = max(time, self.set_at)
             velocity = calc_velocity()
+            # Check if the value is out of bound.
+            for boundary in boundaries:
+                boundary_value = boundary.seg.guess(since)
+                if boundary.cmp_inv(value, boundary_value):
+                    bound, overlapped = boundary, False
+                    break
             if debug:
                 echo('{0} {1:+.2f} {2} {3}'.format(
                      style(' {0}({1}) '.format(until, time),
@@ -472,26 +472,16 @@ class Gauge(object):
                      style({ceil: 'ceil', floor: 'floor', None: ''}[bound],
                            'cyan'),
                      style('overlapped' if overlapped else '', 'cyan')))
-            # skip past boundaries.
-            for boundary in boundaries:
-                while boundary.seg.until <= since:
-                    boundary.walk()
-            # check if out of bound.
-            for boundary in boundaries:
-                boundary_value = boundary.seg.guess(since)
-                if boundary.cmp_inv(value, boundary_value):
-                    bound, overlapped = boundary, False
-                    break
-            # variables to control the loop
-            first = True  # first iteration marker
-            again = False
+            # variables to control the loop.
+            first = True  # first iteration marker.
+            again = False  # if True, don't choose next boundaries.
             while since < until:
                 if first:
                     first = False
                 elif again:
                     again = False
                 else:
-                    # stop iteration if all boundaries have been proceeded.
+                    # stop the loop if all boundaries have been proceeded.
                     if all(b.seg.until >= until for b in boundaries):
                         break
                     # choose next boundaries.
@@ -515,31 +505,33 @@ class Gauge(object):
                          style('overlapped' if overlapped else '',
                                'cyan' if overlapped else '')))
                 if overlapped:
-                    # release from bound
                     bound_until = min(bound.seg.until, until)
                     if bound_until == +inf:
                         break
-                    # released
+                    # released from the boundary.
                     since, value = deter(bound_until, seg.get(bound_until),
                                          'released')
                     continue
+                # find the intersection with a boundary.
                 for boundary in (boundaries if bound is None else [bound]):
                     try:
-                        since, value, bound, overlapped = \
-                            deter_intersection(seg, boundary, 'inter')
+                        intersection = seg.intersect(boundary.seg)
                     except ValueError:
-                        pass
-                    else:
-                        again = True
-                        break
-            # determine the last node in the current itreration
+                        continue
+                    if intersection[TIME] == seg.since:
+                        continue
+                    since, value = deter(*intersection)
+                    bound, overlapped = boundary, True
+                    # iterate with same boundaries again.
+                    again = True
+                    break
+            if until == +inf:
+                break
+            # determine the last node in the current itreration.
             velocity = calc_velocity()
-            if until != +inf:
-                since, value = deter(until, calc_value(until), 'normal')
-            # prepare the next iteration
-            if method is None:
-                pass
-            elif method == ADD:
+            since, value = deter(until, calc_value(until), 'normal')
+            # prepare the next iteration.
+            if method == ADD:
                 velocities.append(momentum.velocity)
             elif method == REMOVE:
                 velocities.remove(momentum.velocity)
