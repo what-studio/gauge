@@ -53,12 +53,6 @@ class Gauge(object):
     #: The base time and value.
     base = (None, 0)
 
-    #: The value set by an user.
-    value = 0
-
-    #: The time when the value was set.
-    set_at = None
-
     #: A sorted list of momenta.  The items are :class:`Momentum` objects.
     momenta = None
 
