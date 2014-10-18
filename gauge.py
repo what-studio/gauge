@@ -9,8 +9,6 @@
     :license: BSD, see LICENSE for more details.
 """
 from collections import namedtuple
-from itertools import chain
-import math
 import operator
 from time import time as now
 import warnings
