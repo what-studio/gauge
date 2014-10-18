@@ -59,34 +59,9 @@ class Gauge(object):
     def __init__(self, value, max, min=0, at=None):
         self._max = max
         self._min = min
-        self.value = value
-        self.set_at = now_or(at)
+        self.base = (now_or(at), value)
         self.momenta = SortedListWithKey(key=lambda m: m[2])  # sort by until
         self._events = SortedList()
-
-    @property
-    def determination(self):
-        """Returns the cached determination.  If there's no the cache, it
-        determines and caches that.
-
-        A determination is a sorted list of 2-dimensional points which take
-        times as x-values, gauge values as y-values.
-        """
-        try:
-            return self._determination
-        except AttributeError:
-            self._determination = self.determine()
-            return self._determination
-
-    @determination.deleter
-    def determination(self):
-        """Clears the cached determination.  If you touches the determination
-        at the next first time, that will be redetermined.
-        """
-        try:
-            del self._determination
-        except AttributeError:
-            pass
 
     @property
     def max(self):
@@ -104,12 +79,55 @@ class Gauge(object):
     def min(self, min):
         self.set_min(min)
 
-    def _set_limits(self, min=None, max=None,
-                    clamp=False, limit=None, at=None):
-        if limit is not None:
-            clamp = limit
-            # deprecated since v0.0.12
-            deprecate('Use clamp={0} instead of limit={0}', limit)
+    @property
+    def determination(self):
+        """The cached determination.  If there's no the cache, it redetermines
+        and caches that.
+
+        A determination is a sorted list of 2-dimensional points which take
+        times as x-values, gauge values as y-values.
+        """
+        try:
+            return self._determination
+        except AttributeError:
+            pass
+        # redetermine and cache.
+        self._determination = SortedList()
+        prev_time = None
+        for time, value in self.determine():
+            if prev_time == time:
+                continue
+            self._determination.add((time, value))
+            prev_time = time
+        return self._determination
+
+    def invalidate(self):
+        """Invalidates the cached determination.  If you touches the
+        determination at the next first time, that will be redetermined.
+
+        You don't need to call this method because all mutating methods such as
+        :meth:`incr` or :meth:`add_momentum` calls it.
+        """
+        try:
+            del self._determination
+        except AttributeError:
+            pass
+
+    def _get_limit(self, limit, at=None):
+        if isinstance(limit, Gauge):
+            return limit.get(at)
+        else:
+            return limit
+
+    def get_max(self, at=None):
+        """Gets the current maximum value."""
+        return self._get_limit(self.max, at=at)
+
+    def get_min(self, at=None):
+        """Gets the current minimum value."""
+        return self._get_limit(self.min, at=at)
+
+    def _set_limits(self, min=None, max=None, clamp=False, at=None):
         if clamp:
             at = now_or(at)
             value = self.get(at=at)
@@ -127,9 +145,9 @@ class Gauge(object):
             if limited is not None:
                 self.forget_past(limited, at=at)
                 return
-        del self.determination
+        self.invalidate()
 
-    def set_max(self, max, clamp=False, limit=None, at=None):
+    def set_max(self, max, clamp=False, at=None):
         """Changes the maximum.
 
         :param max: the value to set as the maximum.
@@ -137,9 +155,9 @@ class Gauge(object):
                       (default: ``True``)
         :param at: the time to change.  (default: now)
         """
-        self._set_limits(max=max, clamp=clamp, limit=limit, at=at)
+        self._set_limits(max=max, clamp=clamp, at=at)
 
-    def set_min(self, min, clamp=False, limit=None, at=None):
+    def set_min(self, min, clamp=False, at=None):
         """Changes the minimum.
 
         :param min: the value to set as the minimum.
@@ -147,7 +165,7 @@ class Gauge(object):
                       (default: ``True``)
         :param at: the time to change.  (default: now)
         """
-        self._set_limits(min=min, clamp=clamp, limit=limit, at=at)
+        self._set_limits(min=min, clamp=clamp, at=at)
 
     def _current_value_and_velocity(self, at=None):
         at = now_or(at)
@@ -186,7 +204,7 @@ class Gauge(object):
         value, velocity = self._current_value_and_velocity(at)
         return velocity
 
-    def incr(self, delta, over=False, clamp=False, limit=None, at=None):
+    def incr(self, delta, over=False, clamp=False, at=None):
         """Increases the value by the given delta immediately.  The
         determination would be changed.
 
@@ -196,31 +214,28 @@ class Gauge(object):
 
         :raises ValueError: the value is out of the range.
         """
-        if limit is not None:
-            over = not limit
-            # deprecated since v0.0.12
-            deprecate('Use over={0} instead of limit={1}', over, limit)
         at = now_or(at)
         prev_value = self.get(at=at)
         value = prev_value + delta
+        max_, min_ = self.get_max(at), self.get_min(at)
         if over:
             pass
         elif clamp:
-            if delta > 0 and value > self.max:
-                value = max(prev_value, self.max)
-            elif delta < 0 and value < self.min:
-                value = min(prev_value, self.min)
+            if delta > 0 and value > max_:
+                value = max(prev_value, max_)
+            elif delta < 0 and value < min_:
+                value = min(prev_value, min_)
         else:
-            if delta > 0 and value > self.max:
+            if delta > 0 and value > max_:
                 raise ValueError('The value to set is bigger than the '
-                                 'maximum ({0} > {1})'.format(value, self.max))
-            elif delta < 0 and value < self.min:
+                                 'maximum ({0} > {1})'.format(value, max_))
+            elif delta < 0 and value < min_:
                 raise ValueError('The value to set is smaller than the '
-                                 'minimum ({0} < {1})'.format(value, self.min))
+                                 'minimum ({0} < {1})'.format(value, min_))
         self.forget_past(value, at=at)
         return value
 
-    def decr(self, delta, over=False, clamp=False, limit=None, at=None):
+    def decr(self, delta, over=False, clamp=False, at=None):
         """Decreases the value by the given delta immediately.  The
         determination would be changed.
 
@@ -230,9 +245,9 @@ class Gauge(object):
 
         :raises ValueError: the value is out of the range.
         """
-        return self.incr(-delta, over=over, clamp=clamp, limit=limit, at=at)
+        return self.incr(-delta, over=over, clamp=clamp, at=at)
 
-    def set(self, value, over=False, clamp=False, limit=None, at=None):
+    def set(self, value, over=False, clamp=False, at=None):
         """Sets the current value immediately.  The determination would be
         changed.
 
@@ -244,7 +259,7 @@ class Gauge(object):
         """
         at = now_or(at)
         delta = value - self.get(at=at)
-        return self.incr(delta, over=over, clamp=clamp, limit=limit, at=at)
+        return self.incr(delta, over=over, clamp=clamp, at=at)
 
     def when(self, value, after=0):
         """When the gauge reaches to the goal value.
@@ -297,7 +312,7 @@ class Gauge(object):
         """
         if isinstance(velocity_or_momentum, Momentum):
             if not (since is until is None):
-                raise TypeError('Arguments behine the first argument as a '
+                raise TypeError('Arguments behind the first argument as a '
                                 'momentum should be None')
             momentum = velocity_or_momentum
         else:
@@ -328,7 +343,7 @@ class Gauge(object):
         self._events.add((neginf_or(since), ADD, momentum))
         if until is not None:
             self._events.add((inf_or(until), REMOVE, momentum))
-        del self.determination
+        self.invalidate()
         return momentum
 
     def remove_momentum(self, *args, **kwargs):
@@ -343,7 +358,7 @@ class Gauge(object):
             self.momenta.remove(momentum)
         except ValueError:
             raise ValueError('{0} not in the gauge'.format(momentum))
-        del self.determination
+        self.invalidate()
 
     def _coerce_and_remove_momenta(self, value=None, at=None,
                                    start=None, stop=None):
@@ -361,10 +376,9 @@ class Gauge(object):
         at = now_or(at)
         if value is None:
             value = self.get(at=at)
-        self.value = value
-        self.set_at = at
+        self.base = (at, value)
         del self.momenta[start:stop]
-        del self.determination
+        self.invalidate()
         return value
 
     def clear_momenta(self, value=None, at=None):
@@ -387,9 +401,18 @@ class Gauge(object):
         stop = self.momenta.bisect_left((-inf, -inf, at))
         return self._coerce_and_remove_momenta(value, at, start, stop)
 
+    def walk_events(self):
+        """Yields momentum adding and removing events.  An event is a tuple of
+        ``(time, ADD|REMOVE, momentum)``.
+        """
+        yield (self.base[TIME], None, None)
+        for time, method, momentum in self._events:
+            yield time, method, momentum
+        yield (+inf, None, None)
+
     def walk_segs(self, number_or_gauge):
         if isinstance(number_or_gauge, Gauge):
-            determination = number_or_gauge.determine()
+            determination = number_or_gauge.determination
             zipped_determination = zip(determination[:-1], determination[1:])
             for (time1, value1), (time2, value2) in zipped_determination:
                 velocity = (value2 - value1) / (time2 - time1)
@@ -398,23 +421,12 @@ class Gauge(object):
             yield Segment(value, 0, since=time, until=+inf)
         else:
             value = number_or_gauge
-            yield Segment(value, 0, since=self.set_at, until=+inf)
+            yield Segment(value, 0, since=self.base[TIME], until=+inf)
 
-    def walk_events(self):
-        yield (self.set_at, None, None)
-        time = +inf
-        for time, method, momentum in self._events:
-            yield time, method, momentum
-        if time != +inf:
-            yield (+inf, None, None)
-
-    def determine(self, debug=False):
+    def determine(self):
         """Determines the transformations from the time when the value set to
         the farthest future.
-
-        :returns: a sorted list of the determination.
         """
-        determination = SortedList()  # will be returned
         since, value = self.base
         velocities = []
         velocity = 0
@@ -424,19 +436,7 @@ class Gauge(object):
         boundaries = [ceil, floor]
         bound = None
         overlapped = False
-        from click import echo, secho, style
-        def repr_seg(seg):
-            return '{0:.2f}{1:+.2f}/s in {2}~{3}'.format(*seg)
-        def deter(time, value, ctx=None):
-            if determination and determination[-1][TIME] == time:
-                # already determined.
-                pass
-            else:
-                determination.add((time, value))
-                if debug:
-                    secho(' => {0:.2f}: {1:.2f} ({2})'
-                          ''.format(time, value, ctx), fg='green')
-            return time, value
+        # calculators
         def calc_value(time):
             return value + velocity * (time - since)
         def calc_velocity():
@@ -446,8 +446,6 @@ class Gauge(object):
                 return bound.best(sum(velocities), bound.seg.velocity)
             else:
                 return sum(v for v in velocities if bound.cmp(v, 0))
-        if debug:
-            print
         # skip past boundaries.
         for boundary in boundaries:
             while boundary.seg.until <= since:
@@ -456,7 +454,7 @@ class Gauge(object):
             if momentum is not None and momentum not in self.momenta:
                 continue
             # Normalize time.
-            until = max(time, self.set_at)
+            until = max(time, self.base[TIME])
             velocity = calc_velocity()
             # Check if the value is out of bound.
             for boundary in boundaries:
@@ -464,14 +462,6 @@ class Gauge(object):
                 if boundary.cmp_inv(value, boundary_value):
                     bound, overlapped = boundary, False
                     break
-            if debug:
-                echo('{0} {1:+.2f} {2} {3}'.format(
-                     style(' {0}({1}) '.format(until, time),
-                           'cyan', reverse=True),
-                     velocity,
-                     style({ceil: 'ceil', floor: 'floor', None: ''}[bound],
-                           'cyan'),
-                     style('overlapped' if overlapped else '', 'cyan')))
             # variables to control the loop.
             first = True  # first iteration marker.
             again = False  # if True, don't choose next boundaries.
@@ -495,22 +485,13 @@ class Gauge(object):
                 if bound is not None and overlapped:
                     if bound.cmp(velocity, bound.seg.velocity):
                         bound, overlapped = None, False
-                if debug:
-                    echo('    {0} between {1} and {2} {3} {4}'.format(
-                         style(repr_seg(seg), 'red'),
-                         style(repr_seg(ceil.seg), 'red'),
-                         style(repr_seg(floor.seg), 'red'),
-                         style({ceil: 'ceil', floor: 'floor', None: ''}
-                               [bound], 'cyan'),
-                         style('overlapped' if overlapped else '',
-                               'cyan' if overlapped else '')))
                 if overlapped:
                     bound_until = min(bound.seg.until, until)
                     if bound_until == +inf:
                         break
                     # released from the boundary.
-                    since, value = deter(bound_until, seg.get(bound_until),
-                                         'released')
+                    since, value = (bound_until, seg.get(bound_until))
+                    yield (since, value)
                     continue
                 # find the intersection with a boundary.
                 for boundary in (boundaries if bound is None else [bound]):
@@ -520,7 +501,8 @@ class Gauge(object):
                         continue
                     if intersection[TIME] == seg.since:
                         continue
-                    since, value = deter(*intersection)
+                    since, value = intersection
+                    yield (since, value)
                     bound, overlapped = boundary, True
                     # iterate with same boundaries again.
                     again = True
@@ -529,30 +511,47 @@ class Gauge(object):
                 break
             # determine the last node in the current itreration.
             velocity = calc_velocity()
-            since, value = deter(until, calc_value(until), 'normal')
+            since, value = (until, calc_value(until))
+            yield (since, value)
             # prepare the next iteration.
             if method == ADD:
                 velocities.append(momentum.velocity)
             elif method == REMOVE:
                 velocities.remove(momentum.velocity)
-        return determination
 
     def __getstate__(self):
-        return (self.value, self.set_at, self._max, self._min,
-                map(tuple, self.momenta))
+        return (self.base, self._max, self._min, map(tuple, self.momenta))
 
     def __setstate__(self, state):
-        value, set_at, max, min, momenta = state
-        self.__init__(value, max=max, min=min, at=set_at)
+        base, max, min, momenta = state
+        self.__init__(base[VALUE], max=max, min=min, at=base[TIME])
         for momentum in momenta:
             self.add_momentum(*momentum)
 
     def __repr__(self, at=None):
+        """Example strings:
+
+        - ``<Gauge 0.00/2.00>``
+        - ``<Gauge 0.00 between 1.00~2.00>``
+        - ``<Gauge 0.00 between <Gauge 0.00/2.00>~<Gauge 2.00/2.00>>``
+
+        """
         at = now_or(at)
         value = self.get(at=at)
         form = '<{0} {1:.2f}'
-        form += '/{2}>' if self.min == 0 else ' between {3}~{2}>'
-        return form.format(type(self).__name__, value, self.max, self.min)
+        hyper = False
+        limit_reprs = []
+        for limit in [self.max, self.min]:
+            if isinstance(limit, Gauge):
+                hyper = True
+                limit_reprs.append('{0!r}'.format(limit))
+            else:
+                limit_reprs.append('{0:.2f}'.format(limit))
+        if not hyper and self.min == 0:
+            form += '/{2}>'
+        else:
+            form += ' between {3}~{2}>'
+        return form.format(type(self).__name__, value, *limit_reprs)
 
     # deprecated features
 
@@ -600,7 +599,7 @@ class Momentum(namedtuple('Momentum', ['velocity', 'since', 'until'])):
     def __repr__(self):
         string = '<{0} {1:+.2f}/s'.format(type(self).__name__, self.velocity)
         if self.since is not None or self.until is not None:
-            string += ' {0}~{1}'.format(
+            string += ' {0:.2f}~{1:.2f}'.format(
                 '' if self.since is None else self.since,
                 '' if self.until is None else self.until)
         string += '>'

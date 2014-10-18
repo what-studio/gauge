@@ -28,8 +28,9 @@ def round_determination(determination, precision=0):
 def test_deprecations():
     g = Gauge(0, 10, at=0)
     pytest.deprecated_call(g.current, 0)
-    pytest.deprecated_call(g.set, 0, limit=True)
-    pytest.deprecated_call(g.set_max, 0, limit=True)
+    # removed since v0.1.0
+    # pytest.deprecated_call(g.set, 0, limit=True)
+    # pytest.deprecated_call(g.set_max, 0, limit=True)
 
 
 def test_in_range():
@@ -91,7 +92,6 @@ def test_permanent():
     assert list(g.determination) == [(0, 0), (10, 10)]
     g = Gauge(12, 10, at=0)
     g.add_momentum(-1)
-    g.determine()
     assert list(g.determination) == [(0, 12), (2, 10), (12, 0)]
     g = Gauge(5, 10, at=0)
     g.add_momentum(+1, since=3)
@@ -284,11 +284,13 @@ def test_since_gte_until():
 
 def test_repr():
     g = Gauge(0, 10, at=0)
-    assert repr(g) == '<Gauge 0.00/10>'
+    assert repr(g) == '<Gauge 0.00/10.00>'
     g.set_min(-10, at=0)
-    assert repr(g) == '<Gauge 0.00 between -10~10>'
+    assert repr(g) == '<Gauge 0.00 between -10.00~10.00>'
+    g.set_max(Gauge(10, 10), at=0)
+    assert repr(g) == '<Gauge 0.00 between -10.00~<Gauge 10.00/10.00>>'
     m = Momentum(+100, since=10, until=20)
-    assert repr(m) == '<Momentum +100.00/s 10~20>'
+    assert repr(m) == '<Momentum +100.00/s 10.00~20.00>'
 
 
 def test_case1():
@@ -397,9 +399,25 @@ def test_extensibility_of_make_momentum():
 
 
 def test_just_one_momentum():
-    g = Gauge(5, 10, at=0)
-    g.add_momentum(+0.1, until=100)
-    assert g.determine() == [(0, 5), (50, 10), (100, 10)]
+    def gen_gauge(since=None, until=None):
+        g = Gauge(5, 10, at=0)
+        g.add_momentum(+0.1, since, until)
+        return g
+    # None ~ None
+    g = gen_gauge()
+    assert g.determination == [(0, 5), (50, 10)]
+    # 0 ~ None
+    g = gen_gauge(since=0)
+    assert g.determination == [(0, 5), (50, 10)]
+    # None ~ 100
+    g = gen_gauge(until=100)
+    assert g.determination == [(0, 5), (50, 10), (100, 10)]
+    # 0 ~ 100
+    g = gen_gauge(since=0, until=100)
+    assert g.determination == [(0, 5), (50, 10), (100, 10)]
+    # -100 ~ 100
+    g = gen_gauge(since=-100, until=100)
+    assert g.determination == [(0, 5), (50, 10), (100, 10)]
 
 
 def test_segment():
@@ -465,26 +483,26 @@ def test_hypergauge():
     # case 1
     g.max = Gauge(15, 15, at=0)
     g.max.add_momentum(-1, until=5)
-    assert g.determine() == [
+    assert g.determination == [
         (0, 12), (1, 12), (2, 13), (3, 12), (5, 10), (6, 10), (8, 8)]
-    assert g.max.determine() == [(0, 15), (5, 10)]
+    assert g.max.determination == [(0, 15), (5, 10)]
     # case 2
     g.max = Gauge(15, 15, at=0)
     g.max.add_momentum(-1, until=4)
     g.max.add_momentum(+1, since=4, until=6)
-    assert g.determine() == [
+    assert g.determination == [
         (0, 12), (1, 12), (2, 13), (3, 12), (4, 11), (6, 11), (8, 9)]
     # case 3
     g.set_max(10, at=0)
-    assert g.determine() == [
+    assert g.determination == [
         (0, 12), (1, 12), (3, 12), (5, 10), (6, 10), (8, 8)]
     g.set_max(Gauge(10, 100, at=0), at=0)
-    assert g.determine() == [
+    assert g.determination == [
         (0, 12), (1, 12), (3, 12), (5, 10), (6, 10), (8, 8)]
     # case 4
     g.max = Gauge(15, 15, at=0)
     g.max.add_momentum(-1)
-    assert g.determine() == [
+    assert g.determination == [
         (0, 12), (1, 12), (2, 13), (3, 12), (6, 9), (8, 7), (15, 0)]
     # case 5
     ceil = Gauge(10, 10, at=0)
@@ -498,16 +516,16 @@ def test_hypergauge():
     g.add_momentum(-1, since=3, until=6)
     g.add_momentum(+1, since=6, until=9)
     g.add_momentum(-1, since=9, until=12)
-    assert g.determine() == [
+    assert g.determination == [
         (0, 5), (2.5, 7.5), (3, 7), (4, 6), (5.5, 4.5), (6, 5), (8, 7),
         (9, 7), (12, 4)]
     # case 6: just one momentum
     g = Gauge(5, Gauge(5, 10, at=0), Gauge(5, 10, at=0), at=0)
     g.max.add_momentum(+1)
     g.min.add_momentum(-1)
-    assert g.determine() == [(0, 5)]
+    assert g.determination == [(0, 5)]
     g.add_momentum(+0.1, until=100)
-    assert g.determine() == [(0, 5), (50, 10), (100, 10)]
+    assert g.determination == [(0, 5), (50, 10), (100, 10)]
 
 
 def test_zigzag_hypergauge():
@@ -522,7 +540,7 @@ def test_zigzag_hypergauge():
         t = sum(y * 2 for y in xrange(x + 1))
         g.add_momentum(+1, since=t, until=t + (x + 1))
         g.add_momentum(-1, since=t + (x + 1), until=t + 2 * (x + 1))
-    assert g.determine() == [
+    assert g.determination == [
         (0, 1), (1, 2), (2, 1), (3.5, 2.5), (4, 2), (5.5, 0.5), (6, 1),
         (7.5, 2.5), (8, 2), (9, 3), (10, 2), (11.5, 0.5), (12, 1)]
     # case 2
@@ -536,7 +554,7 @@ def test_zigzag_hypergauge():
         t = sum(y * 2 for y in xrange(x + 1))
         g.add_momentum(+1, since=t, until=t + (x + 1))
         g.add_momentum(-1, since=t + (x + 1), until=t + 2 * (x + 1))
-    assert g.determine() == [
+    assert g.determination == [
         (0, 2), (1, 3), (2, 2), (3.5, 3.5), (4, 3), (6, 1), (8, 3), (9, 4),
         (11.5, 1.5), (12, 2), (14.5, 4.5), (16, 3), (18.5, 0.5), (20, 2)]
 
@@ -556,6 +574,41 @@ def test_hyper_hypergauge():
     # bug `g` is also a ceil of another gauge.
     gg = Gauge(1, g, at=0)
     gg.add_momentum(+0.5)
-    assert round_determination(gg.determine(), precision=2) == [
+    assert round_determination(gg.determination, precision=2) == [
         (0, 1), (1.33, 1.67), (2, 1), (4, 2), (5.5, 0.5), (9.5, 2.5),
         (10, 2), (11.5, 0.5), (12.5, 1)]
+
+
+def test_over_max_on_hypergauge():
+    g = Gauge(1, Gauge(10, 20, at=0), at=0)
+    g.max.add_momentum(+1)
+    with pytest.raises(ValueError):
+        g.set(20, at=0)
+    g.set(20, at=0, over=True)
+    assert g.get(at=0) == 20
+    g.set(20, at=10)
+    assert g.get(at=10) == 20
+    assert g.get(at=0) == 20  # past was forgot
+
+
+def test_pickle_hypergauge():
+    # case 1 from :func:`test_hypergauge`.
+    g = Gauge(12, 100, at=0)
+    g.add_momentum(+1, since=1, until=6)
+    g.add_momentum(-1, since=3, until=8)
+    g.max = Gauge(15, 15, at=0)
+    g.max.add_momentum(-1, until=5)
+    assert g.determination == [
+        (0, 12), (1, 12), (2, 13), (3, 12), (5, 10), (6, 10), (8, 8)]
+    assert g.max.determination == [(0, 15), (5, 10)]
+    data = pickle.dumps(g)
+    g2 = pickle.loads(data)
+    assert g2.determination == [
+        (0, 12), (1, 12), (2, 13), (3, 12), (5, 10), (6, 10), (8, 8)]
+    assert g2.max.determination == [(0, 15), (5, 10)]
+
+
+def test_determine_is_generator():
+    # determine() changed to be a generator since v0.1.0
+    g = Gauge(12, 100, at=0)
+    assert isinstance(g.determine(), types.GeneratorType)
