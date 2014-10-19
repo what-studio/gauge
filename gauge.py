@@ -652,18 +652,16 @@ class Boundary(object):
     #: Compares two values.  Choose one of `operator.lt` and `operator.gt`.
     cmp = None
 
-    #: Returns the best value in an iterable or arguments.  Usually it is
-    #: indicated from :attr:`cmp` function.  `operator.lt` indicates
-    #: :func:`min` and `operator.gt` indicates :func:`max`.
+    #: Returns the best value in an iterable or arguments.  It is indicated
+    #: from :attr:`cmp` function.  `operator.lt` indicates :func:`min` and
+    #: `operator.gt` indicates :func:`max`.
     best = None
 
-    def __init__(self, segs_iter, cmp=operator.lt, best=None):
+    def __init__(self, segs_iter, cmp=operator.lt):
         assert cmp in [operator.lt, operator.gt]
         self.segs_iter = segs_iter
         self.cmp = cmp
-        if best is None:
-            best = {operator.lt: min, operator.gt: max}[cmp]
-        self.best = best
+        self.best = {operator.lt: min, operator.gt: max}[cmp]
         self.walk()
 
     def walk(self):
@@ -674,6 +672,3 @@ class Boundary(object):
 
     def cmp_inv(self, x, y):
         return not self.cmp_eq(x, y)
-
-    def best_inv(self, *args, **kwargs):
-        return {min: max, max: min}[self.best](*args, **kwargs)

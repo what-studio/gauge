@@ -494,8 +494,6 @@ def test_boundary():
     floor = Boundary(iter([zero_seg]), operator.gt)
     assert ceil.best is min
     assert floor.best is max
-    assert ceil.best_inv(xrange(10)) == 9
-    assert floor.best_inv(xrange(10)) == 0
 
 
 def test_hypergauge():
