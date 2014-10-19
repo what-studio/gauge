@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from contextlib import contextmanager
+import gc
 import operator
 import pickle
 import time
@@ -625,6 +626,7 @@ def test_hypergauge_links():
     # clear dead links.
     g.max = max_g
     del g
+    gc.collect()
     assert list(max_g._links)[0]() is None
     max_g.invalidate()
     assert not max_g._links
