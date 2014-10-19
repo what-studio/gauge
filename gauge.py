@@ -320,8 +320,8 @@ class Gauge(object):
             for (time1, value1), (time2, value2) in zipped_determination:
                 if not (value1 < value <= value2 or value1 > value >= value2):
                     continue
-                time = (value - value1) / float(value2 - value1)
-                yield time1 + (time2 - time1) * time
+                ratio = (value - value1) / float(value2 - value1)
+                yield (time1 + (time2 - time1) * ratio)
 
     def _make_momentum(self, velocity_or_momentum, since=None, until=None):
         """Makes a :class:`Momentum` object by the given arguments.
