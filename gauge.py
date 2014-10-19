@@ -65,10 +65,10 @@ class Gauge(object):
         at = now_or(at)
         self.base = (at, value)
         self.momenta = SortedListWithKey(key=lambda m: m[2])  # sort by until
-        self._events = SortedList()
-        self._links = set()
         self.set_max(max, at=at)
         self.set_min(min, at=at)
+        self._events = SortedList()
+        self._links = set()
 
     @property
     def max(self):
@@ -115,19 +115,25 @@ class Gauge(object):
         You don't need to call this method because all mutating methods such as
         :meth:`incr` or :meth:`add_momentum` calls it.
         """
+        # invalidate linked gauges together.  A linked gauge refers this gauge
+        # as a limit.
+        try:
+            links = list(self._links)
+        except AttributeError:
+            pass
+        else:
+            for gauge_ref in links:
+                gauge = gauge_ref()
+                if gauge is None:
+                    # the gauge has gone away
+                    self._links.remove(gauge_ref)
+                    continue
+                gauge.invalidate()
+        # remove the cached determination.
         try:
             del self._determination
         except AttributeError:
             pass
-        # invalidate linked gauges together.  A linked gauge refers this gauge
-        # as a limit.
-        for gauge_ref in list(self._links):
-            gauge = gauge_ref()
-            if gauge is None:
-                # the gauge has gone away
-                self._links.remove(gauge_ref)
-                continue
-            gauge.invalidate()
 
     def _get_limit(self, limit, at=None):
         """Gets the current limit."""
