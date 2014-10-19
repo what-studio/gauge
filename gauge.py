@@ -13,6 +13,7 @@ from collections import namedtuple
 import operator
 from time import time as now
 import warnings
+import weakref
 
 from sortedcontainers import SortedList, SortedListWithKey
 
@@ -61,10 +62,13 @@ class Gauge(object):
     momenta = None
 
     def __init__(self, value, max, min=0, at=None):
-        self.base = (now_or(at), value)
+        at = now_or(at)
+        self.base = (at, value)
         self.momenta = SortedListWithKey(key=lambda m: m[2])  # sort by until
-        self._max, self._min = max, min
         self._events = SortedList()
+        self._links = set()
+        self.set_max(max, at=at)
+        self.set_min(min, at=at)
 
     @property
     def max(self):
@@ -115,6 +119,15 @@ class Gauge(object):
             del self._determination
         except AttributeError:
             pass
+        # invalidate linked gauges together.  A linked gauge refers this gauge
+        # as a limit.
+        for gauge_ref in list(self._links):
+            gauge = gauge_ref()
+            if gauge is None:
+                # the gauge has gone away
+                self._links.remove(gauge_ref)
+                continue
+            gauge.invalidate()
 
     def _get_limit(self, limit, at=None):
         if isinstance(limit, Gauge):
@@ -130,16 +143,28 @@ class Gauge(object):
         """Gets the current minimum value."""
         return self._get_limit(self.min, at=at)
 
-    def _set_limits(self, min=None, max=None, clamp=False, at=None):
-        if min is not None:
-            self._min = min
-        if max is not None:
-            self._max = max
+    def _set_limits(self, max=None, min=None, clamp=False, at=None):
+        for limit, attr in [(max, '_max'), (min, '_min')]:
+            if limit is None:
+                continue
+            try:
+                prev_limit = getattr(self, attr)
+            except AttributeError:
+                pass
+            else:
+                if isinstance(prev_limit, Gauge):
+                    # unlink this gauge from the previous limiting gauge.
+                    prev_limit._links.discard(weakref.ref(self))
+            if isinstance(limit, Gauge):
+                # link this gauge to the new limiting gauge.
+                limit._links.add(weakref.ref(self))
+            # set the internal attribute.
+            setattr(self, attr, limit)
         if clamp:
             at = now_or(at)
             value = self.get(at=at)
-            max_ = value if max is None else self._get_limit(max, at=at)
-            min_ = value if min is None else self._get_limit(min, at=at)
+            max_ = value if max is None else self.get_max(at=at)
+            min_ = value if min is None else self.get_min(at=at)
             if value > max_:
                 limited = max_
             elif value < min_:
@@ -148,6 +173,7 @@ class Gauge(object):
                 limited = None
             if limited is not None:
                 self.forget_past(limited, at=at)
+                # already invalidated by :meth:`forget_past`.
                 return
         self.invalidate()
 
@@ -417,15 +443,16 @@ class Gauge(object):
     def walk_segs(self, number_or_gauge):
         if isinstance(number_or_gauge, Gauge):
             determination = number_or_gauge.determination
+            first, last = determination[0], determination[-1]
+            yield Segment(first[VALUE], 0, self.base[TIME], first[TIME])
             zipped_determination = zip(determination[:-1], determination[1:])
             for (time1, value1), (time2, value2) in zipped_determination:
                 velocity = (value2 - value1) / (time2 - time1)
-                yield Segment(value1, velocity, since=time1, until=time2)
-            time, value = determination[-1]
-            yield Segment(value, 0, since=time, until=+inf)
+                yield Segment(value1, velocity, time1, time2)
+            yield Segment(last[VALUE], 0, last[TIME], +inf)
         else:
             value = number_or_gauge
-            yield Segment(value, 0, since=self.base[TIME], until=+inf)
+            yield Segment(value, 0, self.base[TIME], +inf)
 
     def determine(self):
         """Determines the transformations from the time when the value set to
@@ -480,7 +507,7 @@ class Gauge(object):
                             boundary.walk()
                 # current segment
                 velocity = calc_velocity()
-                seg = Segment(value, velocity, since=since, until=until)
+                seg = Segment(value, velocity, since, until)
                 # still bound?
                 if bound is not None and overlapped:
                     if bound.cmp(velocity, bound.seg.velocity):

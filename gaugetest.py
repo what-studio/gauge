@@ -4,6 +4,7 @@ import operator
 import pickle
 import time
 import types
+import weakref
 
 import pytest
 
@@ -591,12 +592,36 @@ def test_hyper_hypergauge():
         t = sum(y * 2 for y in xrange(x + 1))
         g.add_momentum(+1, since=t, until=t + (x + 1))
         g.add_momentum(-1, since=t + (x + 1), until=t + 2 * (x + 1))
-    # bug `g` is also a ceil of another gauge.
+    # but `g` is also a ceil of another gauge.
     gg = Gauge(1, g, at=0)
     gg.add_momentum(+0.5)
     assert round_determination(gg.determination, precision=2) == [
         (0, 1), (1.33, 1.67), (2, 1), (4, 2), (5.5, 0.5), (9.5, 2.5),
         (10, 2), (11.5, 0.5), (12.5, 1)]
+
+
+def test_hypergauge_with_different_base_time():
+    g = Gauge(0, Gauge(10, 100, at=100), at=0)
+    g.add_momentum(+1)
+    assert g.max.get(0) == 10
+    assert g.get(10) == 10
+    g = Gauge(0, Gauge(10, 100, at=0), at=100)
+    g.add_momentum(+1)
+    assert g.max.get(100) == 10
+    assert g.get(110) == 10
+
+
+def test_hypergauge_links():
+    max_g = Gauge(10, 100, at=0)
+    g = Gauge(0, max_g, at=0)
+    assert weakref.ref(g) in max_g._links
+    g.add_momentum(+1)
+    assert g.get(100) == 10
+    max_g.set(100, at=0)
+    assert g.get(100) == 100
+    g.max = 10
+    assert g.get(100) == 10
+    assert weakref.ref(g) not in max_g._links
 
 
 def test_over_max_on_hypergauge():
