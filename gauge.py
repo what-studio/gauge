@@ -439,7 +439,10 @@ class Gauge(object):
         ``(time, ADD|REMOVE, momentum)``.
         """
         yield (self.base[TIME], None, None)
-        for time, method, momentum in self._events:
+        for time, method, momentum in list(self._events):
+            if momentum not in self.momenta:
+                self._events.remove((time, method, momentum))
+                continue
             yield time, method, momentum
         yield (+inf, None, None)
 
@@ -475,36 +478,23 @@ class Gauge(object):
         ceil = Boundary(self.walk_segs(self.max), operator.lt)
         floor = Boundary(self.walk_segs(self.min), operator.gt)
         boundaries = [ceil, floor]
-        def calc_velocity():
-            if bound is None:
-                return sum(velocities)
-            elif overlapped:
-                return bound.best(sum(velocities), bound.seg.velocity)
-            else:
-                return sum(v for v in velocities if bound.cmp(v, 0))
         # skip past boundaries.
         for boundary in boundaries:
             while boundary.seg.until <= since:
                 boundary.walk()
         for time, method, momentum in self.walk_events():
-            if momentum is not None and momentum not in self.momenta:
-                continue
-            # normalize time.
-            until = max(time, self.base[TIME])
-            velocity = calc_velocity()
             # check if the value is out of bound.
             for boundary in boundaries:
                 boundary_value = boundary.seg.guess(since)
                 if boundary.cmp_inv(value, boundary_value):
                     bound, overlapped = boundary, False
                     break
+            # normalize time.
+            until = max(time, self.base[TIME])
             # variables to control the loop.
-            first = True  # first iteration marker.
-            again = False  # if True, don't choose next boundaries.
+            again = True  # if True, don't choose next boundaries.
             while since < until:
-                if first:
-                    first = False
-                elif again:
+                if again:
                     again = False
                 else:
                     # stop the loop if all boundaries have been proceeded.
@@ -514,13 +504,18 @@ class Gauge(object):
                     for boundary in boundaries:
                         if boundary.seg.until < until:
                             boundary.walk()
-                # current segment
-                velocity = calc_velocity()
+                # calculate velocity.
+                if bound is None:
+                    velocity = sum(velocities)
+                elif overlapped:
+                    velocity = bound.best(sum(velocities), bound.seg.velocity)
+                else:
+                    velocity = sum(v for v in velocities if bound.cmp(v, 0))
+                # is still bound?
+                if overlapped and bound.cmp(velocity, bound.seg.velocity):
+                    bound, overlapped = None, False
+                # current segment.
                 seg = Segment(value, velocity, since, until)
-                # still bound?
-                if bound is not None and overlapped:
-                    if bound.cmp(velocity, bound.seg.velocity):
-                        bound, overlapped = None, False
                 if overlapped:
                     bound_until = min(bound.seg.until, until)
                     if bound_until == +inf:
@@ -529,8 +524,8 @@ class Gauge(object):
                     since, value = (bound_until, seg.get(bound_until))
                     yield (since, value)
                     continue
-                # find the intersection with a boundary.
                 for boundary in (boundaries if bound is None else [bound]):
+                    # find the intersection with a boundary.
                     try:
                         intersection = seg.intersection(boundary.seg)
                     except ValueError:
@@ -545,15 +540,14 @@ class Gauge(object):
             if until == +inf:
                 break
             # determine the last node in the current itreration.
-            velocity = calc_velocity()
             value += velocity * (until - since)
-            since = until
-            yield (since, value)
+            yield (until, value)
             # prepare the next iteration.
             if method == ADD:
                 velocities.append(momentum.velocity)
             elif method == REMOVE:
                 velocities.remove(momentum.velocity)
+            since = until
 
     def __getstate__(self):
         momenta = list(map(tuple, self.momenta))
