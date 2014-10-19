@@ -458,15 +458,15 @@ def test_segment():
         seg.get(11)
     assert seg.guess(-1) == 0
     assert seg.guess(11) == 10
-    assert seg.intersect(Segment(5, 0, since=0, until=10)) == (5, 5)
-    assert seg.intersect(Segment(10, 0, since=0, until=10)) == (10, 10)
-    assert seg.intersect(Segment(5, 0, since=0, until=inf)) == (5, 5)
+    assert seg.intersection(Segment(5, 0, since=0, until=10)) == (5, 5)
+    assert seg.intersection(Segment(10, 0, since=0, until=10)) == (10, 10)
+    assert seg.intersection(Segment(5, 0, since=0, until=inf)) == (5, 5)
     with pytest.raises(ValueError):
-        seg.intersect(Segment(15, 0, since=0, until=10))
+        seg.intersection(Segment(15, 0, since=0, until=10))
     with pytest.raises(ValueError):
-        seg.intersect(Segment(5, 0, since=6, until=10))
+        seg.intersection(Segment(5, 0, since=6, until=10))
     with pytest.raises(ValueError):
-        seg.intersect(Segment(5, 0, since=-inf, until=inf))
+        seg.intersection(Segment(5, 0, since=-inf, until=inf))
     seg = Segment(0, +1, since=0, until=inf)
     assert seg.get(100) == 100
     assert seg.get(100000) == 100000

@@ -63,22 +63,6 @@ class Gauge(object):
         self._links = set()
 
     @property
-    def max(self):
-        return self._max
-
-    @max.setter
-    def max(self, max):
-        self.set_max(max)
-
-    @property
-    def min(self):
-        return self._min
-
-    @min.setter
-    def min(self, min):
-        self.set_min(min)
-
-    @property
     def determination(self):
         """The cached determination.  If there's no the cache, it redetermines
         and caches that.
@@ -127,19 +111,34 @@ class Gauge(object):
         except AttributeError:
             pass
 
+    @property
+    def max(self):
+        return self._max
+
+    @max.setter
+    def max(self, max):
+        self.set_max(max)
+
+    @property
+    def min(self):
+        return self._min
+
+    @min.setter
+    def min(self, min):
+        self.set_min(min)
+
     def _get_limit(self, limit, at=None):
-        """Gets the current limit."""
         if isinstance(limit, Gauge):
             return limit.get(at)
         else:
             return limit
 
     def get_max(self, at=None):
-        """Gets the current maximum value."""
+        """Predicts the current maximum value."""
         return self._get_limit(self.max, at=at)
 
     def get_min(self, at=None):
-        """Gets the current minimum value."""
+        """Predicts the current minimum value."""
         return self._get_limit(self.min, at=at)
 
     def _set_limits(self, max=None, min=None, clamp=False, at=None):
@@ -180,7 +179,7 @@ class Gauge(object):
     def set_max(self, max, clamp=False, at=None):
         """Changes the maximum.
 
-        :param max: the value to set as the maximum.
+        :param max: a number or gauge to set as the maximum.
         :param clamp: limits the current value to be below the new maximum.
                       (default: ``True``)
         :param at: the time to change.  (default: now)
@@ -190,7 +189,7 @@ class Gauge(object):
     def set_min(self, min, clamp=False, at=None):
         """Changes the minimum.
 
-        :param min: the value to set as the minimum.
+        :param min: a number or gauge to set as the minimum.
         :param clamp: limits the current value to be above the new minimum.
                       (default: ``True``)
         :param at: the time to change.  (default: now)
@@ -445,6 +444,11 @@ class Gauge(object):
         yield (+inf, None, None)
 
     def walk_segs(self, number_or_gauge):
+        """Yields :class:`Segment`s on the graph from `number_or_gauge`.  If
+        `number_or_gauge` is a gauge, the graph is the determination of the
+        gauge.  Otherwise, just a horizontal line which has the number as the
+        Y-intercept.
+        """
         if isinstance(number_or_gauge, Gauge):
             determination = number_or_gauge.determination
             first, last = determination[0], determination[-1]
@@ -528,7 +532,7 @@ class Gauge(object):
                 # find the intersection with a boundary.
                 for boundary in (boundaries if bound is None else [bound]):
                     try:
-                        intersection = seg.intersect(boundary.seg)
+                        intersection = seg.intersection(boundary.seg)
                     except ValueError:
                         continue
                     if intersection[TIME] == seg.since:
@@ -640,14 +644,28 @@ class Momentum(namedtuple('Momentum', ['velocity', 'since', 'until'])):
 
 
 class Segment(namedtuple('Segment', ['value', 'velocity', 'since', 'until'])):
-    # `since` cannot be -inf, but `until` can be +inf.
 
-    def get(self, at):
+    def __new__(cls, value, velocity, since=-inf, until=+inf):
+        value = float(value)
+        velocity = float(velocity)
+        return super(Segment, cls).__new__(cls, value, velocity, since, until)
+
+    def get(self, at=None):
+        """Returns the value at the given time.
+
+        :raises ValueError: the given time is out of the time range.
+        """
+        at = now_or(at)
         if not self.since <= at <= self.until:
-            raise ValueError('Out of range')
+            raise ValueError('Out of the time range: {0:.2f}~{1:.2f}'
+                             ''.format(self.since, self.until))
         return self.value + self.velocity * (at - self.since)
 
-    def guess(self, at):
+    def guess(self, at=None):
+        """Same with :meth:`get` but it returns the first or last value if the
+        given time is out of the time range.
+        """
+        at = now_or(at)
         if at < self.since:
             return self.value
         elif self.until < at:
@@ -655,7 +673,11 @@ class Segment(namedtuple('Segment', ['value', 'velocity', 'since', 'until'])):
         else:
             return self.get(at)
 
-    def intersect(self, seg):
+    def intersection(self, seg):
+        """Gets the intersection with the given segment.
+
+        :raises ValueError: there's no intersection.
+        """
         # y-intercepts
         y_intercept = (self.value - self.velocity * self.since)
         seg_y_intercept = (seg.value - seg.velocity * seg.since)
@@ -669,7 +691,7 @@ class Segment(namedtuple('Segment', ['value', 'velocity', 'since', 'until'])):
         if since <= time <= until:
             pass
         else:
-            raise ValueError('Intersection not in the range')
+            raise ValueError('Intersection not in the time range')
         value = self.get(time)
         return (time, value)
 
@@ -698,6 +720,7 @@ class Boundary(object):
         self.walk()
 
     def walk(self):
+        """Choose the next segment."""
         self.seg = next(self.segs_iter)
 
     def cmp_eq(self, x, y):
