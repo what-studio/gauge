@@ -1,3 +1,4 @@
+from __future__ import print_function
 from gauge import Gauge, now_or
 
 
@@ -43,5 +44,5 @@ if __name__ == '__main__':
         eq.medium = float(medium)
     signal.signal(signal.SIGQUIT, set_medium)
     while True:
-        print eq.gauge.current()
+        print(eq.gauge.current())
         time.sleep(0.5)

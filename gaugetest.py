@@ -299,6 +299,10 @@ def test_repr():
     assert repr(g) == '<Gauge 0.00 between -10.00~<Gauge 10.00/10.00>>'
     m = Momentum(+100, since=10, until=20)
     assert repr(m) == '<Momentum +100.00/s 10.00~20.00>'
+    m = Momentum(+100, since=10)
+    assert repr(m) == '<Momentum +100.00/s 10.00~>'
+    m = Momentum(+100, until=20)
+    assert repr(m) == '<Momentum +100.00/s ~20.00>'
 
 
 def test_case1():
@@ -553,13 +557,13 @@ def test_hypergauge():
 def test_zigzag_hypergauge():
     # case 1
     g = Gauge(1, Gauge(2, 3, 2, at=0), Gauge(1, 1, 0, at=0), at=0)
-    for x in xrange(6):
+    for x in range(6):
         g.max.add_momentum(+1, since=x * 2, until=x * 2 + 1)
         g.max.add_momentum(-1, since=x * 2 + 1, until=x * 2 + 2)
         g.min.add_momentum(-1, since=x * 2, until=x * 2 + 1)
         g.min.add_momentum(+1, since=x * 2 + 1, until=x * 2 + 2)
-    for x in xrange(3):
-        t = sum(y * 2 for y in xrange(x + 1))
+    for x in range(3):
+        t = sum(y * 2 for y in range(x + 1))
         g.add_momentum(+1, since=t, until=t + (x + 1))
         g.add_momentum(-1, since=t + (x + 1), until=t + 2 * (x + 1))
     assert g.determination == [
@@ -567,13 +571,13 @@ def test_zigzag_hypergauge():
         (7.5, 2.5), (8, 2), (9, 3), (10, 2), (11.5, 0.5), (12, 1)]
     # case 2
     g = Gauge(2, Gauge(3, 5, 3, at=0), Gauge(2, 2, 0, at=0), at=0)
-    for x in xrange(5):
+    for x in range(5):
         g.max.add_momentum(+1, since=x * 4, until=x * 4 + 2)
         g.max.add_momentum(-1, since=x * 4 + 2, until=x * 4 + 4)
         g.min.add_momentum(-1, since=x * 4, until=x * 4 + 2)
         g.min.add_momentum(+1, since=x * 4 + 2, until=x * 4 + 4)
-    for x in xrange(4):
-        t = sum(y * 2 for y in xrange(x + 1))
+    for x in range(4):
+        t = sum(y * 2 for y in range(x + 1))
         g.add_momentum(+1, since=t, until=t + (x + 1))
         g.add_momentum(-1, since=t + (x + 1), until=t + 2 * (x + 1))
     assert g.determination == [
@@ -584,13 +588,13 @@ def test_zigzag_hypergauge():
 def test_hyper_hypergauge():
     # same with a hyper-gauge in :func:`test_zigzag_hypergauge`.
     g = Gauge(1, Gauge(2, 3, 2, at=0), Gauge(1, 1, 0, at=0), at=0)
-    for x in xrange(6):
+    for x in range(6):
         g.max.add_momentum(+1, since=x * 2, until=x * 2 + 1)
         g.max.add_momentum(-1, since=x * 2 + 1, until=x * 2 + 2)
         g.min.add_momentum(-1, since=x * 2, until=x * 2 + 1)
         g.min.add_momentum(+1, since=x * 2 + 1, until=x * 2 + 2)
-    for x in xrange(3):
-        t = sum(y * 2 for y in xrange(x + 1))
+    for x in range(3):
+        t = sum(y * 2 for y in range(x + 1))
         g.add_momentum(+1, since=t, until=t + (x + 1))
         g.add_momentum(-1, since=t + (x + 1), until=t + 2 * (x + 1))
     # but `g` is also a ceil of another gauge.

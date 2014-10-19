@@ -42,14 +42,6 @@ def now_or(time):
     return now() if time is None else float(time)
 
 
-def inf_or(num):
-    return +inf if num is None else num
-
-
-def neginf_or(num):
-    return -inf if num is None else num
-
-
 class Gauge(object):
     """Represents a gauge.  A gauge has a value at any moment.  It can be
     modified by an user's adjustment or an effective momentum.
@@ -340,9 +332,9 @@ class Gauge(object):
         :param velocity_or_momentum: a :class:`Momentum` object or just a
                                      number for the velocity.
         :param since: if the first argument is a velocity, it is the time to
-                      start to affect the momentum.  (default: ``None``)
+                      start to affect the momentum.  (default: ``-inf``)
         :param until: if the first argument is a velocity, it is the time to
-                      finish to affect the momentum.  (default: ``None``)
+                      finish to affect the momentum.  (default: ``+inf``)
 
         :raises ValueError: `since` later than or same with `until`.
         :raises TypeError: the first argument is a momentum, but other
@@ -355,9 +347,13 @@ class Gauge(object):
             momentum = velocity_or_momentum
         else:
             velocity = velocity_or_momentum
+            if since is None:
+                since = -inf
+            if until is None:
+                until = +inf
             momentum = Momentum(velocity, since, until)
         since, until = momentum.since, momentum.until
-        if since is None or until is None or since < until:
+        if since == -inf or until == +inf or since < until:
             pass
         else:
             raise ValueError('\'since\' should be earlier than \'until\'')
@@ -378,9 +374,9 @@ class Gauge(object):
         momentum = self._make_momentum(*args, **kwargs)
         since, until = momentum.since, momentum.until
         self.momenta.add(momentum)
-        self._events.add((neginf_or(since), ADD, momentum))
-        if until is not None:
-            self._events.add((inf_or(until), REMOVE, momentum))
+        self._events.add((since, ADD, momentum))
+        if until != +inf:
+            self._events.add((until, REMOVE, momentum))
         self.invalidate()
         return momentum
 
@@ -435,7 +431,7 @@ class Gauge(object):
         :param at: the time base.  (default: now)
         """
         at = now_or(at)
-        start = self.momenta.bisect_right((+inf, +inf, None))
+        start = self.momenta.bisect_right((+inf, +inf, -inf))
         stop = self.momenta.bisect_left((-inf, -inf, at))
         return self._coerce_and_remove_momenta(value, at, start, stop)
 
@@ -459,6 +455,7 @@ class Gauge(object):
                 yield Segment(value1, velocity, time1, time2)
             yield Segment(last[VALUE], 0, last[TIME], +inf)
         else:
+            # just a number.
             value = number_or_gauge
             yield Segment(value, 0, self.base[TIME], +inf)
 
@@ -555,7 +552,8 @@ class Gauge(object):
                 velocities.remove(momentum.velocity)
 
     def __getstate__(self):
-        return (self.base, self._max, self._min, map(tuple, self.momenta))
+        momenta = list(map(tuple, self.momenta))
+        return (self.base, self._max, self._min, momenta)
 
     def __setstate__(self, state):
         base, max, min, momenta = state
@@ -627,22 +625,22 @@ class Momentum(namedtuple('Momentum', ['velocity', 'since', 'until'])):
     specific period.
     """
 
-    def __new__(cls, velocity, since=None, until=None):
+    def __new__(cls, velocity, since=-inf, until=+inf):
         velocity = float(velocity)
         return super(Momentum, cls).__new__(cls, velocity, since, until)
 
     def __repr__(self):
         string = '<{0} {1:+.2f}/s'.format(type(self).__name__, self.velocity)
-        if self.since is not None or self.until is not None:
-            string += ' {0:.2f}~{1:.2f}'.format(
-                '' if self.since is None else self.since,
-                '' if self.until is None else self.until)
+        if self.since != -inf or self.until != +inf:
+            string += ' ' + '~'.join([
+                '' if self.since == -inf else '{0:.2f}'.format(self.since),
+                '' if self.until == +inf else '{0:.2f}'.format(self.until)])
         string += '>'
         return string
 
 
 class Segment(namedtuple('Segment', ['value', 'velocity', 'since', 'until'])):
-    # `since` cannot be None, but `until` can.
+    # `since` cannot be -inf, but `until` can be +inf.
 
     def get(self, at):
         if not self.since <= at <= self.until:
