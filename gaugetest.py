@@ -426,6 +426,22 @@ def test_just_one_momentum():
     assert g.determination == [(0, 5), (50, 10), (100, 10)]
 
 
+def test_velocity():
+    g = Gauge(0, 10, at=0)
+    g.add_momentum(+1, since=2)
+    g.add_momentum(+1, since=4, until=6)
+    assert g.velocity(at=0) == 0
+    assert g.velocity(at=2) == 0
+    assert g.velocity(at=3) == +1
+    assert g.velocity(at=4) == +1
+    assert g.velocity(at=5) == +2
+    assert g.velocity(at=6) == +2
+    assert g.velocity(at=7) == +1
+    assert g.velocity(at=8) == +1
+    assert g.velocity(at=9) == +1
+    assert g.velocity(at=10) == +1
+
+
 def test_segment():
     seg = Segment(0, +1, since=0, until=10)
     assert seg.get(0) == 0

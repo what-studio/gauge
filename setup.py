@@ -15,9 +15,7 @@ assert version
 
 # use pytest instead
 def run_tests(self):
-    pyc = re.compile(r'\.pyc|\$py\.class')
-    test_file = pyc.sub('.py', __import__(self.test_suite).__file__)
-    raise SystemExit(__import__('pytest').main(['-xv', test_file]))
+    raise SystemExit(__import__('pytest').main(['-v']))
 test.run_tests = run_tests
 
 
@@ -46,5 +44,5 @@ setup(
                  'Topic :: Games/Entertainment'],
     install_requires=['sortedcontainers>=0.8.2'],
     tests_require=['pytest'],
-    test_suite='gaugetest',
+    test_suite='...',
 )
