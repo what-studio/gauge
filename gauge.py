@@ -130,6 +130,7 @@ class Gauge(object):
             gauge.invalidate()
 
     def _get_limit(self, limit, at=None):
+        """Gets the current limit."""
         if isinstance(limit, Gauge):
             return limit.get(at)
         else:
@@ -161,6 +162,7 @@ class Gauge(object):
             # set the internal attribute.
             setattr(self, attr, limit)
         if clamp:
+            # clamp the current value.
             at = now_or(at)
             value = self.get(at=at)
             max_ = value if max is None else self.get_max(at=at)
@@ -173,7 +175,7 @@ class Gauge(object):
                 limited = None
             if limited is not None:
                 self.forget_past(limited, at=at)
-                # already invalidated by :meth:`forget_past`.
+                # :meth:`forget_past` calls :meth:`invalidate`.
                 return
         self.invalidate()
 

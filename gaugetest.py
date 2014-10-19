@@ -622,6 +622,12 @@ def test_hypergauge_links():
     g.max = 10
     assert g.get(100) == 10
     assert weakref.ref(g) not in max_g._links
+    # clear dead links.
+    g.max = max_g
+    del g
+    assert list(max_g._links)[0]() is None
+    max_g.invalidate()
+    assert not max_g._links
 
 
 def test_over_max_on_hypergauge():
