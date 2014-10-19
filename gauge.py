@@ -471,10 +471,9 @@ class Gauge(object):
         the farthest future.
         """
         since, value = self.base
-        velocities = []
-        velocity = 0
-        bound = None
-        overlapped = False
+        velocity, velocities = 0, []
+        bound, overlapped = None, False
+        # boundaries.
         ceil = Boundary(self.walk_segs(self.max), operator.lt)
         floor = Boundary(self.walk_segs(self.min), operator.gt)
         boundaries = [ceil, floor]
