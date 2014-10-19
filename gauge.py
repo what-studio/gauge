@@ -483,16 +483,17 @@ class Gauge(object):
             while boundary.seg.until <= since:
                 boundary.walk()
         for time, method, momentum in self.walk_events():
+            # normalize time.
+            until = max(time, self.base[TIME])
             # check if the value is out of bound.
             for boundary in boundaries:
                 boundary_value = boundary.seg.guess(since)
                 if boundary.cmp_inv(value, boundary_value):
                     bound, overlapped = boundary, False
                     break
-            # normalize time.
-            until = max(time, self.base[TIME])
-            # variables to control the loop.
-            again = True  # if True, don't choose next boundaries.
+            # if True, An iteration doesn't choose next boundaries.  The first
+            # iteration doesn't require to choose next boundaries.
+            again = True
             while since < until:
                 if again:
                     again = False
