@@ -530,14 +530,14 @@ def test_hypergauge():
     g.max.add_momentum(-1)
     assert g.determination == [
         (0, 12), (1, 12), (2, 13), (3, 12), (6, 9), (8, 7), (15, 0)]
-    # case 5
-    ceil = Gauge(10, 10, at=0)
-    ceil.add_momentum(-1, since=0, until=4)
-    ceil.add_momentum(+1, since=6, until=7)
-    floor = Gauge(0, 10, at=0)
-    floor.add_momentum(+1, since=1, until=6)
-    floor.add_momentum(-1, since=6, until=8)
-    g = Gauge(5, ceil, floor, at=0)
+    # bidirectional hyper-gauge
+    g_max = Gauge(10, 10, at=0)
+    g_max.add_momentum(-1, since=0, until=4)
+    g_max.add_momentum(+1, since=6, until=7)
+    g_min = Gauge(0, 10, at=0)
+    g_min.add_momentum(+1, since=1, until=6)
+    g_min.add_momentum(-1, since=6, until=8)
+    g = Gauge(5, g_max, g_min, at=0)
     g.add_momentum(+1, since=0, until=3)
     g.add_momentum(-1, since=3, until=6)
     g.add_momentum(+1, since=6, until=9)
@@ -545,17 +545,14 @@ def test_hypergauge():
     assert g.determination == [
         (0, 5), (2.5, 7.5), (3, 7), (4, 6), (5.5, 4.5), (6, 5), (8, 7),
         (9, 7), (12, 4)]
-    # case 6: just one momentum
+    # just one momentum
     g = Gauge(5, Gauge(5, 10, at=0), Gauge(5, 10, at=0), at=0)
     g.max.add_momentum(+1)
     g.min.add_momentum(-1)
     assert g.determination == [(0, 5)]
     g.add_momentum(+0.1, until=100)
     assert g.determination == [(0, 5), (50, 10), (100, 10)]
-
-
-def test_zigzag_hypergauge():
-    # case 1
+    # zigzag 1
     g = Gauge(1, Gauge(2, 3, 2, at=0), Gauge(1, 1, 0, at=0), at=0)
     for x in range(6):
         g.max.add_momentum(+1, since=x * 2, until=x * 2 + 1)
@@ -569,7 +566,7 @@ def test_zigzag_hypergauge():
     assert g.determination == [
         (0, 1), (1, 2), (2, 1), (3.5, 2.5), (4, 2), (5.5, 0.5), (6, 1),
         (7.5, 2.5), (8, 2), (9, 3), (10, 2), (11.5, 0.5), (12, 1)]
-    # case 2
+    # zigzag 2
     g = Gauge(2, Gauge(3, 5, 3, at=0), Gauge(2, 2, 0, at=0), at=0)
     for x in range(5):
         g.max.add_momentum(+1, since=x * 4, until=x * 4 + 2)
@@ -586,23 +583,44 @@ def test_zigzag_hypergauge():
 
 
 def test_hyper_hypergauge():
-    # same with a hyper-gauge in :func:`test_zigzag_hypergauge`.
-    g = Gauge(1, Gauge(2, 3, 2, at=0), Gauge(1, 1, 0, at=0), at=0)
+    # zigzag 1 in :func:`test_hypergauge`.
+    zigzag = Gauge(1, Gauge(2, 3, 2, at=0), Gauge(1, 1, 0, at=0), at=0)
     for x in range(6):
-        g.max.add_momentum(+1, since=x * 2, until=x * 2 + 1)
-        g.max.add_momentum(-1, since=x * 2 + 1, until=x * 2 + 2)
-        g.min.add_momentum(-1, since=x * 2, until=x * 2 + 1)
-        g.min.add_momentum(+1, since=x * 2 + 1, until=x * 2 + 2)
+        zigzag.max.add_momentum(+1, since=x * 2, until=x * 2 + 1)
+        zigzag.max.add_momentum(-1, since=x * 2 + 1, until=x * 2 + 2)
+        zigzag.min.add_momentum(-1, since=x * 2, until=x * 2 + 1)
+        zigzag.min.add_momentum(+1, since=x * 2 + 1, until=x * 2 + 2)
     for x in range(3):
         t = sum(y * 2 for y in range(x + 1))
-        g.add_momentum(+1, since=t, until=t + (x + 1))
-        g.add_momentum(-1, since=t + (x + 1), until=t + 2 * (x + 1))
-    # but `g` is also a ceil of another gauge.
-    gg = Gauge(1, g, at=0)
-    gg.add_momentum(+0.5)
-    assert round_determination(gg.determination, precision=2) == [
+        zigzag.add_momentum(+1, since=t, until=t + (x + 1))
+        zigzag.add_momentum(-1, since=t + (x + 1), until=t + 2 * (x + 1))
+    # bidirectional hyper-gauge in :func:`test_hypergauge`.
+    g_max = Gauge(10, 10, at=0)
+    g_max.add_momentum(-1, since=0, until=4)
+    g_max.add_momentum(+1, since=6, until=7)
+    g_min = Gauge(0, 10, at=0)
+    g_min.add_momentum(+1, since=1, until=6)
+    g_min.add_momentum(-1, since=6, until=8)
+    bidir = Gauge(5, g_max, g_min, at=0)
+    bidir.add_momentum(+1, since=0, until=3)
+    bidir.add_momentum(-1, since=3, until=6)
+    bidir.add_momentum(+1, since=6, until=9)
+    bidir.add_momentum(-1, since=9, until=12)
+    # under zigzag 1
+    g = Gauge(1, zigzag, at=0)
+    g.add_momentum(+0.5)
+    assert round_determination(g.determination, precision=2) == [
         (0, 1), (1.33, 1.67), (2, 1), (4, 2), (5.5, 0.5), (9.5, 2.5),
         (10, 2), (11.5, 0.5), (12.5, 1)]
+    # between zigzag 1 ~ bidirectional hyper-gauge
+    g = Gauge(3, bidir, zigzag, at=0)
+    g.add_momentum(+3, since=0, until=3)
+    g.add_momentum(-3, since=3, until=6)
+    g.add_momentum(+3, since=6, until=9)
+    g.add_momentum(-3, since=9, until=12)
+    assert round_determination(g.determination, precision=2) == [
+        (0, 3), (1, 6), (2.5, 7.5), (3, 7), (5, 1), (5.5, 0.5), (6, 1),
+        (8, 7), (9, 7), (11, 1), (11.5, 0.5), (12, 1)]
 
 
 def test_hypergauge_with_different_base_time():
