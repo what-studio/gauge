@@ -621,6 +621,25 @@ def test_hyper_hypergauge():
     assert round_determination(g.determination, precision=2) == [
         (0, 3), (1, 6), (2.5, 7.5), (3, 7), (5, 1), (5.5, 0.5), (6, 1),
         (8, 7), (9, 7), (11, 1), (11.5, 0.5), (12, 1)]
+    # more sharp
+    g = Gauge(3, bidir, zigzag, at=0)
+    g.add_momentum(+6, since=0, until=1)
+    g.add_momentum(-6, since=1, until=2)
+    g.add_momentum(+6, since=2, until=3)
+    g.add_momentum(-6, since=3, until=4)
+    g.add_momentum(+6, since=4, until=5)
+    g.add_momentum(-6, since=5, until=6)
+    g.add_momentum(+6, since=6, until=7)
+    g.add_momentum(-6, since=7, until=8)
+    g.add_momentum(+6, since=8, until=9)
+    g.add_momentum(-6, since=9, until=10)
+    g.add_momentum(+6, since=10, until=11)
+    g.add_momentum(-6, since=11, until=12)
+    assert round_determination(g.determination, precision=2) == [
+        (0, 3), (0.4, 5.4), (1, 6), (1.8, 1.2), (2, 1), (3, 7), (3.8, 2.2),
+        (4, 2), (4.57, 5.43), (5, 5), (5.71, 0.71), (6, 1), (6.8, 5.8), (7, 6),
+        (7.6, 2.4), (8, 2), (8.83, 7), (9, 7), (9.8, 2.2), (10, 2),
+        (10.57, 5.43), (11, 5), (11.71, 0.71), (12, 1)]
 
 
 def test_hypergauge_with_different_base_time():

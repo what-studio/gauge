@@ -524,7 +524,7 @@ class Gauge(object):
                     since, value = (bound_until, seg.get(bound_until))
                     yield (since, value)
                     continue
-                for boundary in (boundaries if bound is None else [bound]):
+                for boundary in boundaries:
                     # find the intersection with a boundary.
                     try:
                         intersection = seg.intersection(boundary.seg)
