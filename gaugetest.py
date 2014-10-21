@@ -774,6 +774,12 @@ def test_hypergauge_past_bugs(zigzag, bidir):
     for x in xrange(10):
         g3.add_momentum(r.uniform(-10, 10), since=x, until=x + 1)
     assert round(g3.get(9), 1) == 2.9  # not 2.4133871928
+    # bound at first
+    g4 = Gauge(0, 10, Gauge(0, 10, at=1), at=0)
+    g4.min.add_momentum(+1, until=11)
+    g4.add_momentum(-1, until=10)
+    assert g4.get(10) == 9  # not -10
+    assert g4.determination == [(0, 0), (1, 0), (10, 9), (11, 10)]
 
 
 def test_determine_is_generator():
