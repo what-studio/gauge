@@ -718,7 +718,7 @@ def test_hypergauge_past_bugs(zigzag, bidir):
         (10.57, 5.43), (11, 5), (11.71, 0.71), (12, 1)]
     # floating-point inaccuracy
     g = Gauge(0, Gauge(1, 1, at=0), at=0)
-    for x in xrange(10):
+    for x in range(10):
         g.add_momentum(+0.1, since=x, until=x + 1)
     assert 0.999999 < g.get(10) < 1  # inaccuracy
     g.max.add_momentum(-0.1, since=0, until=6)
