@@ -580,6 +580,21 @@ def test_hypergauge():
     assert g.determination == [
         (0, 2), (1, 3), (2, 2), (3.5, 3.5), (4, 3), (6, 1), (8, 3), (9, 4),
         (11.5, 1.5), (12, 2), (14.5, 4.5), (16, 3), (18.5, 0.5), (20, 2)]
+    # hybrid 1: same velocity of `g` and `g.max`.  (suggested by @hybrid0)
+    g = Gauge(0, Gauge(1, 5, at=0), at=0)
+    g.add_momentum(+1)
+    g.max.add_momentum(+1, since=1)
+    assert g.determination == [(0, 0), (1, 1), (5, 5)]
+    # hybrid 2: velocity of `g.max` is faster than `g`'s.
+    g = Gauge(0, Gauge(1, 5, at=0), at=0)
+    g.add_momentum(+1)
+    g.max.add_momentum(+2, since=1)
+    assert g.determination == [(0, 0), (1, 1), (5, 5)]
+    # hybrid 3: velocity of `g.max` is slower than `g`'s.
+    g = Gauge(0, Gauge(1, 5, at=0), at=0)
+    g.add_momentum(+1)
+    g.max.add_momentum(+0.5, since=1)
+    assert g.determination == [(0, 0), (1, 1), (9, 5)]
 
 
 def test_hyper_hypergauge():
