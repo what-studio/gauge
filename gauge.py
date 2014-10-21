@@ -474,8 +474,8 @@ class Gauge(object):
         velocity, velocities = 0, []
         bound, overlapped = None, False
         # boundaries.
-        ceil = Boundary(self.walk_segs(self.max), operator.lt)
-        floor = Boundary(self.walk_segs(self.min), operator.gt)
+        ceil = Boundary(self.walk_segs(self.max), operator.lt, name='ceil')
+        floor = Boundary(self.walk_segs(self.min), operator.gt, name='floor')
         boundaries = [ceil, floor]
         # skip past boundaries.
         for boundary in boundaries:
@@ -507,18 +507,21 @@ class Gauge(object):
                     for boundary in boundaries:
                         if boundary.seg.until < until:
                             boundary.walk()
-                # calculate velocity.
+                if bound is not None and bound.seg.until <= since:
+                    continue
+                # current segment.
                 if bound is None:
                     velocity = sum(velocities)
                 elif overlapped:
                     velocity = bound.best(sum(velocities), bound.seg.velocity)
                 else:
                     velocity = sum(v for v in velocities if bound.cmp(v, 0))
+                seg = Segment(value, velocity, since, until)
                 # is still bound?
                 if overlapped and bound.cmp(velocity, bound.seg.velocity):
                     bound, overlapped = None, False
-                # current segment.
-                seg = Segment(value, velocity, since, until)
+                    again = True
+                    continue
                 if overlapped:
                     bound_until = min(bound.seg.until, until)
                     if bound_until == +inf:
@@ -709,10 +712,11 @@ class Boundary(object):
     #: `operator.gt` indicates :func:`max`.
     best = None
 
-    def __init__(self, segs_iter, cmp=operator.lt):
+    def __init__(self, segs_iter, cmp=operator.lt, name=None):
         assert cmp in [operator.lt, operator.gt]
         self.segs_iter = segs_iter
         self.cmp = cmp
+        self.name = name
         self.best = {operator.lt: min, operator.gt: max}[cmp]
         self.walk()
 
@@ -724,4 +728,8 @@ class Boundary(object):
         return x == y or self.cmp(x, y)
 
     def cmp_inv(self, x, y):
-        return not self.cmp_eq(x, y)
+        return x != y and not self.cmp(x, y)
+
+    def __repr__(self):
+        return '<{0} name={1} seg={2}>'.format(type(self).__name__,
+                                               self.name, self.seg)
