@@ -767,11 +767,11 @@ def test_hypergauge_past_bugs(zigzag, bidir):
     g3_max_max.add_momentum(+6, since=10, until=11)
     g3_max_max.add_momentum(-6, since=11, until=12)
     g3_max = Gauge(0, g3_max_max, at=0)
-    for x in xrange(10):
+    for x in range(10):
         g3_max.add_momentum(+0.1, since=x)
     r = random.Random(10)
     g3 = Gauge(0, shift_gauge(zigzag, +3), g3_max, at=0)
-    for x in xrange(10):
+    for x in range(10):
         g3.add_momentum(r.uniform(-10, 10), since=x, until=x + 1)
     assert round(g3.get(9), 1) == 2.9  # not 2.4133871928
     # bound at first
