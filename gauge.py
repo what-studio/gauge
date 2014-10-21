@@ -485,11 +485,14 @@ class Gauge(object):
             # normalize time.
             until = max(time, self.base[TIME])
             # check if the value is out of bound.
-            for boundary in boundaries:
-                boundary_value = boundary.seg.guess(since)
-                if boundary.cmp_inv(value, boundary_value):
-                    bound, overlapped = boundary, False
-                    break
+            if bound is None:
+                for boundary in boundaries:
+                    boundary_value = boundary.seg.guess(since)
+                    if boundary.cmp_inv(value, boundary_value):
+                        bound, overlapped = boundary, False
+                        break
+            elif bound.cmp_inv(bound.seg.velocity, velocity):
+                overlapped = True
             # if True, An iteration doesn't choose next boundaries.  The first
             # iteration doesn't require to choose next boundaries.
             again = True
