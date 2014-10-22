@@ -4,6 +4,7 @@ import gc
 import operator
 import pickle
 import random
+import sys
 import time
 import types
 import weakref
@@ -365,6 +366,13 @@ def test_case4():
     g.add_momentum(+1)
     g.add_momentum(+1)
     assert g.determination == [(0, 0), (5, 10)]
+
+
+def test_case5():
+    g = Gauge(1, 1, 0, at=0)
+    for x in xrange(11):
+        g.add_momentum(-0.1, since=x, until=x + 1)
+    assert g.get(11) == 0  # adjusted by min=0
 
 
 def test_remove_momentum():
@@ -743,7 +751,6 @@ def test_hypergauge_past_bugs(zigzag, bidir):
     g2 = Gauge(0, Gauge(1, 1, at=0), at=0)
     for x in range(10):
         g2.add_momentum(+0.1, since=x, until=x + 1)
-    assert 0.999999 < g2.get(10) < 1  # inaccuracy
     g2.max.add_momentum(-0.1, since=0, until=6)
     g2.max.add_momentum(+0.5, since=6, until=10)
     assert round(g2.get(5), 1) == 0.5
@@ -786,6 +793,25 @@ def test_hypergauge_past_bugs(zigzag, bidir):
     for x in range(4):
         g5.add_momentum(r.uniform(-10, 10), since=x, until=x + 1)
     assert round(g5.get(4), 1) == 5.0  # not 11.8
+
+
+def _test_randomly():
+    precision = 10
+    for y in range(1000):
+        seed = random.randint(0, sys.maxint)
+        r = random.Random(seed)
+        g_max = Gauge(r.uniform(3, +10), 10, 3, at=0)
+        g_min = Gauge(r.uniform(-10, -3), -3, -10, at=0)
+        g = Gauge(r.uniform(g_min.get(0), g_max.get(0)), g_max, g_min, at=0)
+        for x in range(0, 100, 5):
+            g_max.add_momentum(r.uniform(-10, +10), since=x, until=x + 5)
+        for x in range(0, 100, 2):
+            g.add_momentum(r.uniform(-10, +10), since=x, until=x + 2)
+        for x in range(0, 100, 1):
+            g_min.add_momentum(r.uniform(-10, +10), since=x, until=x + 1)
+        for t, v in g.determine():
+            assert round(v, precision) >= round(g_min.get(t), precision), seed
+            assert round(v, precision) <= round(g_max.get(t), precision), seed
 
 
 def test_determine_is_generator():

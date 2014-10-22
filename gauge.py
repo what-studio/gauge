@@ -39,6 +39,7 @@ def deprecate(message, *args, **kwargs):
 
 
 def now_or(time):
+    """Returns the current time if `time` is ``None``."""
     return now() if time is None else float(time)
 
 
@@ -538,9 +539,13 @@ class Gauge(object):
                         intersection = seg.intersection(boundary.seg)
                     except ValueError:
                         continue
-                    if intersection[TIME] == seg.since:
+                    if intersection[TIME] == since:
                         continue
                     since, value = intersection
+                    if boundary.seg.velocity == 0:
+                        value = boundary.seg.value
+                    elif boundary.seg.since == since:
+                        value = boundary.seg.value
                     bound, overlapped = boundary, True
                     again = True  # iterate with same boundaries again.
                     yield (since, value)
