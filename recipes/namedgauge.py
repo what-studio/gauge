@@ -94,7 +94,7 @@ class NamedGauge(Gauge):
         :raises KeyError: failed to find a momentum named `name`.
         """
         at = now_or(at)
-        self.incr(0, at=at)
+        self.forget_past(at=at)
         return self.update_momentum_by_name(name, velocity=velocity, since=at)
 
 
