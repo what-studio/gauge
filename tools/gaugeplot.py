@@ -55,7 +55,7 @@ class GaugePlotting(object):
         for limit in [self.gauge.max, self.gauge.min]:
             times, values = self.divide_segs(self.gauge.walk_segs(limit))
             self.expand_time_range(times, values, min_time, max_time)
-            plt.plot(times, values, '--')
+            plt.plot(times, values, 'o--')
         # set axes
         plt.xlabel('Time')
         plt.xlim(min_time, max_time)

@@ -19,7 +19,7 @@ from sortedcontainers import SortedList, SortedListWithKey
 
 
 __all__ = ['Gauge', 'Momentum']
-__version__ = '0.1.3'
+__version__ = '0.1.4'
 
 
 # indices
@@ -474,8 +474,8 @@ class Gauge(object):
         velocity, velocities = 0, []
         bound, overlapped = None, False
         # boundaries.
-        ceil = Boundary(self.walk_segs(self.max), operator.lt, name='ceil')
-        floor = Boundary(self.walk_segs(self.min), operator.gt, name='floor')
+        ceil = Boundary(self.walk_segs(self.max), operator.lt)
+        floor = Boundary(self.walk_segs(self.min), operator.gt)
         boundaries = [ceil, floor]
         # skip past boundaries.
         for boundary in boundaries:
@@ -505,10 +505,10 @@ class Gauge(object):
                     # stop the loop if all boundaries have been proceeded.
                     if all(b.seg.until >= until for b in boundaries):
                         break
-                    # choose next boundaries.
-                    for boundary in boundaries:
-                        if boundary.seg.until < until:
-                            boundary.walk()
+                    # choose the next boundary.
+                    boundary = min(boundaries, key=lambda b: b.seg.until)
+                    if boundary.seg.until < until:
+                        boundary.walk()
                 if bound is not None and bound.seg.until <= since:
                     continue
                 # current segment.
@@ -714,11 +714,10 @@ class Boundary(object):
     #: `operator.gt` indicates :func:`max`.
     best = None
 
-    def __init__(self, segs_iter, cmp=operator.lt, name=None):
+    def __init__(self, segs_iter, cmp=operator.lt):
         assert cmp in [operator.lt, operator.gt]
         self.segs_iter = segs_iter
         self.cmp = cmp
-        self.name = name
         self.best = {operator.lt: min, operator.gt: max}[cmp]
         self.walk()
 
@@ -733,5 +732,5 @@ class Boundary(object):
         return x != y and not self.cmp(x, y)
 
     def __repr__(self):
-        return '<{0} name={1} seg={2}>'.format(type(self).__name__,
-                                               self.name, self.seg)
+        return ('<{0} seg={1}, cmp={2}>'
+                ''.format(type(self).__name__, self.seg, self.cmp))

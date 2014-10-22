@@ -780,6 +780,12 @@ def test_hypergauge_past_bugs(zigzag, bidir):
     g4.add_momentum(-1, until=10)
     assert g4.get(10) == 9  # not -10
     assert g4.determination == [(0, 0), (1, 0), (10, 9), (11, 10)]
+    # floor is dense than ceil
+    r = random.Random(2810856076715324514)
+    g5 = Gauge(0, shift_gauge(zigzag, +3), g3, at=0)
+    for x in xrange(4):
+        g5.add_momentum(r.uniform(-10, 10), since=x, until=x + 1)
+    assert round(g5.get(4), 1) == 5.0  # not 11.8
 
 
 def test_determine_is_generator():
