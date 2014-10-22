@@ -512,19 +512,20 @@ class Gauge(object):
                         boundary.walk()
                 if bound is not None and bound.seg.until <= since:
                     continue
-                # current segment.
+                # calculate velocity.
                 if bound is None:
                     velocity = sum(velocities)
                 elif overlapped:
                     velocity = bound.best(sum(velocities), bound.seg.velocity)
                 else:
                     velocity = sum(v for v in velocities if bound.cmp(v, 0))
-                seg = Segment(value, velocity, since, until)
                 # is still bound?
                 if overlapped and bound.cmp(velocity, bound.seg.velocity):
                     bound, overlapped = None, False
                     again = True
                     continue
+                # current segment.
+                seg = Segment(value, velocity, since, until)
                 if overlapped:
                     bound_until = min(bound.seg.until, until)
                     if bound_until == +inf:
