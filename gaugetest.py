@@ -370,7 +370,7 @@ def test_case4():
 
 def test_case5():
     g = Gauge(1, 1, 0, at=0)
-    for x in xrange(11):
+    for x in range(11):
         g.add_momentum(-0.1, since=x, until=x + 1)
     assert g.get(11) == 0  # adjusted by min=0
 
