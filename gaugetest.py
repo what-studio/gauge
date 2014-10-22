@@ -783,7 +783,7 @@ def test_hypergauge_past_bugs(zigzag, bidir):
     # floor is dense than ceil
     r = random.Random(2810856076715324514)
     g5 = Gauge(0, shift_gauge(zigzag, +3), g3, at=0)
-    for x in xrange(4):
+    for x in range(4):
         g5.add_momentum(r.uniform(-10, 10), since=x, until=x + 1)
     assert round(g5.get(4), 1) == 5.0  # not 11.8
 
