@@ -65,18 +65,22 @@ class GaugePlotting(object):
         plt.ylim(min_value - y_margin, max_value + y_margin)
 
 
-@click.command()
-@click.argument('gauge', type=ImportString())
-@click.option('--matplotlib-backend', default='Qt4Agg')
-def main(gauge, matplotlib_backend):
-    import matplotlib
-    matplotlib.use(matplotlib_backend)
+def show_gauge(gauge):
     import matplotlib.pyplot as plt
     from mpltools import style
     style.use('ggplot')
     plotter = GaugePlotting(gauge)
     plotter.plot(plt)
     plt.show()
+
+
+@click.command()
+@click.argument('gauge', type=ImportString())
+@click.option('--matplotlib-backend', default='Qt4Agg')
+def main(gauge, matplotlib_backend):
+    import matplotlib
+    matplotlib.use(matplotlib_backend)
+    show_gauge(gauge)
 
 
 if __name__ == '__main__':

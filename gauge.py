@@ -542,13 +542,29 @@ class Gauge(object):
                         continue
                     if intersection[TIME] == since:
                         continue
+                    again = True  # iterate with same boundaries again.
+                    bound, overlapped = boundary, True
                     since, value = intersection
+                    # adjust by more accurate value.
                     if boundary.seg.velocity == 0:
                         value = boundary.seg.value
                     elif boundary.seg.since == since:
                         value = boundary.seg.value
+                    yield (since, value)
+                    break
+                if again:
+                    continue  # the intersection was found.
+                for boundary in boundaries:
+                    bound_until = boundary.seg.until
+                    if bound_until == +inf:
+                        continue
+                    elif bound_until > until or bound_until < since:
+                        continue
+                    bound_value = boundary.seg.get(bound_until)
+                    if boundary.cmp_eq(seg.get(bound_until), bound_value):
+                        continue
                     bound, overlapped = boundary, True
-                    again = True  # iterate with same boundaries again.
+                    since, value = bound_until, bound_value
                     yield (since, value)
                     break
             if until == +inf:
