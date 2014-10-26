@@ -4,7 +4,6 @@ import gc
 import operator
 import pickle
 import random
-import sys
 import time
 import types
 import weakref
@@ -820,8 +819,9 @@ def test_hypergauge_past_bugs(zigzag, bidir):
 
 
 def test_randomly():
+    maxint = 2 ** 64 / 2
     for y in range(100):
-        seed = random.randint(0, sys.maxint)
+        seed = random.randrange(maxint)
         g = random_gauge(seed)
         for t, v in g.determine():
             assert \
