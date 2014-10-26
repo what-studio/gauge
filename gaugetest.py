@@ -814,12 +814,9 @@ def test_hypergauge_past_bugs(zigzag, bidir):
     for x in range(4):
         g5.add_momentum(r.uniform(-10, 10), since=x, until=x + 1)
     assert round(g5.get(4), 1) == 5.0  # not 11.8
-    # failed test_randomly()
-    seeds_failed_at_past = [1098651790867685487]
-    for seed in seeds_failed_at_past:
-        g = random_gauge(seed)
-        for t, v in g.determine():
-            assert round_(g.min.get(t)) <= round_(v) <= round_(g.max.get(t))
+    # failed gauges from test_randomly()
+    g6 = random_gauge(1098651790867685487)
+    assert 2.999 <= g6.get(11.289) <= 3.001  # not 7.376
 
 
 def test_randomly():

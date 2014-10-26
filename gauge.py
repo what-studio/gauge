@@ -555,6 +555,8 @@ class Gauge(object):
                 if again:
                     continue  # the intersection was found.
                 for boundary in boundaries:
+                    # find missing intersection caused by floating-point
+                    # inaccuracy.
                     bound_until = boundary.seg.until
                     if bound_until == +inf:
                         continue
