@@ -497,14 +497,15 @@ class Gauge(object):
             while since < until:
                 if again:
                     again = False
+                    walked_boundaries = boundaries
                 else:
                     # stop the loop if all boundaries have been proceeded.
                     if all(b.seg.until >= until for b in boundaries):
                         break
                     # choose the next boundary.
                     boundary = min(boundaries, key=lambda b: b.seg.until)
-                    if boundary.seg.until < until:
-                        boundary.walk()
+                    boundary.walk()
+                    walked_boundaries = [boundary]
                 # calculate velocity.
                 if bound is None:
                     velocity = sum(velocities)
@@ -527,7 +528,7 @@ class Gauge(object):
                     since, value = (bound_until, seg.get(bound_until))
                     yield (since, value)
                     continue
-                for boundary in boundaries:
+                for boundary in walked_boundaries:
                     # find the intersection with a boundary.
                     try:
                         intersection = seg.intersection(boundary.seg)
@@ -547,7 +548,7 @@ class Gauge(object):
                     break
                 if bound is not None:
                     continue  # the intersection was found.
-                for boundary in boundaries:
+                for boundary in walked_boundaries:
                     # find missing intersection caused by floating-point
                     # inaccuracy.
                     bound_until = min(boundary.seg.until, until)

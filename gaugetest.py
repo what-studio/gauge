@@ -863,11 +863,12 @@ def test_randomly():
         assert_all_inside(g, 'random_gauge2({0})'.format(seed))
 
 
-def test_failed_random_gauges():
-    # failed gauges from test_randomly()
+def test_repaired_random_gauges():
+    # from test_randomly()
     assert_all_inside(random_gauge1(Random(1098651790867685487)))
     assert_all_inside(random_gauge1(Random(7276062123994486117), near=1e-10))
     assert_all_inside(random_gauge1(Random(6867673013126676888), near=1e-10))
+    # assert_all_inside(random_gauge1(2881266403492433952, far=1000))
     # assert_all_inside(random_gauge2(Random(3373542927760325757), far=1e6))
 
 
