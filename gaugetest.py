@@ -726,6 +726,34 @@ def test_pickle_hypergauge():
     assert g2.max.determination == [(0, 15), (5, 10)]
 
 
+def test_thin_momenta():
+    g = Gauge(0, 100, at=0)
+    for x in range(1000):
+        g.add_momentum(+1000000000, since=x, until=x + 1e-10)
+    assert_all_inside(g)
+    assert g.get(0) == 0
+    assert g.get(1001) == 100
+    for x, y in zip(range(9999), range(1, 10000)):
+        assert 0 <= g.get(x / 10.) <= g.get(y / 10.) <= 100
+
+
+def test_determine_is_generator():
+    # determine() changed to be a generator since v0.1.0
+    g = Gauge(12, 100, at=0)
+    assert isinstance(g.determine(), types.GeneratorType)
+
+
+def test_clear_events():
+    g = Gauge(0, 10, at=0)
+    m = g.add_momentum(+1, since=10, until=20)
+    assert list(g.walk_events()) == \
+        [(0, None, None), (10, ADD, m), (20, REMOVE, m), (+inf, None, None)]
+    assert len(g._events) == 2
+    g.remove_momentum(m)
+    assert list(g.walk_events()) == [(0, None, None), (+inf, None, None)]
+    assert len(g._events) == 0
+
+
 def test_hypergauge_past_bugs(zigzag, bidir):
     """Regression testing for hyper-gauge."""
     # just one momentum
@@ -870,31 +898,3 @@ def test_repaired_random_gauges():
     assert_all_inside(random_gauge1(Random(6867673013126676888), near=1e-10))
     # assert_all_inside(random_gauge1(2881266403492433952, far=1000))
     # assert_all_inside(random_gauge2(Random(3373542927760325757), far=1e6))
-
-
-def test_thin_momenta():
-    g = Gauge(0, 100, at=0)
-    for x in range(1000):
-        g.add_momentum(+1000000000, since=x, until=x + 1e-10)
-    assert_all_inside(g)
-    assert g.get(0) == 0
-    assert g.get(1001) == 100
-    for x, y in zip(range(9999), range(1, 10000)):
-        assert 0 <= g.get(x / 10.) <= g.get(y / 10.) <= 100
-
-
-def test_determine_is_generator():
-    # determine() changed to be a generator since v0.1.0
-    g = Gauge(12, 100, at=0)
-    assert isinstance(g.determine(), types.GeneratorType)
-
-
-def test_clear_events():
-    g = Gauge(0, 10, at=0)
-    m = g.add_momentum(+1, since=10, until=20)
-    assert list(g.walk_events()) == \
-        [(0, None, None), (10, ADD, m), (20, REMOVE, m), (+inf, None, None)]
-    assert len(g._events) == 2
-    g.remove_momentum(m)
-    assert list(g.walk_events()) == [(0, None, None), (+inf, None, None)]
-    assert len(g._events) == 0
