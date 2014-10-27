@@ -212,9 +212,9 @@ class Gauge(object):
         except IndexError:
             return (determination[-1][VALUE], 0.)
         prev_time, prev_value = determination[x - 1]
-        time = float(at - prev_time) / (next_time - prev_time)
+        ratio = float(at - prev_time) / (next_time - prev_time)
         delta = next_value - prev_value
-        value = prev_value + time * delta
+        value = prev_value + ratio * delta
         velocity = delta / (next_time - prev_time)
         return (value, velocity)
 
@@ -478,24 +478,19 @@ class Gauge(object):
         ceil = Boundary(self.walk_segs(self.max), operator.lt)
         floor = Boundary(self.walk_segs(self.min), operator.gt)
         boundaries = [ceil, floor]
-        # skip past boundaries.
         for boundary in boundaries:
+            # skip past boundaries.
             while boundary.seg.until <= since:
                 boundary.walk()
+            # check overflowing.
+            if bound is not None:
+                continue
+            boundary_value = boundary.seg.guess(since)
+            if boundary.cmp(boundary_value, value):
+                bound, overlapped = boundary, False
         for time, method, momentum in self.walk_events():
             # normalize time.
             until = max(time, self.base[TIME])
-            # check if the value is out of bound.
-            if bound is None:
-                for boundary in boundaries:
-                    boundary_value = boundary.seg.guess(since)
-                    if boundary.cmp(value, boundary_value):
-                        continue
-                    bound = boundary
-                    overlapped = value == boundary_value
-                    break
-            elif bound.cmp_inv(bound.seg.velocity, velocity):
-                overlapped = True
             # if True, An iteration doesn't choose next boundaries.  The first
             # iteration doesn't require to choose next boundaries.
             again = True
@@ -510,8 +505,6 @@ class Gauge(object):
                     boundary = min(boundaries, key=lambda b: b.seg.until)
                     if boundary.seg.until < until:
                         boundary.walk()
-                if bound is not None and bound.seg.until <= since:
-                    continue
                 # calculate velocity.
                 if bound is None:
                     velocity = sum(velocities)
@@ -552,21 +545,19 @@ class Gauge(object):
                         value = boundary.seg.value
                     yield (since, value)
                     break
-                if again:
+                if bound is not None:
                     continue  # the intersection was found.
                 for boundary in boundaries:
                     # find missing intersection caused by floating-point
                     # inaccuracy.
-                    bound_until = boundary.seg.until
-                    if bound_until == +inf:
+                    bound_until = min(boundary.seg.until, until)
+                    if bound_until == +inf or bound_until < since:
                         continue
-                    elif bound_until > until or bound_until < since:
-                        continue
-                    bound_value = boundary.seg.get(bound_until)
-                    if boundary.cmp_eq(seg.get(bound_until), bound_value):
+                    boundary_value = boundary.seg.get(bound_until)
+                    if boundary.cmp_eq(seg.get(bound_until), boundary_value):
                         continue
                     bound, overlapped = boundary, True
-                    since, value = bound_until, bound_value
+                    since, value = bound_until, boundary_value
                     yield (since, value)
                     break
             if until == +inf:

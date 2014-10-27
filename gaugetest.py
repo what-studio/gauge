@@ -4,6 +4,7 @@ import gc
 import operator
 import pickle
 import random
+from random import Random
 import time
 import types
 import weakref
@@ -725,20 +726,6 @@ def test_pickle_hypergauge():
     assert g2.max.determination == [(0, 15), (5, 10)]
 
 
-def random_gauge(seed=None):
-    r = random.Random(seed)
-    g_max = Gauge(r.uniform(3, +10), 10, 3, at=0)
-    g_min = Gauge(r.uniform(-10, -3), -3, -10, at=0)
-    g = Gauge(r.uniform(g_min.get(0), g_max.get(0)), g_max, g_min, at=0)
-    for x in range(0, 20, 5):
-        g_max.add_momentum(r.uniform(-10, +10), since=x, until=x + 5)
-    for x in range(0, 20, 2):
-        g.add_momentum(r.uniform(-10, +10), since=x, until=x + 2)
-    for x in range(0, 20, 1):
-        g_min.add_momentum(r.uniform(-10, +10), since=x, until=x + 1)
-    return g
-
-
 def test_hypergauge_past_bugs(zigzag, bidir):
     """Regression testing for hyper-gauge."""
     # just one momentum
@@ -813,27 +800,86 @@ def test_hypergauge_past_bugs(zigzag, bidir):
     for x in range(4):
         g5.add_momentum(r.uniform(-10, 10), since=x, until=x + 1)
     assert round(g5.get(4), 1) == 5.0  # not 11.8
-    # failed gauges from test_randomly()
-    g6 = random_gauge(1098651790867685487)
-    assert 2.999 <= g6.get(11.289) <= 3.001  # not 7.376
+
+
+def assert_all_inside(g, message=None):
+    for t, v in g.determine():
+        try:
+            assert round_(g.get_min(t)) <= round_(v) <= round_(g.get_max(t))
+        except AssertionError:
+            # from gaugeplot import show_gauge
+            # show_gauge(g)
+            report = ('[{0!r}] {1!r} <= {2!r} <= {3!r}'
+                      ''.format(t, g.get_min(t), v, g.get_max(t)))
+            if message is None:
+                message = report
+            else:
+                message = '\n'.join([message, report])
+            pytest.fail(message)
+
+
+def random_gauge1(random=random, far=10, near=3, until=20):
+    # (-far ~ -near) <= g <= (near ~ far)
+    g_max = Gauge(random.uniform(near, far), far, near, at=0)
+    g_min = Gauge(random.uniform(-far, -near), -near, -far, at=0)
+    g = Gauge(random.uniform(g_min.get(0), g_max.get(0)), g_max, g_min, at=0)
+    for x in range(0, until, 5):
+        g_max.add_momentum(random.uniform(-far, +far), since=x, until=x + 5)
+    for x in range(0, until, 2):
+        g.add_momentum(random.uniform(-far, +far), since=x, until=x + 2)
+    for x in range(0, until, 1):
+        g_min.add_momentum(random.uniform(-far, +far), since=x, until=x + 1)
+    return g
+
+
+def random_gauge2(random=random, far=1000, near=1, until=20):
+    # 0 <= g <= (near ~ far)
+    g_far = Gauge(random.uniform(near, far), far, near, at=0)
+    g = Gauge(random.uniform(0, g_far.get(0)), g_far, at=0)
+    for x in range(0, until, 5):
+        g_far.add_momentum(random.uniform(-far, +far), since=x, until=x + 5)
+    for x in range(0, until, 2):
+        g.add_momentum(random.uniform(-far, +far), since=x, until=x + 2)
+    return g
 
 
 def test_randomly():
     maxint = 2 ** 64 / 2
     for y in range(100):
         seed = random.randrange(maxint)
-        g = random_gauge(seed)
-        for t, v in g.determine():
-            assert \
-                round_(g.min.get(t)) <= round_(v) <= round_(g.max.get(t)), \
-                'random_gauge({0})'.format(seed)
+        g = random_gauge1(Random(seed))
+        assert_all_inside(g, 'random_gauge1({0})'.format(seed))
+    for y in range(100):
+        seed = random.randrange(maxint)
+        g = random_gauge1(Random(seed), far=1000)
+        assert_all_inside(g, 'random_gauge1({0}, far=1000)'.format(seed))
+    for y in range(100):
+        seed = random.randrange(maxint)
+        g = random_gauge1(Random(seed), near=1e-10)
+        assert_all_inside(g, 'random_gauge1({0}, near=1e-10)'.format(seed))
+    for y in range(100):
+        seed = random.randrange(maxint)
+        g = random_gauge2(Random(seed), far=1e4)
+        assert_all_inside(g, 'random_gauge2({0})'.format(seed))
 
 
-def test_tttt():
-    g = Gauge(4, Gauge(5, 5, at=0), 1, at=0)
-    g.add_momentum(+1, since=0, until=1)
-    g.add_momentum(-2 / 3., since=2, until=6)
-    g.max.add_momentum(-2, since=2, until=4)
+def test_failed_random_gauges():
+    # failed gauges from test_randomly()
+    assert_all_inside(random_gauge1(Random(1098651790867685487)))
+    assert_all_inside(random_gauge1(Random(7276062123994486117), near=1e-10))
+    assert_all_inside(random_gauge1(Random(6867673013126676888), near=1e-10))
+    # assert_all_inside(random_gauge2(Random(3373542927760325757), far=1e6))
+
+
+def test_thin_momenta():
+    g = Gauge(0, 100, at=0)
+    for x in range(1000):
+        g.add_momentum(+1000000000, since=x, until=x + 1e-10)
+    assert_all_inside(g)
+    assert g.get(0) == 0
+    assert g.get(1001) == 100
+    for x, y in zip(range(9999), range(1, 10000)):
+        assert 0 <= g.get(x / 10.) <= g.get(y / 10.) <= 100
 
 
 def test_determine_is_generator():
