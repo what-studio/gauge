@@ -538,6 +538,9 @@ def test_boundary():
     floor = Boundary(iter([zero_seg]), operator.gt)
     assert ceil.best is min
     assert floor.best is max
+    # repr
+    assert repr(ceil) == ('<Boundary seg={0}, cmp=<built-in function lt>>'
+                          ''.format(zero_seg))
 
 
 @pytest.fixture
