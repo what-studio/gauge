@@ -212,10 +212,11 @@ class Gauge(object):
         except IndexError:
             return (determination[-1][VALUE], 0.)
         prev_time, prev_value = determination[x - 1]
-        ratio = float(at - prev_time) / (next_time - prev_time)
-        delta = next_value - prev_value
-        value = prev_value + ratio * delta
-        velocity = delta / (next_time - prev_time)
+        time_delta = next_time - prev_time
+        value_delta = next_value - prev_value
+        ratio = float(at - prev_time) / time_delta
+        value = prev_value + ratio * value_delta
+        velocity = value_delta / time_delta
         return (value, velocity)
 
     def get(self, at=None):
