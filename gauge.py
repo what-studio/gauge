@@ -479,7 +479,7 @@ class Gauge(object):
         ceil = Boundary(self.walk_segs(self.max), operator.lt)
         floor = Boundary(self.walk_segs(self.min), operator.gt)
         boundaries = [ceil, floor]
-        def adjust(value, at):
+        def clamp_by_boundaries(value, at):
             if bound is None or overlapped:
                 value = min(value, ceil.seg.guess(at))
                 value = max(value, floor.seg.guess(at))
@@ -532,7 +532,7 @@ class Gauge(object):
                         break
                     # released from the boundary.
                     since, value = (bound_until, seg.get(bound_until))
-                    value = adjust(value, at=since)
+                    value = clamp_by_boundaries(value, at=since)
                     yield (since, value)
                     continue
                 for boundary in walked_boundaries:
@@ -551,7 +551,7 @@ class Gauge(object):
                         value = boundary.seg.value
                     elif boundary.seg.since == since:
                         value = boundary.seg.value
-                    value = adjust(value, at=since)
+                    value = clamp_by_boundaries(value, at=since)
                     yield (since, value)
                     break
                 if bound is not None:
@@ -567,14 +567,14 @@ class Gauge(object):
                         continue
                     bound, overlapped = boundary, True
                     since, value = bound_until, boundary_value
-                    value = adjust(value, at=since)
+                    value = clamp_by_boundaries(value, at=since)
                     yield (since, value)
                     break
             if until == +inf:
                 break
             # determine the last node in the current itreration.
             value += velocity * (until - since)
-            value = adjust(value, at=until)
+            value = clamp_by_boundaries(value, at=until)
             yield (until, value)
             # prepare the next iteration.
             if method == ADD:
