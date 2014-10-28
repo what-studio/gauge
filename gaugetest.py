@@ -880,19 +880,19 @@ def test_randomly():
     for y in range(times):
         seed = random.randrange(maxint)
         g = random_gauge1(Random(seed))
-        assert_all_inside(g, 'random_gauge1({0})'.format(seed))
+        assert_all_inside(g, 'random_gauge1(R({0}))'.format(seed))
     for y in range(times):
         seed = random.randrange(maxint)
         g = random_gauge1(Random(seed), far=1000)
-        assert_all_inside(g, 'random_gauge1({0}, far=1000)'.format(seed))
+        assert_all_inside(g, 'random_gauge1(R({0}), far=1000)'.format(seed))
     for y in range(times):
         seed = random.randrange(maxint)
         g = random_gauge1(Random(seed), near=1e-10)
-        assert_all_inside(g, 'random_gauge1({0}, near=1e-10)'.format(seed))
+        assert_all_inside(g, 'random_gauge1(R({0}), near=1e-10)'.format(seed))
     for y in range(times):
         seed = random.randrange(maxint)
         g = random_gauge2(Random(seed), far=1e4)
-        assert_all_inside(g, 'random_gauge2({0})'.format(seed))
+        assert_all_inside(g, 'random_gauge2(R({0}), far=1e4)'.format(seed))
 
 
 def test_repaired_random_gauges():
@@ -902,3 +902,4 @@ def test_repaired_random_gauges():
     assert_all_inside(random_gauge1(Random(6867673013126676888), near=1e-10))
     assert_all_inside(random_gauge1(Random(2881266403492433952), far=1000))
     assert_all_inside(random_gauge2(Random(3373542927760325757), far=1e6))
+    # assert_all_inside(random_gauge2(Random(7588425536572564538), far=1e4))

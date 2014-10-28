@@ -19,7 +19,7 @@ from sortedcontainers import SortedList, SortedListWithKey
 
 
 __all__ = ['Gauge', 'Momentum']
-__version__ = '0.1.4'
+__version__ = '0.1.5'
 
 
 # indices
