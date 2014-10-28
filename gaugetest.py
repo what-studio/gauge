@@ -875,20 +875,21 @@ def random_gauge2(random=random, far=1000, near=1, until=20):
 
 
 def test_randomly():
+    times = 100
     maxint = 2 ** 64 / 2
-    for y in range(100):
+    for y in range(times):
         seed = random.randrange(maxint)
         g = random_gauge1(Random(seed))
         assert_all_inside(g, 'random_gauge1({0})'.format(seed))
-    for y in range(100):
+    for y in range(times):
         seed = random.randrange(maxint)
         g = random_gauge1(Random(seed), far=1000)
         assert_all_inside(g, 'random_gauge1({0}, far=1000)'.format(seed))
-    for y in range(100):
+    for y in range(times):
         seed = random.randrange(maxint)
         g = random_gauge1(Random(seed), near=1e-10)
         assert_all_inside(g, 'random_gauge1({0}, near=1e-10)'.format(seed))
-    for y in range(100):
+    for y in range(times):
         seed = random.randrange(maxint)
         g = random_gauge2(Random(seed), far=1e4)
         assert_all_inside(g, 'random_gauge2({0})'.format(seed))
