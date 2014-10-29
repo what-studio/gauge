@@ -902,4 +902,4 @@ def test_repaired_random_gauges():
     assert_all_inside(random_gauge1(Random(6867673013126676888), near=1e-10))
     assert_all_inside(random_gauge1(Random(2881266403492433952), far=1000))
     assert_all_inside(random_gauge2(Random(3373542927760325757), far=1e6))
-    # assert_all_inside(random_gauge2(Random(7588425536572564538), far=1e4))
+    assert_all_inside(random_gauge2(Random(7588425536572564538), far=1e4))

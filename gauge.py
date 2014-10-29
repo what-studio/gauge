@@ -214,8 +214,8 @@ class Gauge(object):
         prev_time, prev_value = determination[x - 1]
         time_delta = next_time - prev_time
         value_delta = next_value - prev_value
-        ratio = float(at - prev_time) / time_delta
-        value = prev_value + ratio * value_delta
+        rate = float(at - prev_time) / time_delta
+        value = prev_value + rate * value_delta
         velocity = value_delta / time_delta
         return (value, velocity)
 
@@ -481,8 +481,10 @@ class Gauge(object):
         boundaries = [ceil, floor]
         def clamp_by_boundaries(value, at):
             if bound is None or overlapped:
-                value = min(value, ceil.seg.guess(at))
-                value = max(value, floor.seg.guess(at))
+                # value = min(value, ceil.seg.guess(at))
+                # value = max(value, floor.seg.guess(at))
+                value = min(value, self.get_max(at))
+                value = max(value, self.get_min(at))
             return value
         for boundary in boundaries:
             # skip past boundaries.
@@ -671,12 +673,18 @@ class Momentum(namedtuple('Momentum', ['velocity', 'since', 'until'])):
         return string
 
 
-class Segment(namedtuple('Segment', ['value', 'velocity', 'since', 'until'])):
+class Segment(object):
 
-    def __new__(cls, value, velocity, since=-inf, until=+inf):
-        value = float(value)
-        velocity = float(velocity)
-        return super(Segment, cls).__new__(cls, value, velocity, since, until)
+    value = None
+    velocity = None
+    since = None
+    until = None
+
+    def __init__(self, value, velocity, since, until):
+        self.value = value
+        self.velocity = velocity
+        self.since = since
+        self.until = until
 
     def get(self, at=None):
         """Returns the value at the given time.
@@ -722,6 +730,23 @@ class Segment(namedtuple('Segment', ['value', 'velocity', 'since', 'until'])):
             raise ValueError('Intersection not in the time range')
         value = self.get(time)
         return (time, value)
+
+
+class Segment2(Segment):
+
+    def __init__(self, value, final_value, since, until):
+        time_delta = until - since
+        value_delta = final_value - value
+        velocity = value_delta / time_delta
+        self.final_value = final_value
+        super(Segment2, self).__init__(value, velocity, since, until)
+
+    def get(self, at=None):
+        at = now_or(at)
+        time_delta = self.until - self.since
+        value_delta = self.final_value - self.value
+        rate = float(at - self.since) / time_delta
+        return self.value + rate * value_delta
 
 
 class Boundary(object):
