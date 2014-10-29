@@ -457,12 +457,12 @@ class Gauge(object):
         if isinstance(number_or_gauge, Gauge):
             determination = number_or_gauge.determination
             first, last = determination[0], determination[-1]
-            yield Segment(first[VALUE], 0, self.base[TIME], first[TIME])
+            if self.base[TIME] < first[TIME]:
+                yield Segment2((self.base[TIME], first[VALUE]), first)
             zipped_determination = zip(determination[:-1], determination[1:])
-            for (time1, value1), (time2, value2) in zipped_determination:
-                velocity = (value2 - value1) / (time2 - time1)
-                yield Segment(value1, velocity, time1, time2)
-            yield Segment(last[VALUE], 0, last[TIME], +inf)
+            for begin, end in zipped_determination:
+                yield Segment2(begin, end)
+            yield Segment2(last, (+inf, last[VALUE]))
         else:
             # just a number.
             value = number_or_gauge
@@ -481,10 +481,8 @@ class Gauge(object):
         boundaries = [ceil, floor]
         def clamp_by_boundaries(value, at):
             if bound is None or overlapped:
-                # value = min(value, ceil.seg.guess(at))
-                # value = max(value, floor.seg.guess(at))
-                value = min(value, self.get_max(at))
-                value = max(value, self.get_min(at))
+                value = min(value, ceil.seg.guess(at))
+                value = max(value, floor.seg.guess(at))
             return value
         for boundary in boundaries:
             # skip past boundaries.
@@ -734,19 +732,35 @@ class Segment(object):
 
 class Segment2(Segment):
 
-    def __init__(self, value, final_value, since, until):
-        time_delta = until - since
-        value_delta = final_value - value
-        velocity = value_delta / time_delta
-        self.final_value = final_value
-        super(Segment2, self).__init__(value, velocity, since, until)
+    def __init__(self, begin, end):
+        self.begin = begin
+        self.end = end
+
+    @property
+    def value(self):
+        return self.begin[VALUE]
+
+    @property
+    def velocity(self):
+        (time1, value1), (time2, value2) = self.begin, self.end
+        return (value2 - value1) / (time2 - time1)
+
+    @property
+    def since(self):
+        return self.begin[TIME]
+
+    @property
+    def until(self):
+        return self.end[TIME]
 
     def get(self, at=None):
         at = now_or(at)
-        time_delta = self.until - self.since
-        value_delta = self.final_value - self.value
-        rate = float(at - self.since) / time_delta
-        return self.value + rate * value_delta
+        (time1, value1), (time2, value2) = self.begin, self.end
+        if not time1 <= at <= time2:
+            raise ValueError('Out of the time range: {0:.2f}~{1:.2f}'
+                             ''.format(time1, time2))
+        rate = float(at - time1) / (time2 - time1)
+        return value1 + rate * (value2 - value1)
 
 
 class Boundary(object):
