@@ -458,11 +458,12 @@ class Gauge(object):
             determination = number_or_gauge.determination
             first, last = determination[0], determination[-1]
             if self.base[TIME] < first[TIME]:
-                yield Segment2((self.base[TIME], first[VALUE]), first)
+                yield FiniteSegment(first[VALUE], first[VALUE],
+                                    self.base[TIME], first[TIME])
             zipped_determination = zip(determination[:-1], determination[1:])
-            for begin, end in zipped_determination:
-                yield Segment2(begin, end)
-            yield Segment2(last, (+inf, last[VALUE]))
+            for (since, value), (until, final) in zipped_determination:
+                yield FiniteSegment(value, final, since, until)
+            yield Segment(last[VALUE], 0, last[TIME], +inf)
         else:
             # just a number.
             value = number_or_gauge
@@ -730,37 +731,20 @@ class Segment(object):
         return (time, value)
 
 
-class Segment2(Segment):
+class FiniteSegment(Segment):
 
-    def __init__(self, begin, end):
-        self.begin = begin
-        self.end = end
-
-    @property
-    def value(self):
-        return self.begin[VALUE]
-
-    @property
-    def velocity(self):
-        (time1, value1), (time2, value2) = self.begin, self.end
-        return (value2 - value1) / (time2 - time1)
-
-    @property
-    def since(self):
-        return self.begin[TIME]
-
-    @property
-    def until(self):
-        return self.end[TIME]
+    def __init__(self, value, final, since, until):
+        velocity = (final - value) / (until - since)
+        self.final = final
+        super(FiniteSegment, self).__init__(value, velocity, since, until)
 
     def get(self, at=None):
         at = now_or(at)
-        (time1, value1), (time2, value2) = self.begin, self.end
-        if not time1 <= at <= time2:
+        if not self.since <= at <= self.until:
             raise ValueError('Out of the time range: {0:.2f}~{1:.2f}'
-                             ''.format(time1, time2))
-        rate = float(at - time1) / (time2 - time1)
-        return value1 + rate * (value2 - value1)
+                             ''.format(self.since, self.until))
+        rate = float(at - self.since) / (self.until - self.since)
+        return self.value + rate * (self.final - self.value)
 
 
 class Boundary(object):
