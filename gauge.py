@@ -677,8 +677,9 @@ class Line(object):
     velocity = None
     until = None
 
-    def __init__(self, begin):
+    def __init__(self, begin, until):
         self.begin = begin
+        self.until = until
 
     def get(self, at=None):
         raise NotImplementedError
@@ -710,9 +711,8 @@ class Line(object):
 class Ray(Line):
 
     def __init__(self, begin, velocity, until=+inf):
-        super(Ray, self).__init__(begin)
+        super(Ray, self).__init__(begin, until)
         self.velocity = velocity
-        self.until = until
 
     def get(self, at=None):
         """Returns the value at the given time.
@@ -740,7 +740,7 @@ class Segment(Line):
     end = None
 
     def __init__(self, begin, end):
-        super(Segment, self).__init__(begin)
+        super(Segment, self).__init__(begin, end[TIME])
         self.end = end
 
     @property
