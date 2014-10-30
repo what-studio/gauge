@@ -448,7 +448,7 @@ class Gauge(object):
             yield time, method, momentum
         yield (+inf, None, None)
 
-    def walk_segs(self, number_or_gauge):
+    def walk_lines(self, number_or_gauge):
         """Yields :class:`Segment`s on the graph from `number_or_gauge`.  If
         `number_or_gauge` is a gauge, the graph is the determination of the
         gauge.  Otherwise, just a horizontal line which has the number as the
@@ -458,16 +458,15 @@ class Gauge(object):
             determination = number_or_gauge.determination
             first, last = determination[0], determination[-1]
             if self.base[TIME] < first[TIME]:
-                yield FiniteSegment(first[VALUE], first[VALUE],
-                                    self.base[TIME], first[TIME])
+                yield Segment((self.base[TIME], first[VALUE]), first)
             zipped_determination = zip(determination[:-1], determination[1:])
-            for (since, value), (until, final) in zipped_determination:
-                yield FiniteSegment(value, final, since, until)
-            yield Segment(last[VALUE], 0, last[TIME], +inf)
+            for begin, end in zipped_determination:
+                yield Segment(begin, end)
+            yield Ray(last, 0)
         else:
             # just a number.
             value = number_or_gauge
-            yield Segment(value, 0, self.base[TIME], +inf)
+            yield Ray((self.base[TIME], value), 0)
 
     def determine(self):
         """Determines the transformations from the time when the value set to
@@ -477,22 +476,22 @@ class Gauge(object):
         velocity, velocities = 0, []
         bound, overlapped = None, False
         # boundaries.
-        ceil = Boundary(self.walk_segs(self.max), operator.lt)
-        floor = Boundary(self.walk_segs(self.min), operator.gt)
+        ceil = Boundary(self.walk_lines(self.max), operator.lt)
+        floor = Boundary(self.walk_lines(self.min), operator.gt)
         boundaries = [ceil, floor]
         def clamp_by_boundaries(value, at):
             if bound is None or overlapped:
-                value = min(value, ceil.seg.guess(at))
-                value = max(value, floor.seg.guess(at))
+                value = min(value, ceil.line.guess(at))
+                value = max(value, floor.line.guess(at))
             return value
         for boundary in boundaries:
             # skip past boundaries.
-            while boundary.seg.until <= since:
+            while boundary.line.until <= since:
                 boundary.walk()
             # check overflowing.
             if bound is not None:
                 continue
-            boundary_value = boundary.seg.guess(since)
+            boundary_value = boundary.line.guess(since)
             if boundary.cmp(boundary_value, value):
                 bound, overlapped = boundary, False
         for time, method, momentum in self.walk_events():
@@ -507,39 +506,39 @@ class Gauge(object):
                     walked_boundaries = boundaries
                 else:
                     # stop the loop if all boundaries have been proceeded.
-                    if all(b.seg.until >= until for b in boundaries):
+                    if all(b.line.until >= until for b in boundaries):
                         break
                     # choose the next boundary.
-                    boundary = min(boundaries, key=lambda b: b.seg.until)
+                    boundary = min(boundaries, key=lambda b: b.line.until)
                     boundary.walk()
                     walked_boundaries = [boundary]
                 # calculate velocity.
                 if bound is None:
                     velocity = sum(velocities)
                 elif overlapped:
-                    velocity = bound.best(sum(velocities), bound.seg.velocity)
+                    velocity = bound.best(sum(velocities), bound.line.velocity)
                 else:
                     velocity = sum(v for v in velocities if bound.cmp(v, 0))
                 # is still bound?
-                if overlapped and bound.cmp(velocity, bound.seg.velocity):
+                if overlapped and bound.cmp(velocity, bound.line.velocity):
                     bound, overlapped = None, False
                     again = True
                     continue
-                # current segment.
-                seg = Segment(value, velocity, since, until)
+                # current ray.
+                line = Ray((since, value), velocity)
                 if overlapped:
-                    bound_until = min(bound.seg.until, until)
+                    bound_until = min(bound.line.until, until)
                     if bound_until == +inf:
                         break
                     # released from the boundary.
-                    since, value = (bound_until, seg.get(bound_until))
+                    since, value = (bound_until, line.get(bound_until))
                     value = clamp_by_boundaries(value, at=since)
                     yield (since, value)
                     continue
                 for boundary in walked_boundaries:
                     # find the intersection with a boundary.
                     try:
-                        intersection = seg.intersection(boundary.seg)
+                        intersection = line.intersection(boundary.line)
                     except ValueError:
                         continue
                     if intersection[TIME] == since:
@@ -548,10 +547,10 @@ class Gauge(object):
                     bound, overlapped = boundary, True
                     since, value = intersection
                     # adjust by more accurate value.
-                    if boundary.seg.velocity == 0:
-                        value = boundary.seg.value
-                    elif boundary.seg.since == since:
-                        value = boundary.seg.value
+                    if boundary.line.velocity == 0:
+                        value = boundary.line.begin[VALUE]
+                    elif boundary.line.begin[TIME] == since:
+                        value = boundary.line.begin[VALUE]
                     value = clamp_by_boundaries(value, at=since)
                     yield (since, value)
                     break
@@ -560,11 +559,11 @@ class Gauge(object):
                 for boundary in walked_boundaries:
                     # find missing intersection caused by floating-point
                     # inaccuracy.
-                    bound_until = min(boundary.seg.until, until)
+                    bound_until = min(boundary.line.until, until)
                     if bound_until == +inf or bound_until < since:
                         continue
-                    boundary_value = boundary.seg.get(bound_until)
-                    if boundary.cmp_eq(seg.get(bound_until), boundary_value):
+                    boundary_value = boundary.line.get(bound_until)
+                    if boundary.cmp_eq(line.get(bound_until), boundary_value):
                         continue
                     bound, overlapped = boundary, True
                     since, value = bound_until, boundary_value
@@ -672,7 +671,104 @@ class Momentum(namedtuple('Momentum', ['velocity', 'since', 'until'])):
         return string
 
 
-class Segment(object):
+class Line(object):
+
+    begin = None
+    velocity = None
+    until = None
+
+    def __init__(self, begin):
+        self.begin = begin
+
+    def get(self, at=None):
+        raise NotImplementedError
+
+    def guess(self, at=None):
+        raise NotImplementedError
+
+    def intersection(self, line):
+        """Gets the intersection with the given segment.
+
+        :raises ValueError: there's no intersection.
+        """
+        # value-intercepts
+        value_intercept_delta = self.value_intercept() - line.value_intercept()
+        velocity_delta = self.velocity - line.velocity
+        try:
+            time = value_intercept_delta / velocity_delta
+        except ZeroDivisionError:
+            raise ValueError('Parallel segment')
+        if time < max(self.begin[TIME], line.begin[TIME]):
+            raise ValueError('Intersection not in the time range')
+        value = self.get(time)
+        return (time, value)
+
+    def value_intercept(self):
+        return self.begin[VALUE] - self.velocity * self.begin[TIME]
+
+
+class Ray(Line):
+
+    def __init__(self, begin, velocity, until=+inf):
+        super(Ray, self).__init__(begin)
+        self.velocity = velocity
+        self.until = until
+
+    def get(self, at=None):
+        """Returns the value at the given time.
+
+        :raises ValueError: the given time is out of the time range.
+        """
+        at = now_or(at)
+        since = self.begin[TIME]
+        if at < since:
+            raise ValueError
+        return self.begin[VALUE] + self.velocity * (at - since)
+
+    def guess(self, at=None):
+        """Same with :meth:`get` but it returns the first or last value if the
+        given time is out of the time range.
+        """
+        at = now_or(at)
+        if at < self.begin[TIME]:
+            return self.begin[VALUE]
+        return self.get(at)
+
+
+class Segment(Line):
+
+    end = None
+
+    def __init__(self, begin, end):
+        super(Segment, self).__init__(begin)
+        self.end = end
+
+    @property
+    def velocity(self):
+        value_delta = self.begin[VALUE] - self.end[VALUE]
+        time_delta = self.begin[TIME] - self.end[TIME]
+        return value_delta / time_delta
+
+    @property
+    def until(self):
+        return self.end[TIME]
+
+    def get(self, at=None):
+        at = now_or(at)
+        if not self.begin[TIME] <= at <= self.end[TIME]:
+            raise ValueError('Out of the time range: {0:.2f}~{1:.2f}'
+                             ''.format(self.begin[TIME], self.end[TIME]))
+        rate = (at - self.begin[TIME]) / (self.end[TIME] - self.begin[TIME])
+        return self.begin[VALUE] + rate * (self.end[VALUE] - self.begin[VALUE])
+
+    def guess(self, at=None):
+        at = now_or(at)
+        if self.end[TIME] <= at:
+            return self.end[VALUE]
+        return self.get(at)
+
+
+class _Segment(object):
 
     value = None
     velocity = None
@@ -704,6 +800,7 @@ class Segment(object):
         if at < self.since:
             return self.value
         elif self.until < at:
+            # assert 0
             return self.get(self.until)
         else:
             return self.get(at)
@@ -731,7 +828,7 @@ class Segment(object):
         return (time, value)
 
 
-class FiniteSegment(Segment):
+class FiniteSegment(_Segment):
 
     def __init__(self, value, final, since, until):
         velocity = (final - value) / (until - since)
@@ -749,11 +846,11 @@ class FiniteSegment(Segment):
 
 class Boundary(object):
 
-    #: The current segment.  To select next segment, call :meth:`walk`.
-    seg = None
+    #: The current line.  To select next segment, call :meth:`walk`.
+    line = None
 
-    #: The segment iterator.
-    segs_iter = None
+    #: The iterator of lines.
+    lines_iter = None
 
     #: Compares two values.  Choose one of `operator.lt` and `operator.gt`.
     cmp = None
@@ -763,16 +860,16 @@ class Boundary(object):
     #: `operator.gt` indicates :func:`max`.
     best = None
 
-    def __init__(self, segs_iter, cmp=operator.lt):
+    def __init__(self, lines_iter, cmp=operator.lt):
         assert cmp in [operator.lt, operator.gt]
-        self.segs_iter = segs_iter
+        self.lines_iter = lines_iter
         self.cmp = cmp
         self.best = {operator.lt: min, operator.gt: max}[cmp]
         self.walk()
 
     def walk(self):
         """Choose the next segment."""
-        self.seg = next(self.segs_iter)
+        self.line = next(self.lines_iter)
 
     def cmp_eq(self, x, y):
         return x == y or self.cmp(x, y)
@@ -781,5 +878,5 @@ class Boundary(object):
         return x != y and not self.cmp(x, y)
 
     def __repr__(self):
-        return ('<{0} seg={1}, cmp={2}>'
-                ''.format(type(self).__name__, self.seg, self.cmp))
+        return ('<{0} line={1}, cmp={2}>'
+                ''.format(type(self).__name__, self.line, self.cmp))
