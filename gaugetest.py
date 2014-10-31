@@ -13,7 +13,8 @@ import pytest
 
 import gauge
 from gauge import (
-    ADD, REMOVE, TIME, VALUE, Boundary, Gauge, Momentum, Segment, inf)
+    ADD, REMOVE, TIME, VALUE, Boundary, Gauge, Momentum, _Segment as Segment,
+    inf)
 
 
 PRECISION = 8
@@ -486,41 +487,41 @@ def test_velocity():
     assert g.velocity(at=10) == +1
 
 
-def test_segment():
-    seg = Segment(0, +1, since=0, until=10)
-    assert seg.get(0) == 0
-    assert seg.get(5) == 5
+def test_linement():
+    line = Segment(0, +1, since=0, until=10)
+    assert line.get(0) == 0
+    assert line.get(5) == 5
     with pytest.raises(ValueError):
-        seg.get(-1)
+        line.get(-1)
     with pytest.raises(ValueError):
-        seg.get(11)
-    assert seg.guess(-1) == 0
-    assert seg.guess(11) == 10
-    assert seg.intersection(Segment(5, 0, since=0, until=10)) == (5, 5)
-    assert seg.intersection(Segment(10, 0, since=0, until=10)) == (10, 10)
-    assert seg.intersection(Segment(5, 0, since=0, until=inf)) == (5, 5)
+        line.get(11)
+    assert line.guess(-1) == 0
+    assert line.guess(11) == 10
+    assert line.intersect(Segment(5, 0, since=0, until=10)) == (5, 5)
+    assert line.intersect(Segment(10, 0, since=0, until=10)) == (10, 10)
+    assert line.intersect(Segment(5, 0, since=0, until=inf)) == (5, 5)
     with pytest.raises(ValueError):
-        seg.intersection(Segment(15, 0, since=0, until=10))
+        line.intersect(Segment(15, 0, since=0, until=10))
     with pytest.raises(ValueError):
-        seg.intersection(Segment(5, 0, since=6, until=10))
+        line.intersect(Segment(5, 0, since=6, until=10))
     with pytest.raises(ValueError):
-        seg.intersection(Segment(5, 0, since=-inf, until=inf))
-    seg = Segment(0, +1, since=0, until=inf)
-    assert seg.get(100) == 100
-    assert seg.get(100000) == 100000
+        line.intersect(Segment(5, 0, since=-inf, until=inf))
+    line = Segment(0, +1, since=0, until=inf)
+    assert line.get(100) == 100
+    assert line.get(100000) == 100000
 
 
 def test_boundary():
     # walk
-    segs = [Segment(0, 0, since=0, until=10),
-            Segment(0, +1, since=10, until=20),
-            Segment(10, -1, since=20, until=30)]
-    boundary = Boundary(iter(segs))
-    assert boundary.seg is segs[0]
+    lines = [Segment(0, 0, since=0, until=10),
+             Segment(0, +1, since=10, until=20),
+             Segment(10, -1, since=20, until=30)]
+    boundary = Boundary(iter(lines))
+    assert boundary.line is lines[0]
     boundary.walk()
-    assert boundary.seg is segs[1]
+    assert boundary.line is lines[1]
     boundary.walk()
-    assert boundary.seg is segs[2]
+    assert boundary.line is lines[2]
     with pytest.raises(StopIteration):
         boundary.walk()
     # cmp
@@ -533,14 +534,14 @@ def test_boundary():
     assert not boundary.cmp_inv(1, 2)
     assert not boundary.cmp_inv(1, 1)
     # best
-    zero_seg = Segment(0, 0, 0, 0)
-    ceil = Boundary(iter([zero_seg]), operator.lt)
-    floor = Boundary(iter([zero_seg]), operator.gt)
+    zero_line = Segment(0, 0, 0, 0)
+    ceil = Boundary(iter([zero_line]), operator.lt)
+    floor = Boundary(iter([zero_line]), operator.gt)
     assert ceil.best is min
     assert floor.best is max
     # repr
-    assert repr(ceil) == ('<Boundary seg={0}, cmp=<built-in function lt>>'
-                          ''.format(zero_seg))
+    assert repr(ceil) == ('<Boundary line={0}, cmp=<built-in function lt>>'
+                          ''.format(zero_line))
 
 
 @pytest.fixture

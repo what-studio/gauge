@@ -454,19 +454,25 @@ class Gauge(object):
         gauge.  Otherwise, just a Horizon line which has the number as the
         Y-intercept.
         """
+        Ray = _Segment
         if isinstance(number_or_gauge, Gauge):
             determination = number_or_gauge.determination
             first, last = determination[0], determination[-1]
             if self.base[TIME] < first[TIME]:
-                yield Horizon(first[VALUE], self.base[TIME], first[VALUE])
+                # yield Horizon(first[VALUE], self.base[TIME], first[VALUE])
+                yield Ray(first[VALUE], 0, self.base[TIME], first[VALUE])
             zipped_determination = zip(determination[:-1], determination[1:])
             for (time1, value1), (time2, value2) in zipped_determination:
-                yield Segment(value1, value2, time1, time2)
-            yield Horizon(last[VALUE], last[TIME], +inf)
+                # yield Segment(value1, value2, time1, time2)
+                velocity = (value2 - value1) / (time2 - time1)
+                yield Ray(value1, velocity, time1, time2)
+            # yield Horizon(last[VALUE], last[TIME], +inf)
+            yield Ray(last[VALUE], 0, last[TIME], +inf)
         else:
             # just a number.
             value = number_or_gauge
-            yield Horizon(value, self.base[TIME], +inf)
+            # yield Horizon(value, self.base[TIME], +inf)
+            yield Ray(value, 0, self.base[TIME], +inf)
 
     def determine(self):
         """Determines the transformations from the time when the value set to
@@ -525,6 +531,7 @@ class Gauge(object):
                     again = True
                     continue
                 # current ray.
+                Ray = _Segment
                 line = Ray(value, velocity, since, until)
                 if overlapped:
                     bound_until = min(bound.line.until, until)
@@ -538,7 +545,7 @@ class Gauge(object):
                 for boundary in walked_boundaries:
                     # find the intersection with a boundary.
                     try:
-                        intersection = line.intersection(boundary.line)
+                        intersection = line.intersect(boundary.line)
                     except ValueError:
                         continue
                     if intersection[TIME] == since:
@@ -713,24 +720,27 @@ class Line(object):
     def _later(self, at):
         raise NotImplementedError
 
-    def intersection(self, line):
+    def intersect(self, line):
         """Gets the intersection with the given segment.
 
         :raises ValueError: there's no intersection.
         """
-        # value-intercepts
-        value_intercept_delta = self.value_intercept() - line.value_intercept()
+        intercept_delta = self.intercept() - line.intercept()
         velocity_delta = self.velocity - line.velocity
         try:
-            time = value_intercept_delta / velocity_delta
+            time = intercept_delta / velocity_delta
         except ZeroDivisionError:
             raise ValueError('Parallel segment')
-        if time < max(self.since, line.since):
+        since = max(self.since, line.since)
+        until = min(self.until, line.until)
+        if since <= time <= until:
+            pass
+        else:
             raise ValueError('Intersection not in the time range')
         value = self.get(time)
         return (time, value)
 
-    def value_intercept(self):
+    def intercept(self):
         return self.value - self.velocity * self.since
 
 
@@ -770,15 +780,15 @@ class Segment(Line):
 
     final = None
 
-    def __init__(self, value, final, since, until):
-        super(Segment, self).__init__(value, since, until)
-        self.final = final
-
     @property
     def velocity(self):
         value_delta = self.final - self.value
         time_delta = self.until - self.since
         return value_delta / time_delta
+
+    def __init__(self, value, final, since, until):
+        super(Segment, self).__init__(value, since, until)
+        self.final = final
 
     def _get(self, at):
         rate = (at - self.since) / (self.until - self.since)
@@ -828,7 +838,7 @@ class _Segment(object):
         else:
             return self.get(at)
 
-    def intersection(self, seg):
+    def intersect(self, seg):
         """Gets the intersection with the given segment.
 
         :raises ValueError: there's no intersection.
