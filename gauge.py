@@ -454,25 +454,19 @@ class Gauge(object):
         gauge.  Otherwise, just a Horizon line which has the number as the
         Y-intercept.
         """
-        Ray = _Segment
         if isinstance(number_or_gauge, Gauge):
             determination = number_or_gauge.determination
             first, last = determination[0], determination[-1]
             if self.base[TIME] < first[TIME]:
-                # yield Horizon(first[VALUE], self.base[TIME], first[VALUE])
-                yield Ray(first[VALUE], 0, self.base[TIME], first[VALUE])
+                yield Horizon(self.base[TIME], first[TIME], first[VALUE])
             zipped_determination = zip(determination[:-1], determination[1:])
             for (time1, value1), (time2, value2) in zipped_determination:
-                # yield Segment(value1, value2, time1, time2)
-                velocity = (value2 - value1) / (time2 - time1)
-                yield Ray(value1, velocity, time1, time2)
-            # yield Horizon(last[VALUE], last[TIME], +inf)
-            yield Ray(last[VALUE], 0, last[TIME], +inf)
+                yield Segment(time1, time2, value1, value2)
+            yield Horizon(last[TIME], +inf, last[VALUE])
         else:
             # just a number.
             value = number_or_gauge
-            # yield Horizon(value, self.base[TIME], +inf)
-            yield Ray(value, 0, self.base[TIME], +inf)
+            yield Horizon(self.base[TIME], +inf, value)
 
     def determine(self):
         """Determines the transformations from the time when the value set to
@@ -531,8 +525,7 @@ class Gauge(object):
                     again = True
                     continue
                 # current ray.
-                Ray = _Segment
-                line = Ray(value, velocity, since, until)
+                line = Ray(since, until, value, velocity)
                 if overlapped:
                     bound_until = min(bound.line.until, until)
                     if bound_until == +inf:
@@ -680,16 +673,16 @@ class Momentum(namedtuple('Momentum', ['velocity', 'since', 'until'])):
 
 class Line(object):
 
-    value = None
     since = None
     until = None
+    value = None
 
     velocity = NotImplemented
 
-    def __init__(self, value, since, until):
-        self.value = value
+    def __init__(self, since, until, value):
         self.since = since
         self.until = until
+        self.value = value
 
     def get(self, at=None):
         """Returns the value at the given time.
@@ -725,7 +718,7 @@ class Line(object):
 
         :raises ValueError: there's no intersection.
         """
-        intercept_delta = self.intercept() - line.intercept()
+        intercept_delta = line.intercept() - self.intercept()
         velocity_delta = self.velocity - line.velocity
         try:
             time = intercept_delta / velocity_delta
@@ -762,8 +755,8 @@ class Ray(Line):
 
     velocity = None
 
-    def __init__(self, value, velocity, since, until):
-        super(Ray, self).__init__(value, since, until)
+    def __init__(self, since, until, value, velocity):
+        super(Ray, self).__init__(since, until, value)
         self.velocity = velocity
 
     def _get(self, at):
@@ -773,7 +766,7 @@ class Ray(Line):
         return self.value
 
     def _later(self, at):
-        return self._get(at)
+        return self._get(self.until)
 
 
 class Segment(Line):
@@ -786,12 +779,12 @@ class Segment(Line):
         time_delta = self.until - self.since
         return value_delta / time_delta
 
-    def __init__(self, value, final, since, until):
-        super(Segment, self).__init__(value, since, until)
+    def __init__(self, since, until, value, final):
+        super(Segment, self).__init__(since, until, value)
         self.final = final
 
     def _get(self, at):
-        rate = (at - self.since) / (self.until - self.since)
+        rate = float(at - self.since) / (self.until - self.since)
         return self.value + rate * (self.final - self.value)
 
     def _earlier(self, at):
