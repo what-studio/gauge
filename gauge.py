@@ -451,22 +451,22 @@ class Gauge(object):
     def walk_lines(self, number_or_gauge):
         """Yields :class:`Segment`s on the graph from `number_or_gauge`.  If
         `number_or_gauge` is a gauge, the graph is the determination of the
-        gauge.  Otherwise, just a horizontal line which has the number as the
+        gauge.  Otherwise, just a Horizon line which has the number as the
         Y-intercept.
         """
         if isinstance(number_or_gauge, Gauge):
             determination = number_or_gauge.determination
             first, last = determination[0], determination[-1]
             if self.base[TIME] < first[TIME]:
-                yield Segment((self.base[TIME], first[VALUE]), first)
+                yield Horizon(first[VALUE], self.base[TIME], first[VALUE])
             zipped_determination = zip(determination[:-1], determination[1:])
-            for begin, end in zipped_determination:
-                yield Segment(begin, end)
-            yield Ray(last, 0)
+            for (time1, value1), (time2, value2) in zipped_determination:
+                yield Segment(value1, value2, time1, time2)
+            yield Horizon(last[VALUE], last[TIME], +inf)
         else:
             # just a number.
             value = number_or_gauge
-            yield Ray((self.base[TIME], value), 0)
+            yield Horizon(value, self.base[TIME], +inf)
 
     def determine(self):
         """Determines the transformations from the time when the value set to
@@ -525,7 +525,7 @@ class Gauge(object):
                     again = True
                     continue
                 # current ray.
-                line = Ray((since, value), velocity)
+                line = Ray(value, velocity, since, until)
                 if overlapped:
                     bound_until = min(bound.line.until, until)
                     if bound_until == +inf:
@@ -548,9 +548,9 @@ class Gauge(object):
                     since, value = intersection
                     # adjust by more accurate value.
                     if boundary.line.velocity == 0:
-                        value = boundary.line.begin[VALUE]
-                    elif boundary.line.begin[TIME] == since:
-                        value = boundary.line.begin[VALUE]
+                        value = boundary.line.value
+                    elif boundary.line.since == since:
+                        value = boundary.line.value
                     value = clamp_by_boundaries(value, at=since)
                     yield (since, value)
                     break
@@ -673,18 +673,44 @@ class Momentum(namedtuple('Momentum', ['velocity', 'since', 'until'])):
 
 class Line(object):
 
-    begin = None
-    velocity = None
+    value = None
+    since = None
     until = None
 
-    def __init__(self, begin, until):
-        self.begin = begin
+    velocity = NotImplemented
+
+    def __init__(self, value, since, until):
+        self.value = value
+        self.since = since
         self.until = until
 
     def get(self, at=None):
-        raise NotImplementedError
+        """Returns the value at the given time.
+
+        :raises ValueError: the given time is out of the time range.
+        """
+        at = now_or(at)
+        if not self.since <= at <= self.until:
+            raise ValueError('Out of the time range: {0:.2f}~{1:.2f}'
+                             ''.format(self.since, self.until))
+        return self._get(at)
 
     def guess(self, at=None):
+        at = now_or(at)
+        if at < self.since:
+            return self._earlier(at)
+        elif at > self.until:
+            return self._later(at)
+        else:
+            return self.get(at)
+
+    def _get(self, at):
+        raise NotImplementedError
+
+    def _earlier(self, at):
+        raise NotImplementedError
+
+    def _later(self, at):
         raise NotImplementedError
 
     def intersection(self, line):
@@ -699,73 +725,70 @@ class Line(object):
             time = value_intercept_delta / velocity_delta
         except ZeroDivisionError:
             raise ValueError('Parallel segment')
-        if time < max(self.begin[TIME], line.begin[TIME]):
+        if time < max(self.since, line.since):
             raise ValueError('Intersection not in the time range')
         value = self.get(time)
         return (time, value)
 
     def value_intercept(self):
-        return self.begin[VALUE] - self.velocity * self.begin[TIME]
+        return self.value - self.velocity * self.since
+
+
+class Horizon(Line):
+
+    velocity = 0
+
+    def _get(self, at):
+        return self.value
+
+    def _earlier(self, at):
+        return self.value
+
+    def _later(self, at):
+        return self.value
 
 
 class Ray(Line):
 
-    def __init__(self, begin, velocity, until=+inf):
-        super(Ray, self).__init__(begin, until)
+    velocity = None
+
+    def __init__(self, value, velocity, since, until):
+        super(Ray, self).__init__(value, since, until)
         self.velocity = velocity
 
-    def get(self, at=None):
-        """Returns the value at the given time.
+    def _get(self, at):
+        return self.value + self.velocity * (at - self.since)
 
-        :raises ValueError: the given time is out of the time range.
-        """
-        at = now_or(at)
-        since = self.begin[TIME]
-        if at < since:
-            raise ValueError
-        return self.begin[VALUE] + self.velocity * (at - since)
+    def _earlier(self, at):
+        return self.value
 
-    def guess(self, at=None):
-        """Same with :meth:`get` but it returns the first or last value if the
-        given time is out of the time range.
-        """
-        at = now_or(at)
-        if at < self.begin[TIME]:
-            return self.begin[VALUE]
-        return self.get(at)
+    def _later(self, at):
+        return self._get(at)
 
 
 class Segment(Line):
 
-    end = None
+    final = None
 
-    def __init__(self, begin, end):
-        super(Segment, self).__init__(begin, end[TIME])
-        self.end = end
+    def __init__(self, value, final, since, until):
+        super(Segment, self).__init__(value, since, until)
+        self.final = final
 
     @property
     def velocity(self):
-        value_delta = self.begin[VALUE] - self.end[VALUE]
-        time_delta = self.begin[TIME] - self.end[TIME]
+        value_delta = self.final - self.value
+        time_delta = self.until - self.since
         return value_delta / time_delta
 
-    @property
-    def until(self):
-        return self.end[TIME]
+    def _get(self, at):
+        rate = (at - self.since) / (self.until - self.since)
+        return self.value + rate * (self.final - self.value)
 
-    def get(self, at=None):
-        at = now_or(at)
-        if not self.begin[TIME] <= at <= self.end[TIME]:
-            raise ValueError('Out of the time range: {0:.2f}~{1:.2f}'
-                             ''.format(self.begin[TIME], self.end[TIME]))
-        rate = (at - self.begin[TIME]) / (self.end[TIME] - self.begin[TIME])
-        return self.begin[VALUE] + rate * (self.end[VALUE] - self.begin[VALUE])
+    def _earlier(self, at):
+        return self.value
 
-    def guess(self, at=None):
-        at = now_or(at)
-        if self.end[TIME] <= at:
-            return self.end[VALUE]
-        return self.get(at)
+    def _later(self, at):
+        return self.final
 
 
 class _Segment(object):
