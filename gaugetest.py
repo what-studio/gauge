@@ -13,8 +13,8 @@ import pytest
 
 import gauge
 from gauge import (
-    ADD, REMOVE, TIME, VALUE, Boundary, Gauge, Horizon, Momentum, Ray, Segment,
-    inf)
+    ADD, REMOVE, TIME, VALUE, Boundary, Gauge, Horizon, Line, Momentum, Ray,
+    Segment, inf)
 
 
 PRECISION = 8
@@ -488,10 +488,18 @@ def test_velocity():
 
 
 def test_lines():
+    line = Line(0, 0, 0)
+    with pytest.raises(NotImplementedError):
+        line.get(0)
+    with pytest.raises(NotImplementedError):
+        line.guess(-1)
+    with pytest.raises(NotImplementedError):
+        line.guess(+1)
     horizon = Horizon(0, 10, 1234)
     assert horizon.get(0) == 1234
     assert horizon.get(10) == 1234
     assert horizon.guess(100) == 1234
+    assert horizon.guess(-100) == 1234
     ray = Ray(0, 10, 0, velocity=+1)
     assert ray.get(0) == 0
     assert ray.get(5) == 5
@@ -515,6 +523,8 @@ def test_lines():
     assert ray.get(100000) == 100000
     seg = Segment(0, 10, -50.05804016454045, 12.780503036230357)
     assert seg.get(10) == 12.780503036230357
+    assert seg.guess(100) == 12.780503036230357
+    assert seg.guess(-100) == -50.05804016454045
 
 
 def test_boundary():
