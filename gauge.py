@@ -536,7 +536,7 @@ class Gauge(object):
                     again = True  # iterate with same boundaries again.
                     bound, overlapped = boundary, True
                     since, value = intersection
-                    # clamp by boundary.
+                    # clamp by the boundary.
                     value = boundary.best(value, boundary.line.guess(since))
                     yield (since, value)
                     break
