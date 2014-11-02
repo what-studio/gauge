@@ -479,11 +479,6 @@ class Gauge(object):
         ceil = Boundary(self.walk_lines(self.max), operator.lt)
         floor = Boundary(self.walk_lines(self.min), operator.gt)
         boundaries = [ceil, floor]
-        def clamp_by_boundaries(value, at):
-            if bound is None or overlapped:
-                value = min(value, ceil.line.guess(at))
-                value = max(value, floor.line.guess(at))
-            return value
         for boundary in boundaries:
             # skip past boundaries.
             while boundary.line.until <= since:
@@ -545,7 +540,10 @@ class Gauge(object):
                     again = True  # iterate with same boundaries again.
                     bound, overlapped = boundary, True
                     since, value = intersection
-                    value = clamp_by_boundaries(value, at=since)
+                    # clamp by boundaries.
+                    if bound is None or overlapped:
+                        value = min(value, ceil.line.guess(since))
+                        value = max(value, floor.line.guess(since))
                     yield (since, value)
                     break
                 if bound is not None:
