@@ -449,7 +449,7 @@ class Gauge(object):
         yield (+inf, None, None)
 
     def walk_lines(self, number_or_gauge):
-        """Yields :class:`Segment`s on the graph from `number_or_gauge`.  If
+        """Yields :class:`Line`s on the graph from `number_or_gauge`.  If
         `number_or_gauge` is a gauge, the graph is the determination of the
         gauge.  Otherwise, just a Horizon line which has the number as the
         Y-intercept.
@@ -664,6 +664,15 @@ class Momentum(namedtuple('Momentum', ['velocity', 'since', 'until'])):
 
 
 class Line(object):
+    """An abstract class to represent lines between 2 times which start from
+    `value`.  Subclasses should describe where lines end.
+
+    .. note::
+
+       Each subclass must implement :meth:`_get`, :meth:`_earlier`,
+       :meth:`_later`, and :attr:`velocity` property.
+
+    """
 
     since = None
     until = None
@@ -688,6 +697,9 @@ class Line(object):
         return self._get(at)
 
     def guess(self, at=None):
+        """Returns the value at the given time even the time it out of the time
+        range.
+        """
         at = now_or(at)
         if at < self.since:
             return self._earlier(at)
@@ -697,16 +709,25 @@ class Line(object):
             return self.get(at)
 
     def _get(self, at):
+        """Implement at subclass as to calculate the value at the given time
+        which is between the time range.
+        """
         raise NotImplementedError
 
     def _earlier(self, at):
+        """Implement at subclass as to calculate the value at the given time
+        which is earlier than `since`.
+        """
         raise NotImplementedError
 
     def _later(self, at):
+        """Implement at subclass as to calculate the value at the given time
+        which is later than `until`.
+        """
         raise NotImplementedError
 
     def intersect(self, line):
-        """Gets the intersection with the given segment.
+        """Gets the intersection with the given line.
 
         :raises ValueError: there's no intersection.
         """
@@ -715,7 +736,7 @@ class Line(object):
         try:
             time = intercept_delta / velocity_delta
         except ZeroDivisionError:
-            raise ValueError('Parallel segment')
+            raise ValueError('Parallel line given')
         since = max(self.since, line.since)
         until = min(self.until, line.until)
         if since <= time <= until:
@@ -726,10 +747,12 @@ class Line(object):
         return (time, value)
 
     def intercept(self):
+        """Gets the value-intercept. (Y-intercept)"""
         return self.value - self.velocity * self.since
 
 
 class Horizon(Line):
+    """A line which has no velocity."""
 
     velocity = 0
 
@@ -744,6 +767,7 @@ class Horizon(Line):
 
 
 class Ray(Line):
+    """A line based on starting value and velocity."""
 
     velocity = None
 
@@ -762,7 +786,9 @@ class Ray(Line):
 
 
 class Segment(Line):
+    """A line based on starting and ending value."""
 
+    #: The value at `until`.
     final = None
 
     @property
@@ -788,7 +814,7 @@ class Segment(Line):
 
 class Boundary(object):
 
-    #: The current line.  To select next segment, call :meth:`walk`.
+    #: The current line.  To select next line, call :meth:`walk`.
     line = None
 
     #: The iterator of lines.
@@ -810,7 +836,7 @@ class Boundary(object):
         self.walk()
 
     def walk(self):
-        """Choose the next segment."""
+        """Choose the next line."""
         self.line = next(self.lines_iter)
 
     def cmp_eq(self, x, y):
