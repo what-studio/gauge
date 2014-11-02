@@ -13,7 +13,7 @@ import pytest
 
 import gauge
 from gauge import (
-    ADD, REMOVE, TIME, VALUE, Boundary, Gauge, Momentum, _Segment as Segment,
+    ADD, REMOVE, TIME, VALUE, Boundary, Gauge, Horizon, Momentum, Ray, Segment,
     inf)
 
 
@@ -487,35 +487,41 @@ def test_velocity():
     assert g.velocity(at=10) == +1
 
 
-def test_linement():
-    line = Segment(0, +1, since=0, until=10)
-    assert line.get(0) == 0
-    assert line.get(5) == 5
+def test_lines():
+    horizon = Horizon(0, 10, 1234)
+    assert horizon.get(0) == 1234
+    assert horizon.get(10) == 1234
+    assert horizon.guess(100) == 1234
+    ray = Ray(0, 10, 0, velocity=+1)
+    assert ray.get(0) == 0
+    assert ray.get(5) == 5
     with pytest.raises(ValueError):
-        line.get(-1)
+        ray.get(-1)
     with pytest.raises(ValueError):
-        line.get(11)
-    assert line.guess(-1) == 0
-    assert line.guess(11) == 10
-    assert line.intersect(Segment(5, 0, since=0, until=10)) == (5, 5)
-    assert line.intersect(Segment(10, 0, since=0, until=10)) == (10, 10)
-    assert line.intersect(Segment(5, 0, since=0, until=inf)) == (5, 5)
+        ray.get(11)
+    assert ray.guess(-1) == 0
+    assert ray.guess(11) == 10
+    assert ray.intersect(Horizon(0, 10, 5)) == (5, 5)
+    assert ray.intersect(Horizon(0, 10, 10)) == (10, 10)
+    assert ray.intersect(Horizon(0, +inf, 5)) == (5, 5)
     with pytest.raises(ValueError):
-        line.intersect(Segment(15, 0, since=0, until=10))
+        ray.intersect(Horizon(0, 10, 15))
     with pytest.raises(ValueError):
-        line.intersect(Segment(5, 0, since=6, until=10))
+        ray.intersect(Horizon(6, 10, 5))
     with pytest.raises(ValueError):
-        line.intersect(Segment(5, 0, since=-inf, until=inf))
-    line = Segment(0, +1, since=0, until=inf)
-    assert line.get(100) == 100
-    assert line.get(100000) == 100000
+        ray.intersect(Horizon(-inf, +inf, 5))
+    ray = Ray(0, +inf, 0, velocity=+1)
+    assert ray.get(100) == 100
+    assert ray.get(100000) == 100000
+    seg = Segment(0, 10, -50.05804016454045, 12.780503036230357)
+    assert seg.get(10) == 12.780503036230357
 
 
 def test_boundary():
     # walk
-    lines = [Segment(0, 0, since=0, until=10),
-             Segment(0, +1, since=10, until=20),
-             Segment(10, -1, since=20, until=30)]
+    lines = [Horizon(0, 10, 0),
+             Ray(10, 20, 0, velocity=+1),
+             Ray(20, 30, 10, velocity=-1)]
     boundary = Boundary(iter(lines))
     assert boundary.line is lines[0]
     boundary.walk()
@@ -835,26 +841,30 @@ def test_hypergauge_past_bugs(zigzag, bidir):
 
 
 def assert_all_inside(g, message=None):
+    outside = True
     for t, v in g.determine():
-        try:
-            assert round_(g.get_min(t)) <= round_(v) <= round_(g.get_max(t))
-        except AssertionError:
-            # from gaugeplot import show_gauge
-            # show_gauge(g)
-            report = ('[{0!r}] {1!r} <= {2!r} <= {3!r}'
-                      ''.format(t, g.get_min(t), v, g.get_max(t)))
-            if message is None:
-                message = report
-            else:
-                message = '\n'.join([message, report])
-            pytest.fail(message)
+        inside = g.get_min(t) <= v <= g.get_max(t)
+        if inside:
+            outside = False
+            continue
+        elif outside:
+            continue
+        # from gaugeplot import show_gauge
+        # show_gauge(g)
+        report = ('[{0!r}] {1!r} <= {2!r} <= {3!r}'
+                  ''.format(t, g.get_min(t), v, g.get_max(t)))
+        if message is None:
+            message = report
+        else:
+            message = '\n'.join([message, report])
+        pytest.fail(message)
 
 
 def random_gauge1(random=random, far=10, near=3, until=20):
     # (-far ~ -near) <= g <= (near ~ far)
     g_max = Gauge(random.uniform(near, far), far, near, at=0)
     g_min = Gauge(random.uniform(-far, -near), -near, -far, at=0)
-    g = Gauge(random.uniform(g_min.get(0), g_max.get(0)), g_max, g_min, at=0)
+    g = Gauge(random.uniform(g_min.min, g_max.max), g_max, g_min, at=0)
     for x in range(0, until, 5):
         g_max.add_momentum(random.uniform(-far, +far), since=x, until=x + 5)
     for x in range(0, until, 2):
@@ -866,10 +876,10 @@ def random_gauge1(random=random, far=10, near=3, until=20):
 
 def random_gauge2(random=random, far=1000, near=1, until=20):
     # 0 <= g <= (near ~ far)
-    g_far = Gauge(random.uniform(near, far), far, near, at=0)
-    g = Gauge(random.uniform(0, g_far.get(0)), g_far, at=0)
+    g_max = Gauge(random.uniform(near, far), far, near, at=0)
+    g = Gauge(random.uniform(0, g_max.max), g_max, at=0)
     for x in range(0, until, 5):
-        g_far.add_momentum(random.uniform(-far, +far), since=x, until=x + 5)
+        g_max.add_momentum(random.uniform(-far, +far), since=x, until=x + 5)
     for x in range(0, until, 2):
         g.add_momentum(random.uniform(-far, +far), since=x, until=x + 2)
     return g
@@ -899,8 +909,11 @@ def test_randomly():
 def test_repaired_random_gauges():
     # from test_randomly()
     assert_all_inside(random_gauge1(Random(1098651790867685487)))
+    assert_all_inside(random_gauge1(Random(957826144573409526)))
     assert_all_inside(random_gauge1(Random(7276062123994486117), near=1e-10))
     assert_all_inside(random_gauge1(Random(6867673013126676888), near=1e-10))
+    assert_all_inside(random_gauge1(Random(8038810374719555655), near=1e-10))
+    assert_all_inside(random_gauge1(Random(5925612648020704501), near=1e-10))
     assert_all_inside(random_gauge1(Random(2881266403492433952), far=1000))
     assert_all_inside(random_gauge2(Random(3373542927760325757), far=1e6))
     assert_all_inside(random_gauge2(Random(7588425536572564538), far=1e4))

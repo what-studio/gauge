@@ -531,8 +531,7 @@ class Gauge(object):
                     if bound_until == +inf:
                         break
                     # released from the boundary.
-                    since, value = (bound_until, line.get(bound_until))
-                    value = clamp_by_boundaries(value, at=since)
+                    since, value = (bound_until, bound.line.get(bound_until))
                     yield (since, value)
                     continue
                 for boundary in walked_boundaries:
@@ -546,11 +545,6 @@ class Gauge(object):
                     again = True  # iterate with same boundaries again.
                     bound, overlapped = boundary, True
                     since, value = intersection
-                    # adjust by more accurate value.
-                    if boundary.line.velocity == 0:
-                        value = boundary.line.value
-                    elif boundary.line.since == since:
-                        value = boundary.line.value
                     value = clamp_by_boundaries(value, at=since)
                     yield (since, value)
                     break
@@ -567,14 +561,12 @@ class Gauge(object):
                         continue
                     bound, overlapped = boundary, True
                     since, value = bound_until, boundary_value
-                    value = clamp_by_boundaries(value, at=since)
                     yield (since, value)
                     break
             if until == +inf:
                 break
             # determine the last node in the current itreration.
             value += velocity * (until - since)
-            value = clamp_by_boundaries(value, at=until)
             yield (until, value)
             # prepare the next iteration.
             if method == ADD:

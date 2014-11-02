@@ -1,6 +1,23 @@
 import random
 from random import Random
 from gaugetest import assert_all_inside, random_gauge1, random_gauge2
+from gauge import Ray, Segment
+
+
+'''
+while True:
+    value = random.uniform(-100, +100)
+    final = random.uniform(-100, +100)
+    velocity = (final - value) / 10.
+    r = Ray(0, 10, value, velocity)
+    s = Segment(0, 10, value, final)
+    rg = r.get(10)
+    sg = s.get(10)
+    if value < final:
+        assert sg <= final, `(rg, sg, value, final)`
+    else:
+        assert sg >= final, `(rg, sg, value, final)`
+'''
 
 
 maxint = 2 ** 64 / 2
