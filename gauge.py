@@ -197,7 +197,7 @@ class Gauge(object):
         """
         self._set_limits(min=min, clamp=clamp, at=at)
 
-    def _current_value_and_velocity(self, at=None):
+    def _value_and_velocity(self, at=None):
         at = now_or(at)
         determination = self.determination
         if len(determination) == 1:
@@ -208,23 +208,19 @@ class Gauge(object):
         if x == 0:
             return (determination[0][VALUE], 0.)
         try:
-            next_time, next_value = determination[x]
+            until, final = determination[x]
         except IndexError:
             return (determination[-1][VALUE], 0.)
-        prev_time, prev_value = determination[x - 1]
-        time_delta = next_time - prev_time
-        value_delta = next_value - prev_value
-        rate = float(at - prev_time) / time_delta
-        value = prev_value + rate * value_delta
-        velocity = value_delta / time_delta
-        return (value, velocity)
+        since, value = determination[x - 1]
+        seg = Segment(since, until, value, final)
+        return (seg.get(at), seg.velocity)
 
     def get(self, at=None):
         """Predicts the current value.
 
         :param at: the time to observe.  (default: now)
         """
-        value, velocity = self._current_value_and_velocity(at)
+        value, velocity = self._value_and_velocity(at)
         return value
 
     def velocity(self, at=None):
@@ -232,7 +228,7 @@ class Gauge(object):
 
         :param at: the time to observe.  (default: now)
         """
-        value, velocity = self._current_value_and_velocity(at)
+        value, velocity = self._value_and_velocity(at)
         return velocity
 
     def incr(self, delta, over=False, clamp=False, at=None):
@@ -519,7 +515,7 @@ class Gauge(object):
                     bound, overlapped = None, False
                     again = True
                     continue
-                # current ray.
+                # current value line.
                 line = Ray(since, until, value, velocity)
                 if overlapped:
                     bound_until = min(bound.line.until, until)
@@ -563,7 +559,7 @@ class Gauge(object):
                     break
             if until == +inf:
                 break
-            # determine the last node in the current itreration.
+            # determine the final node in the current itreration.
             value += velocity * (until - since)
             yield (until, value)
             # prepare the next iteration.
