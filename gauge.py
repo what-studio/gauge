@@ -536,10 +536,8 @@ class Gauge(object):
                     again = True  # iterate with same boundaries again.
                     bound, overlapped = boundary, True
                     since, value = intersection
-                    # clamp by boundaries.
-                    if bound is None or overlapped:
-                        value = min(value, ceil.line.guess(since))
-                        value = max(value, floor.line.guess(since))
+                    # clamp by boundary.
+                    value = boundary.best(value, boundary.line.guess(since))
                     yield (since, value)
                     break
                 if bound is not None:
