@@ -853,21 +853,22 @@ def test_hypergauge_past_bugs(zigzag, bidir):
 def assert_all_inside(g, message=None):
     outside = True
     for t, v in g.determine():
-        inside = g.get_min(t) <= v <= g.get_max(t)
-        if inside:
-            outside = False
-            continue
-        elif outside:
-            continue
-        # from gaugeplot import show_gauge
-        # show_gauge(g)
-        report = ('[{0!r}] {1!r} <= {2!r} <= {3!r}'
-                  ''.format(t, g.get_min(t), v, g.get_max(t)))
-        if message is None:
-            message = report
-        else:
-            message = '\n'.join([message, report])
-        pytest.fail(message)
+        for v in [v, g.get(t)]:
+            inside = g.get_min(t) <= v <= g.get_max(t)
+            if inside:
+                outside = False
+                continue
+            elif outside:
+                continue
+            # from gaugeplot import show_gauge
+            # show_gauge(g)
+            report = ('[{0!r}] {1!r} <= {2!r} <= {3!r}'
+                      ''.format(t, g.get_min(t), v, g.get_max(t)))
+            if message is None:
+                message = report
+            else:
+                message = '\n'.join([message, report])
+            pytest.fail(message)
 
 
 def random_gauge1(random=random, far=10, near=3, until=20):
@@ -927,3 +928,14 @@ def test_repaired_random_gauges():
     assert_all_inside(random_gauge1(Random(2881266403492433952), far=1000))
     assert_all_inside(random_gauge2(Random(3373542927760325757), far=1e6))
     assert_all_inside(random_gauge2(Random(7588425536572564538), far=1e4))
+
+
+def test_clamp_on_segment_get():
+    g = random_gauge1(Random(6883875130559908307))
+    at = 14.803740162409357
+    e = 00.000000000000001
+    g.clear_momenta(at=at)
+    g.add_momentum(-100)
+    for x in range(-100, +1):  # ~ +100 fails
+        t = at + x * e
+        assert g.get_min(t) <= g.get(t)

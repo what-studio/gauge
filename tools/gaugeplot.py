@@ -23,11 +23,11 @@ class GaugePlotting(object):
     def __init__(self, gauge):
         self.gauge = gauge
 
-    def divide_segs(self, segs):
+    def divide_lines(self, lines):
         times, values = [], []
-        for seg in segs:
-            times.append(seg.since)
-            values.append(seg.value)
+        for line in lines:
+            times.append(line.since)
+            values.append(line.value)
         return times, values
 
     def expand_time_range(self, times, values, min_time=None, max_time=None):
@@ -45,15 +45,15 @@ class GaugePlotting(object):
 
     def plot(self, plt):
         # determination
-        determination_segs = self.gauge.walk_segs(self.gauge)
-        times, values = self.divide_segs(determination_segs)
+        determination_lines = self.gauge.walk_lines(self.gauge)
+        times, values = self.divide_lines(determination_lines)
         min_time, max_time = self.expand_time_range(times, values)
         plt.plot(times, values, 'o-')
         # base time
         plt.axvline(self.gauge.base[TIME], linestyle=':')
         # max & min
         for limit in [self.gauge.max, self.gauge.min]:
-            times, values = self.divide_segs(self.gauge.walk_segs(limit))
+            times, values = self.divide_lines(self.gauge.walk_lines(limit))
             self.expand_time_range(times, values, min_time, max_time)
             plt.plot(times, values, 'o--')
         # set axes

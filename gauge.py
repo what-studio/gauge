@@ -794,6 +794,12 @@ class Segment(Line):
         self.final = final
 
     def _get(self, at):
+        if at == self.since:
+            # rate: 0
+            return self.value
+        elif at == self.until:
+            # rate: 1
+            return self.final
         rate = float(at - self.since) / (self.until - self.since)
         return self.value + rate * (self.final - self.value)
 
