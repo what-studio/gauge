@@ -10,6 +10,7 @@
 
 """
 from collections import namedtuple
+from itertools import islice
 import operator
 from time import time as now
 import warnings
@@ -197,6 +198,16 @@ class Gauge(object):
         """
         self._set_limits(min=min, clamp=clamp, at=at)
 
+    def clamp(self, value, at=None):
+        """Clamps by the limits at the given time.
+
+        :param at: the time to get limits.  (default: now)
+        """
+        at = now_or(at)
+        value = min(value, self.get_max(at))
+        value = max(value, self.get_min(at))
+        return value
+
     def _value_and_velocity(self, at=None):
         at = now_or(at)
         determination = self.determination
@@ -213,7 +224,16 @@ class Gauge(object):
             return (determination[-1][VALUE], 0.)
         since, value = determination[x - 1]
         seg = Segment(since, until, value, final)
-        return (seg.get(at), seg.velocity)
+        value, velocity = seg.get(at), seg.velocity
+        if self._inbound_since(islice(self.determination, x)) <= at:
+            value = self.clamp(value, at=at)
+        return (value, velocity)
+
+    def _inbound_since(self, determination):
+        for time, value in determination:
+            if self.get_min(time) <= value <= self.get_max(time):
+                return time
+        return +inf
 
     def get(self, at=None):
         """Predicts the current value.
