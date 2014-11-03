@@ -935,12 +935,11 @@ def test_clamp_on_segment_get():
     at = 14.803740162409357
     e = 00.000000000000001
     g.clear_momenta(at=at)
-    for x in range(-100, +100):  # ~100 fails
+    for x in range(-100, +100):
         t = at + x * e
         assert g.get_min(t) <= g.get(t)
 
 
-# @pytest.mark.xfail  # if it passes, increase range to ~100 at the above test
 def test_false_accusation():
     g = random_gauge1(Random(6883875130559908307))
     assert g.get(15) == -3

@@ -10,7 +10,7 @@
 
 """
 from collections import namedtuple
-from itertools import islice
+import itertools
 import operator
 from time import time as now
 import warnings
@@ -225,7 +225,7 @@ class Gauge(object):
         since, value = determination[x - 1]
         seg = Segment(since, until, value, final)
         value, velocity = seg.get(at), seg.velocity
-        if self._inbound_since(islice(self.determination, x)) <= at:
+        if self._inbound_since(itertools.islice(self.determination, x)) <= at:
             value = self.clamp(value, at=at)
         return (value, velocity)
 
