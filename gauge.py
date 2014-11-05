@@ -9,8 +9,8 @@
     :license: BSD, see LICENSE for more details.
 
 """
+from bisect import bisect_left
 from collections import namedtuple
-import itertools
 import operator
 from time import time as now
 import warnings
@@ -77,12 +77,12 @@ class Gauge(object):
         except AttributeError:
             pass
         # redetermine and cache.
-        self._determination = SortedList()
+        self._determination = []
         prev_time = None
         for time, value in self.determine():
             if prev_time == time:
                 continue
-            self._determination.add((time, value))
+            self._determination.append((time, value))
             prev_time = time
         return self._determination
 
@@ -204,8 +204,12 @@ class Gauge(object):
         :param at: the time to get limits.  (default: now)
         """
         at = now_or(at)
-        value = min(value, self.get_max(at))
-        value = max(value, self.get_min(at))
+        max = self.get_max(at)
+        if value > max:
+            return max
+        min = self.get_min(at)
+        if value < min:
+            return min
         return value
 
     def _value_and_velocity(self, at=None):
@@ -215,7 +219,7 @@ class Gauge(object):
             # skip bisect_left() because it is expensive
             x = 0
         else:
-            x = determination.bisect_left((at,))
+            x = bisect_left(determination, (at,))
         if x == 0:
             return (determination[0][VALUE], 0.)
         try:
@@ -225,15 +229,9 @@ class Gauge(object):
         since, value = determination[x - 1]
         seg = Segment(since, until, value, final)
         value, velocity = seg.get(at), seg.velocity
-        if self._inbound_since(itertools.islice(self.determination, x)) <= at:
-            value = self.clamp(value, at=at)
+        # if inside:
+        #     value = self.clamp(value, at=at)
         return (value, velocity)
-
-    def _inbound_since(self, determination):
-        for time, value in determination:
-            if self.get_min(time) <= value <= self.get_max(time):
-                return time
-        return +inf
 
     def get(self, at=None):
         """Predicts the current value.
@@ -335,7 +333,9 @@ class Gauge(object):
             if first_value == value:
                 yield first_time
             zipped_determination = zip(determination[:-1], determination[1:])
-            for (time1, value1), (time2, value2) in zipped_determination:
+            for node1, node2 in zipped_determination:
+                time1, value1 = node1
+                time2, value2 = node2
                 if not (value1 < value <= value2 or value1 > value >= value2):
                     continue
                 ratio = (value - value1) / float(value2 - value1)
@@ -476,7 +476,9 @@ class Gauge(object):
             if self.base[TIME] < first[TIME]:
                 yield Horizon(self.base[TIME], first[TIME], first[VALUE])
             zipped_determination = zip(determination[:-1], determination[1:])
-            for (time1, value1), (time2, value2) in zipped_determination:
+            for node1, node2 in zipped_determination:
+                time1, value1 = node1
+                time2, value2 = node2
                 yield Segment(time1, time2, value1, value2)
             yield Horizon(last[TIME], +inf, last[VALUE])
         else:
@@ -543,7 +545,7 @@ class Gauge(object):
                         break
                     # released from the boundary.
                     since, value = (bound_until, bound.line.get(bound_until))
-                    yield (since, value)
+                    yield (since, value)  # , True)
                     continue
                 for boundary in walked_boundaries:
                     # find the intersection with a boundary.
@@ -558,7 +560,7 @@ class Gauge(object):
                     since, value = intersection
                     # clamp by the boundary.
                     value = boundary.best(value, boundary.line.guess(since))
-                    yield (since, value)
+                    yield (since, value)  # , True)
                     break
                 if bound is not None:
                     continue  # the intersection was found.
@@ -573,13 +575,13 @@ class Gauge(object):
                         continue
                     bound, overlapped = boundary, True
                     since, value = bound_until, boundary_value
-                    yield (since, value)
+                    yield (since, value)  # , True)
                     break
             if until == +inf:
                 break
             # determine the final node in the current itreration.
             value += velocity * (until - since)
-            yield (until, value)
+            yield (until, value)  # , boundary is None or overlapped)
             # prepare the next iteration.
             if method == ADD:
                 velocities.append(momentum.velocity)
