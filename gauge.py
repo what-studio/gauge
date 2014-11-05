@@ -20,12 +20,14 @@ from sortedcontainers import SortedList, SortedListWithKey
 
 
 __all__ = ['Gauge', 'Momentum']
-__version__ = '0.2.0-dev'
+__version__ = '0.1.7-dev'
 
 
 # indices
 TIME = 0
 VALUE = 1
+DETERMINATION = 0
+INSIDE_SINCE = 1
 
 # events
 ADD = +1
@@ -73,21 +75,21 @@ class Gauge(object):
         times as x-values, gauge values as y-values.
         """
         try:
-            return self._determination
+            return self._determined[DETERMINATION]
         except AttributeError:
             pass
         # redetermine and cache.
-        self._determination = []
-        self._inside_since = None
+        determination, inside_since = [], None
         prev_time = None
         for time, value, inside in self.determine():
             if prev_time == time:
                 continue
-            elif inside and self._inside_since is None:
-                self._inside_since = time
-            self._determination.append((time, value))
+            elif inside and inside_since is None:
+                inside_since = time
+            determination.append((time, value))
             prev_time = time
-        return self._determination
+        self._determined = (determination, inside_since)
+        return determination
 
     def invalidate(self):
         """Invalidates the cached determination.  If you touches the
@@ -112,7 +114,7 @@ class Gauge(object):
                 gauge.invalidate()
         # remove the cached determination.
         try:
-            del self._determination
+            del self._determined
         except AttributeError:
             pass
 
@@ -226,13 +228,17 @@ class Gauge(object):
         if x == 0:
             return (determination[0][VALUE], 0.)
         try:
-            until, final = determination[x]
+            time2, value2 = determination[x]
         except IndexError:
             return (determination[-1][VALUE], 0.)
-        since, value = determination[x - 1]
-        seg = Segment(since, until, value, final)
+        time1, value1 = determination[x - 1]
+        seg = Segment(time1, time2, value1, value2)
         value, velocity = seg.get(at), seg.velocity
-        if self._inside_since <= since:
+        # clamp if the node is inside of or overlapped on the boundaries.
+        inside_since = self._determined[INSIDE_SINCE]
+        if inside_since is None:
+            pass
+        elif inside_since <= time1:
             value = self.clamp(value, at=at)
         return (value, velocity)
 
@@ -336,9 +342,7 @@ class Gauge(object):
             if first_value == value:
                 yield first_time
             zipped_determination = zip(determination[:-1], determination[1:])
-            for node1, node2 in zipped_determination:
-                time1, value1 = node1
-                time2, value2 = node2
+            for (time1, value1), (time2, value2) in zipped_determination:
                 if not (value1 < value <= value2 or value1 > value >= value2):
                     continue
                 ratio = (value - value1) / float(value2 - value1)
@@ -479,9 +483,7 @@ class Gauge(object):
             if self.base[TIME] < first[TIME]:
                 yield Horizon(self.base[TIME], first[TIME], first[VALUE])
             zipped_determination = zip(determination[:-1], determination[1:])
-            for node1, node2 in zipped_determination:
-                time1, value1 = node1
-                time2, value2 = node2
+            for (time1, value1), (time2, value2) in zipped_determination:
                 yield Segment(time1, time2, value1, value2)
             yield Horizon(last[TIME], +inf, last[VALUE])
         else:

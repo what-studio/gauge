@@ -926,11 +926,12 @@ def test_repaired_random_gauges():
     assert_all_inside(random_gauge1(Random(8038810374719555655), near=1e-10))
     assert_all_inside(random_gauge1(Random(5925612648020704501), near=1e-10))
     assert_all_inside(random_gauge1(Random(2881266403492433952), far=1000))
+    assert_all_inside(random_gauge1(Random(6468976982055982554), far=1000))
     assert_all_inside(random_gauge2(Random(3373542927760325757), far=1e6))
     assert_all_inside(random_gauge2(Random(7588425536572564538), far=1e4))
 
 
-def test_clamp_on_segment_get():
+def test_clamp_on_get():
     g = random_gauge1(Random(6883875130559908307))
     at = 14.803740162409357
     e = 00.000000000000001
