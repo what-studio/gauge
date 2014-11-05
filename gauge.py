@@ -20,7 +20,7 @@ from sortedcontainers import SortedList, SortedListWithKey
 
 
 __all__ = ['Gauge', 'Momentum']
-__version__ = '0.1.6'
+__version__ = '0.2.0-dev'
 
 
 # indices
@@ -78,10 +78,13 @@ class Gauge(object):
             pass
         # redetermine and cache.
         self._determination = []
+        self._inside_since = None
         prev_time = None
-        for time, value in self.determine():
+        for time, value, inside in self.determine():
             if prev_time == time:
                 continue
+            elif inside and self._inside_since is None:
+                self._inside_since = time
             self._determination.append((time, value))
             prev_time = time
         return self._determination
@@ -229,8 +232,8 @@ class Gauge(object):
         since, value = determination[x - 1]
         seg = Segment(since, until, value, final)
         value, velocity = seg.get(at), seg.velocity
-        # if inside:
-        #     value = self.clamp(value, at=at)
+        if self._inside_since <= since:
+            value = self.clamp(value, at=at)
         return (value, velocity)
 
     def get(self, at=None):
@@ -545,7 +548,7 @@ class Gauge(object):
                         break
                     # released from the boundary.
                     since, value = (bound_until, bound.line.get(bound_until))
-                    yield (since, value)  # , True)
+                    yield (since, value, True)
                     continue
                 for boundary in walked_boundaries:
                     # find the intersection with a boundary.
@@ -560,7 +563,7 @@ class Gauge(object):
                     since, value = intersection
                     # clamp by the boundary.
                     value = boundary.best(value, boundary.line.guess(since))
-                    yield (since, value)  # , True)
+                    yield (since, value, True)
                     break
                 if bound is not None:
                     continue  # the intersection was found.
@@ -575,13 +578,14 @@ class Gauge(object):
                         continue
                     bound, overlapped = boundary, True
                     since, value = bound_until, boundary_value
-                    yield (since, value)  # , True)
+                    yield (since, value, True)
                     break
             if until == +inf:
                 break
             # determine the final node in the current itreration.
             value += velocity * (until - since)
-            yield (until, value)  # , boundary is None or overlapped)
+            inside = bound is None or overlapped
+            yield (until, value, inside)
             # prepare the next iteration.
             if method == ADD:
                 velocities.append(momentum.velocity)

@@ -852,7 +852,7 @@ def test_hypergauge_past_bugs(zigzag, bidir):
 
 def assert_all_inside(g, message=None):
     outside = True
-    for t, v in g.determine():
+    for t, v in g.determination:
         for v in [v, g.get(t)]:
             inside = g.get_min(t) <= v <= g.get_max(t)
             if inside:
