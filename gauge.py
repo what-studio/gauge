@@ -16,7 +16,6 @@ from time import time as now
 import warnings
 import weakref
 
-from lazyseq import LazySeq
 from sortedcontainers import SortedList, SortedListWithKey
 
 
@@ -38,6 +37,16 @@ REMOVE = -1
 inf = float('inf')
 
 
+def zip_(determination):
+    prev = None
+    for next in determination:
+        if prev is None:
+            prev = next
+            continue
+        yield (prev, next)
+        prev = next
+
+
 def deprecate(message, *args, **kwargs):
     warnings.warn(DeprecationWarning(message.format(*args, **kwargs)))
 
@@ -45,25 +54,6 @@ def deprecate(message, *args, **kwargs):
 def now_or(time):
     """Returns the current time if `time` is ``None``."""
     return now() if time is None else float(time)
-
-
-class Determination(LazySeq):
-
-    inside_since = None
-
-    def __init__(self, determining):
-        iterator = self.wrap_determining(determining)
-        super(Determination, self).__init__(iterator)
-
-    def wrap_determining(self, determining):
-        prev_time = None
-        for time, value, inside in determining:
-            if prev_time == time:
-                continue
-            elif inside and self.inside_since is None:
-                self.inside_since = time
-            yield (time, value)
-            prev_time = time
 
 
 class Gauge(object):
@@ -695,6 +685,26 @@ class Momentum(namedtuple('Momentum', ['velocity', 'since', 'until'])):
                 '' if self.until == +inf else '{0:.2f}'.format(self.until)])
         string += '>'
         return string
+
+
+class Determination(list):
+    """Determination of a gauge is a list of `(time, value)` pairs.
+
+    :param determining: a :meth:`Gauge.determine` iterator.
+    """
+
+    #: The time when the gauge starts to be inside of the limits.
+    inside_since = None
+
+    def __init__(self, determining):
+        prev_time = None
+        for time, value, inside in determining:
+            if prev_time == time:
+                continue
+            elif inside and self.inside_since is None:
+                self.inside_since = time
+            self.append((time, value))
+            prev_time = time
 
 
 class Line(object):
