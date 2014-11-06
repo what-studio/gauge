@@ -15,7 +15,7 @@ import weakref
 
 from sortedcontainers import SortedList, SortedListWithKey
 
-from .common import ADD, REMOVE, TIME, VALUE, inf, now_or, deprecate
+from .common import ADD, REMOVE, TIME, VALUE, inf, now_or
 from .deterministic import Determination, Segment
 
 
@@ -476,39 +476,6 @@ class Gauge(object):
         else:
             form += ' between {3}~{2}>'
         return form.format(type(self).__name__, value, *limit_reprs)
-
-    # deprecated features
-
-    @property
-    def set_at(self):
-        # deprecated since v0.1.0
-        deprecate('Get Gauge.base[0] instead')
-        return self.base[TIME]
-
-    @set_at.setter
-    def set_at(self, time):
-        # deprecated since v0.1.0
-        deprecate('Update Gauge.base instead')
-        self.base = (time, self.base[VALUE])
-
-    @property
-    def value(self):
-        # deprecated since v0.1.0
-        deprecate('Get Gauge.base[1] instead')
-        return self.base[VALUE]
-
-    @value.setter
-    def value(self, value):
-        # deprecated since v0.1.0
-        deprecate('Update Gauge.base instead')
-        self.base = (self.base[TIME], value)
-
-    def current(self, at=None):
-        # deprecated since v0.0.5
-        deprecate('Use Gauge.get() instead')
-        return self.get(at=at)
-
-    current.__doc__ = get.__doc__
 
 
 class Momentum(namedtuple('Momentum', ['velocity', 'since', 'until'])):
