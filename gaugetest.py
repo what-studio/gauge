@@ -706,7 +706,7 @@ def test_hypergauge_links():
     max_g.set(100, at=0)
     assert g.get(100) == 100
     g.max = 10
-    assert g.get(100) == 10
+    assert g.get(100) == 100
     assert weakref.ref(g) not in max_g._links
     # clear dead links.
     g.max = max_g
@@ -775,11 +775,36 @@ def test_clear_events():
 
 
 def test_decr_max():
+    # normal gauge
+    g = Gauge(0, 10, at=0)
+    g.add_momentum(+2)
+    g.add_momentum(-1)
+    assert g.base[TIME] == 0
+    assert g.get(10) == 10
+    g.set_max(5, at=10)
+    assert g.base[TIME] == 10
+    assert g.get(10) == 10
+    assert g.get(15) == 5
+    assert g.get(20) == 5
+    # hyper-gauge
     g = Gauge(0, Gauge(10, 100, at=0), at=0)
     g.add_momentum(+2)
     g.add_momentum(-1)
+    assert g.base[TIME] == 0
     assert g.get(10) == 10
     g.max.decr(5, at=10)
+    assert g.base[TIME] == 10
+    assert g.get(10) == 10
+    assert g.get(15) == 5
+    assert g.get(20) == 5
+    # skewed yper-gauge
+    g = Gauge(0, Gauge(10, 100, at=10), at=0)
+    g.add_momentum(+2)
+    g.add_momentum(-1)
+    assert g.base[TIME] == 0
+    assert g.get(10) == 10
+    g.max.decr(5, at=10)
+    assert g.base[TIME] == 10
     assert g.get(10) == 10
     assert g.get(15) == 5
     assert g.get(20) == 5

@@ -81,8 +81,7 @@ class Gauge(object):
         at = now_or(at)
         self.base = (at, value)
         self.momenta = SortedListWithKey(key=lambda m: m[2])  # sort by until
-        self.set_max(max, at=at)
-        self.set_min(min, at=at)
+        self._set_limits(max_=max, min_=min, at=at, forget_past=False)
         self._events = SortedList()
         self._links = set()
 
@@ -162,40 +161,37 @@ class Gauge(object):
         """Predicts the current minimum value."""
         return self._get_limit(self.min, at=at)
 
-    def _set_limits(self, max=None, min=None, clamp=False, at=None):
-        for limit, attr in [(max, '_max'), (min, '_min')]:
-            if limit is None:
-                continue
+    def _set_limits(self, max_=None, min_=None, clamp=False, at=None,
+                    forget_past=True):
+        limit_attrs = [(limit, attr) for limit, attr in
+                       [(max_, '_max'), (min_, '_min')]
+                       if limit is not None]
+        at = now_or(at)
+        forget_until = at
+        for limit, attr in limit_attrs:
             try:
                 prev_limit = getattr(self, attr)
             except AttributeError:
-                pass
-            else:
-                if isinstance(prev_limit, Gauge):
-                    # unlink this gauge from the previous limiting gauge.
-                    prev_limit._links.discard(weakref.ref(self))
+                prev_limit = None
+            if isinstance(prev_limit, Gauge):
+                # unlink this gauge from the previous limiting gauge.
+                prev_limit._links.discard(weakref.ref(self))
             if isinstance(limit, Gauge):
                 # link this gauge to the new limiting gauge.
                 limit._links.add(weakref.ref(self))
+                forget_until = min(forget_until, limit.base[TIME])
+        if forget_past:
+            value = self.get(at=forget_until)
+        for limit, attr in limit_attrs:
             # set the internal attribute.
             setattr(self, attr, limit)
-        if clamp:
-            # clamp the current value.
-            at = now_or(at)
-            value = self.get(at=at)
-            max_ = value if max is None else self.get_max(at=at)
-            min_ = value if min is None else self.get_min(at=at)
-            if value > max_:
-                limited = max_
-            elif value < min_:
-                limited = min_
-            else:
-                limited = None
-            if limited is not None:
-                self.forget_past(limited, at=at)
-                # :meth:`forget_past` calls :meth:`invalidate`.
-                return
         self.invalidate()
+        if not forget_past:
+            return
+        if clamp:
+            value = self.clamp(value, at=at)
+            forget_until = at
+        self.forget_past(value, at=forget_until)
 
     def set_max(self, max, clamp=False, at=None):
         """Changes the maximum.
@@ -205,7 +201,7 @@ class Gauge(object):
                       (default: ``True``)
         :param at: the time to change.  (default: now)
         """
-        self._set_limits(max=max, clamp=clamp, at=at)
+        self._set_limits(max_=max, clamp=clamp, at=at)
 
     def set_min(self, min, clamp=False, at=None):
         """Changes the minimum.
@@ -215,7 +211,7 @@ class Gauge(object):
                       (default: ``True``)
         :param at: the time to change.  (default: now)
         """
-        self._set_limits(min=min, clamp=clamp, at=at)
+        self._set_limits(min_=min, clamp=clamp, at=at)
 
     def clamp(self, value, at=None):
         """Clamps by the limits at the given time.
