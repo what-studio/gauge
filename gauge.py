@@ -37,16 +37,6 @@ REMOVE = -1
 inf = float('inf')
 
 
-def zip_(determination):
-    prev = None
-    for next in determination:
-        if prev is None:
-            prev = next
-            continue
-        yield (prev, next)
-        prev = next
-
-
 def deprecate(message, *args, **kwargs):
     warnings.warn(DeprecationWarning(message.format(*args, **kwargs)))
 
