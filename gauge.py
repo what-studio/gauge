@@ -11,6 +11,7 @@
 """
 from bisect import bisect_left
 from collections import namedtuple
+import numbers
 import operator
 from time import time as now
 import warnings
@@ -569,7 +570,11 @@ class Determination(list):
         gauge.  Otherwise, just a Horizon line which has the number as the
         Y-intercept.
         """
-        if isinstance(number_or_gauge, Gauge):
+        if isinstance(number_or_gauge, numbers.Number):
+            # just a number.
+            value = number_or_gauge
+            yield Horizon(gauge.base[TIME], +inf, value)
+        else:
             determination = number_or_gauge.determination
             first, last = determination[0], determination[-1]
             if gauge.base[TIME] < first[TIME]:
@@ -578,10 +583,6 @@ class Determination(list):
             for (time1, value1), (time2, value2) in zipped_determination:
                 yield Segment(time1, time2, value1, value2)
             yield Horizon(last[TIME], +inf, last[VALUE])
-        else:
-            # just a number.
-            value = number_or_gauge
-            yield Horizon(gauge.base[TIME], +inf, value)
 
     def determine(self, time, value, inside=True):
         try:
