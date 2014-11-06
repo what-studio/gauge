@@ -19,7 +19,7 @@ from .common import ADD, REMOVE, TIME, VALUE, inf, now_or
 from .deterministic import Determination, Segment
 
 
-__all__ = ['Gauge', 'Momentum']
+__all__ = ['Gauge', 'Momentum', 'inf', 'now_or']
 __version__ = '0.2.0-dev'
 
 
