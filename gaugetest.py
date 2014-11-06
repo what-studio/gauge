@@ -13,8 +13,8 @@ import pytest
 
 import gauge
 from gauge import (
-    ADD, REMOVE, TIME, VALUE, Boundary, Gauge, Horizon, Line, Momentum, Ray,
-    Segment, inf)
+    ADD, REMOVE, TIME, VALUE, Boundary, Determination, Gauge, Horizon, Line,
+    Momentum, Ray, Segment, inf)
 
 
 PRECISION = 8
@@ -757,20 +757,15 @@ def test_thin_momenta():
         assert 0 <= g.get(x / 10.) <= g.get(y / 10.) <= 100
 
 
-def test_determine_is_generator():
-    # determine() changed to be a generator since v0.1.0
-    g = Gauge(12, 100, at=0)
-    assert isinstance(g.determine(), types.GeneratorType)
-
-
 def test_clear_events():
     g = Gauge(0, 10, at=0)
     m = g.add_momentum(+1, since=10, until=20)
-    assert list(g.walk_events()) == \
+    assert list(Determination.walk_events(g)) == \
         [(0, None, None), (10, ADD, m), (20, REMOVE, m), (+inf, None, None)]
     assert len(g._events) == 2
     g.remove_momentum(m)
-    assert list(g.walk_events()) == [(0, None, None), (+inf, None, None)]
+    assert list(Determination.walk_events(g)) == \
+        [(0, None, None), (+inf, None, None)]
     assert len(g._events) == 0
 
 

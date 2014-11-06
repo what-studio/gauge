@@ -78,7 +78,7 @@ class Gauge(object):
         except AttributeError:
             pass
         # redetermine and cache.
-        self._determination = Determination(self.determine())
+        self._determination = Determination(self)
         return self._determination
 
     def _linked_gauges(self):
@@ -453,142 +453,6 @@ class Gauge(object):
         value = self._coerce_and_remove_momenta(value, at, start, stop)
         return value
 
-    def walk_events(self):
-        """Yields momentum adding and removing events.  An event is a tuple of
-        ``(time, ADD|REMOVE, momentum)``.
-        """
-        yield (self.base[TIME], None, None)
-        for time, method, momentum in list(self._events):
-            if momentum not in self.momenta:
-                self._events.remove((time, method, momentum))
-                continue
-            yield time, method, momentum
-        yield (+inf, None, None)
-
-    def walk_lines(self, number_or_gauge):
-        """Yields :class:`Line`s on the graph from `number_or_gauge`.  If
-        `number_or_gauge` is a gauge, the graph is the determination of the
-        gauge.  Otherwise, just a Horizon line which has the number as the
-        Y-intercept.
-        """
-        if isinstance(number_or_gauge, Gauge):
-            determination = number_or_gauge.determination
-            first, last = determination[0], determination[-1]
-            if self.base[TIME] < first[TIME]:
-                yield Horizon(self.base[TIME], first[TIME], first[VALUE])
-            zipped_determination = zip(determination[:-1], determination[1:])
-            for (time1, value1), (time2, value2) in zipped_determination:
-                yield Segment(time1, time2, value1, value2)
-            yield Horizon(last[TIME], +inf, last[VALUE])
-        else:
-            # just a number.
-            value = number_or_gauge
-            yield Horizon(self.base[TIME], +inf, value)
-
-    def determine(self):
-        """Determines the transformations from the time when the value set to
-        the farthest future.
-        """
-        since, value = self.base
-        velocity, velocities = 0, []
-        bound, overlapped = None, False
-        # boundaries.
-        ceil = Boundary(self.walk_lines(self.max), operator.lt)
-        floor = Boundary(self.walk_lines(self.min), operator.gt)
-        boundaries = [ceil, floor]
-        for boundary in boundaries:
-            # skip past boundaries.
-            while boundary.line.until <= since:
-                boundary.walk()
-            # check overflowing.
-            if bound is not None:
-                continue
-            boundary_value = boundary.line.guess(since)
-            if boundary.cmp(boundary_value, value):
-                bound, overlapped = boundary, False
-        for time, method, momentum in self.walk_events():
-            # normalize time.
-            until = max(time, self.base[TIME])
-            # if True, An iteration doesn't choose next boundaries.  The first
-            # iteration doesn't require to choose next boundaries.
-            again = True
-            while since < until:
-                if again:
-                    again = False
-                    walked_boundaries = boundaries
-                else:
-                    # stop the loop if all boundaries have been proceeded.
-                    if all(b.line.until >= until for b in boundaries):
-                        break
-                    # choose the next boundary.
-                    boundary = min(boundaries, key=lambda b: b.line.until)
-                    boundary.walk()
-                    walked_boundaries = [boundary]
-                # calculate velocity.
-                if bound is None:
-                    velocity = sum(velocities)
-                elif overlapped:
-                    velocity = bound.best(sum(velocities), bound.line.velocity)
-                else:
-                    velocity = sum(v for v in velocities if bound.cmp(v, 0))
-                # is still bound?
-                if overlapped and bound.cmp(velocity, bound.line.velocity):
-                    bound, overlapped = None, False
-                    again = True
-                    continue
-                # current value line.
-                line = Ray(since, until, value, velocity)
-                if overlapped:
-                    bound_until = min(bound.line.until, until)
-                    if bound_until == +inf:
-                        break
-                    # released from the boundary.
-                    since, value = (bound_until, bound.line.get(bound_until))
-                    yield (since, value, True)
-                    continue
-                for boundary in walked_boundaries:
-                    # find the intersection with a boundary.
-                    try:
-                        intersection = line.intersect(boundary.line)
-                    except ValueError:
-                        continue
-                    if intersection[TIME] == since:
-                        continue
-                    again = True  # iterate with same boundaries again.
-                    bound, overlapped = boundary, True
-                    since, value = intersection
-                    # clamp by the boundary.
-                    value = boundary.best(value, boundary.line.guess(since))
-                    yield (since, value, True)
-                    break
-                if bound is not None:
-                    continue  # the intersection was found.
-                for boundary in walked_boundaries:
-                    # find missing intersection caused by floating-point
-                    # inaccuracy.
-                    bound_until = min(boundary.line.until, until)
-                    if bound_until == +inf or bound_until < since:
-                        continue
-                    boundary_value = boundary.line.get(bound_until)
-                    if boundary.cmp_eq(line.get(bound_until), boundary_value):
-                        continue
-                    bound, overlapped = boundary, True
-                    since, value = bound_until, boundary_value
-                    yield (since, value, True)
-                    break
-            if until == +inf:
-                break
-            # determine the final node in the current itreration.
-            value += velocity * (until - since)
-            inside = bound is None or overlapped
-            yield (until, value, inside)
-            # prepare the next iteration.
-            if method == ADD:
-                velocities.append(momentum.velocity)
-            elif method == REMOVE:
-                velocities.remove(momentum.velocity)
-            since = until
-
     def __getstate__(self):
         momenta = list(map(tuple, self.momenta))
         return (self.base, self._max, self._min, momenta)
@@ -686,15 +550,152 @@ class Determination(list):
     #: The time when the gauge starts to be inside of the limits.
     inside_since = None
 
-    def __init__(self, determining):
-        prev_time = None
-        for time, value, inside in determining:
-            if prev_time == time:
+    @staticmethod
+    def walk_events(gauge):
+        """Yields momentum adding and removing events.  An event is a tuple of
+        ``(time, ADD|REMOVE, momentum)``.
+        """
+        yield (gauge.base[TIME], None, None)
+        for time, method, momentum in list(gauge._events):
+            if momentum not in gauge.momenta:
+                gauge._events.remove((time, method, momentum))
                 continue
-            elif inside and self.inside_since is None:
-                self.inside_since = time
-            self.append((time, value))
-            prev_time = time
+            yield time, method, momentum
+        yield (+inf, None, None)
+
+    @staticmethod
+    def walk_lines(gauge, number_or_gauge):
+        """Yields :class:`Line`s on the graph from `number_or_gauge`.  If
+        `number_or_gauge` is a gauge, the graph is the determination of the
+        gauge.  Otherwise, just a Horizon line which has the number as the
+        Y-intercept.
+        """
+        if isinstance(number_or_gauge, Gauge):
+            determination = number_or_gauge.determination
+            first, last = determination[0], determination[-1]
+            if gauge.base[TIME] < first[TIME]:
+                yield Horizon(gauge.base[TIME], first[TIME], first[VALUE])
+            zipped_determination = zip(determination[:-1], determination[1:])
+            for (time1, value1), (time2, value2) in zipped_determination:
+                yield Segment(time1, time2, value1, value2)
+            yield Horizon(last[TIME], +inf, last[VALUE])
+        else:
+            # just a number.
+            value = number_or_gauge
+            yield Horizon(gauge.base[TIME], +inf, value)
+
+    def determine(self, time, value, inside=True):
+        try:
+            if self[-1][TIME] == time:
+                return
+        except IndexError:
+            pass
+        if inside and self.inside_since is None:
+            self.inside_since = time
+        self.append((time, value))
+
+    def __init__(self, gauge):
+        """Determines the transformations from the time when the value set to
+        the farthest future.
+        """
+        since, value = gauge.base
+        velocity, velocities = 0, []
+        bound, overlapped = None, False
+        # boundaries.
+        ceil = Boundary(self.walk_lines(gauge, gauge.max), operator.lt)
+        floor = Boundary(self.walk_lines(gauge, gauge.min), operator.gt)
+        boundaries = [ceil, floor]
+        for boundary in boundaries:
+            # skip past boundaries.
+            while boundary.line.until <= since:
+                boundary.walk()
+            # check overflowing.
+            if bound is not None:
+                continue
+            boundary_value = boundary.line.guess(since)
+            if boundary.cmp(boundary_value, value):
+                bound, overlapped = boundary, False
+        for time, method, momentum in self.walk_events(gauge):
+            # normalize time.
+            until = max(time, gauge.base[TIME])
+            # if True, An iteration doesn't choose next boundaries.  The first
+            # iteration doesn't require to choose next boundaries.
+            again = True
+            while since < until:
+                if again:
+                    again = False
+                    walked_boundaries = boundaries
+                else:
+                    # stop the loop if all boundaries have been proceeded.
+                    if all(b.line.until >= until for b in boundaries):
+                        break
+                    # choose the next boundary.
+                    boundary = min(boundaries, key=lambda b: b.line.until)
+                    boundary.walk()
+                    walked_boundaries = [boundary]
+                # calculate velocity.
+                if bound is None:
+                    velocity = sum(velocities)
+                elif overlapped:
+                    velocity = bound.best(sum(velocities), bound.line.velocity)
+                else:
+                    velocity = sum(v for v in velocities if bound.cmp(v, 0))
+                # is still bound?
+                if overlapped and bound.cmp(velocity, bound.line.velocity):
+                    bound, overlapped = None, False
+                    again = True
+                    continue
+                # current value line.
+                line = Ray(since, until, value, velocity)
+                if overlapped:
+                    bound_until = min(bound.line.until, until)
+                    if bound_until == +inf:
+                        break
+                    # released from the boundary.
+                    since, value = (bound_until, bound.line.get(bound_until))
+                    self.determine(since, value)
+                    continue
+                for boundary in walked_boundaries:
+                    # find the intersection with a boundary.
+                    try:
+                        intersection = line.intersect(boundary.line)
+                    except ValueError:
+                        continue
+                    if intersection[TIME] == since:
+                        continue
+                    again = True  # iterate with same boundaries again.
+                    bound, overlapped = boundary, True
+                    since, value = intersection
+                    # clamp by the boundary.
+                    value = boundary.best(value, boundary.line.guess(since))
+                    self.determine(since, value)
+                    break
+                if bound is not None:
+                    continue  # the intersection was found.
+                for boundary in walked_boundaries:
+                    # find missing intersection caused by floating-point
+                    # inaccuracy.
+                    bound_until = min(boundary.line.until, until)
+                    if bound_until == +inf or bound_until < since:
+                        continue
+                    boundary_value = boundary.line.get(bound_until)
+                    if boundary.cmp_eq(line.get(bound_until), boundary_value):
+                        continue
+                    bound, overlapped = boundary, True
+                    since, value = bound_until, boundary_value
+                    self.determine(since, value)
+                    break
+            if until == +inf:
+                break
+            # determine the final node in the current itreration.
+            value += velocity * (until - since)
+            self.determine(until, value, inside=(bound is None or overlapped))
+            # prepare the next iteration.
+            if method == ADD:
+                velocities.append(momentum.velocity)
+            elif method == REMOVE:
+                velocities.remove(momentum.velocity)
+            since = until
 
 
 class Line(object):
