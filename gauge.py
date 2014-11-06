@@ -91,6 +91,19 @@ class Gauge(object):
         self._determined = (determination, inside_since)
         return determination
 
+    def _linked_gauges(self):
+        try:
+            links = list(self._links)
+        except AttributeError:
+            pass
+        else:
+            for gauge_ref in links:
+                gauge = gauge_ref()
+                if gauge is None:
+                    self._links.remove(gauge_ref)
+                    continue
+                yield gauge
+
     def invalidate(self):
         """Invalidates the cached determination.  If you touches the
         determination at the next first time, that will be redetermined.
@@ -100,18 +113,8 @@ class Gauge(object):
         """
         # invalidate linked gauges together.  A linked gauge refers this gauge
         # as a limit.
-        try:
-            links = list(self._links)
-        except AttributeError:
-            pass
-        else:
-            for gauge_ref in links:
-                gauge = gauge_ref()
-                if gauge is None:
-                    # the gauge has gone away
-                    self._links.remove(gauge_ref)
-                    continue
-                gauge.invalidate()
+        for gauge in self._linked_gauges():
+            gauge.invalidate()
         # remove the cached determination.
         try:
             del self._determined
@@ -455,9 +458,12 @@ class Gauge(object):
         :param at: the time base.  (default: now)
         """
         at = now_or(at)
+        for gauge in self._linked_gauges():
+            gauge.forget_past(at=at)
         start = self.momenta.bisect_right((+inf, +inf, -inf))
         stop = self.momenta.bisect_left((-inf, -inf, at))
-        return self._coerce_and_remove_momenta(value, at, start, stop)
+        value = self._coerce_and_remove_momenta(value, at, start, stop)
+        return value
 
     def walk_events(self):
         """Yields momentum adding and removing events.  An event is a tuple of

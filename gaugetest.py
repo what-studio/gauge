@@ -774,6 +774,17 @@ def test_clear_events():
     assert len(g._events) == 0
 
 
+def test_decr_max():
+    g = Gauge(0, Gauge(10, 100, at=0), at=0)
+    g.add_momentum(+2)
+    g.add_momentum(-1)
+    assert g.get(10) == 10
+    g.max.decr(5, at=10)
+    assert g.get(10) == 10
+    assert g.get(15) == 5
+    assert g.get(20) == 5
+
+
 def test_hypergauge_past_bugs(zigzag, bidir):
     """Regression testing for hyper-gauge."""
     # just one momentum
