@@ -439,6 +439,18 @@ class Gauge(object):
         """
         return self._coerce_and_remove_momenta(value, at)
 
+    def events(self):
+        """Yields momentum adding and removing events.  An event is a tuple of
+        ``(time, ADD|REMOVE, momentum)``.
+        """
+        yield (self.base[TIME], None, None)
+        for time, method, momentum in list(self._events):
+            if momentum not in self.momenta:
+                self._events.remove((time, method, momentum))
+                continue
+            yield time, method, momentum
+        yield (+inf, None, None)
+
     def forget_past(self, value=None, at=None):
         """Discards the momenta which doesn't effect anymore.
 
@@ -551,19 +563,6 @@ class Determination(list):
     inside_since = None
 
     @staticmethod
-    def walk_events(gauge):
-        """Yields momentum adding and removing events.  An event is a tuple of
-        ``(time, ADD|REMOVE, momentum)``.
-        """
-        yield (gauge.base[TIME], None, None)
-        for time, method, momentum in list(gauge._events):
-            if momentum not in gauge.momenta:
-                gauge._events.remove((time, method, momentum))
-                continue
-            yield time, method, momentum
-        yield (+inf, None, None)
-
-    @staticmethod
     def walk_lines(gauge, number_or_gauge):
         """Yields :class:`Line`s on the graph from `number_or_gauge`.  If
         `number_or_gauge` is a gauge, the graph is the determination of the
@@ -615,7 +614,7 @@ class Determination(list):
             boundary_value = boundary.line.guess(since)
             if boundary.cmp(boundary_value, value):
                 bound, overlapped = boundary, False
-        for time, method, momentum in self.walk_events(gauge):
+        for time, method, momentum in gauge.events():
             # normalize time.
             until = max(time, gauge.base[TIME])
             # if True, An iteration doesn't choose next boundaries.  The first
