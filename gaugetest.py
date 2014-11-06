@@ -12,9 +12,9 @@ import weakref
 import pytest
 
 import gauge
-from gauge import (
-    ADD, REMOVE, TIME, VALUE, Boundary, Gauge, Horizon, Line, Momentum, Ray,
-    Segment, inf)
+from gauge import Gauge, Momentum
+from gauge.common import ADD, REMOVE, TIME, VALUE, inf
+from gauge.deterministic import Line, Horizon, Ray, Segment, Boundary
 
 
 PRECISION = 8
@@ -26,11 +26,11 @@ def round_(x):
 
 @contextmanager
 def t(timestamp):
-    gauge.now = lambda: float(timestamp)
+    gauge.common.now = lambda: float(timestamp)
     try:
         yield
     finally:
-        gauge.now = time.time
+        gauge.common.now = time.time
 
 
 def round_determination(determination, precision=0):

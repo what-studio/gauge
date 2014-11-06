@@ -30,7 +30,7 @@ setup(
     description='Deterministic linear gauge library',
     long_description=__doc__,
     platforms='any',
-    py_modules=['gauge'],
+    packages=['gauge'],
     classifiers=['Development Status :: 4 - Beta',
                  'Intended Audience :: Developers',
                  'License :: OSI Approved :: BSD License',
