@@ -16,6 +16,7 @@ from time import time as now
 import warnings
 import weakref
 
+from lazyseq import LazySeq
 from sortedcontainers import SortedList, SortedListWithKey
 
 
@@ -44,6 +45,25 @@ def deprecate(message, *args, **kwargs):
 def now_or(time):
     """Returns the current time if `time` is ``None``."""
     return now() if time is None else float(time)
+
+
+class Determination(LazySeq):
+
+    inside_since = None
+
+    def __init__(self, determining):
+        iterator = self.wrap_determining(determining)
+        super(Determination, self).__init__(iterator)
+
+    def wrap_determining(self, determining):
+        prev_time = None
+        for time, value, inside in determining:
+            if prev_time == time:
+                continue
+            elif inside and self.inside_since is None:
+                self.inside_since = time
+            yield (time, value)
+            prev_time = time
 
 
 class Gauge(object):
@@ -75,21 +95,12 @@ class Gauge(object):
         times as x-values, gauge values as y-values.
         """
         try:
-            return self._determined[DETERMINATION]
+            return self._determination
         except AttributeError:
             pass
         # redetermine and cache.
-        determination, inside_since = [], None
-        prev_time = None
-        for time, value, inside in self.determine():
-            if prev_time == time:
-                continue
-            elif inside and inside_since is None:
-                inside_since = time
-            determination.append((time, value))
-            prev_time = time
-        self._determined = (determination, inside_since)
-        return determination
+        self._determination = Determination(self.determine())
+        return self._determination
 
     def _linked_gauges(self):
         try:
@@ -117,7 +128,7 @@ class Gauge(object):
             gauge.invalidate()
         # remove the cached determination.
         try:
-            del self._determined
+            del self._determination
         except AttributeError:
             pass
 
@@ -223,7 +234,9 @@ class Gauge(object):
     def _value_and_velocity(self, at=None):
         at = now_or(at)
         determination = self.determination
-        if len(determination) == 1:
+        try:
+            determination[1]
+        except IndexError:
             # skip bisect_left() because it is expensive
             x = 0
         else:
@@ -238,10 +251,9 @@ class Gauge(object):
         seg = Segment(time1, time2, value1, value2)
         value, velocity = seg.get(at), seg.velocity
         # clamp if the node is inside of or overlapped on the boundaries.
-        inside_since = self._determined[INSIDE_SINCE]
-        if inside_since is None:
+        if determination.inside_since is None:
             pass
-        elif inside_since <= time1:
+        elif determination.inside_since <= time1:
             value = self.clamp(value, at=at)
         return (value, velocity)
 

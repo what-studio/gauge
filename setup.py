@@ -46,7 +46,7 @@ setup(
                  'Programming Language :: Python :: Implementation :: CPython',
                  'Programming Language :: Python :: Implementation :: PyPy',
                  'Topic :: Games/Entertainment'],
-    install_requires=['sortedcontainers>=0.8.2'],
+    install_requires=['lazyseq>=0.1.1', 'sortedcontainers>=0.8.2'],
     tests_require=['pytest'],
     test_suite='...',
 )
