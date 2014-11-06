@@ -60,15 +60,17 @@ def shift_gauge(gauge, delta=0):
 
 
 def test_deprecations():
-    g = Gauge(0, 10, at=0)
-    pytest.deprecated_call(g.current, 0)
+    # g = Gauge(0, 10, at=0)
     # removed since v0.1.0
     # pytest.deprecated_call(g.set, 0, limit=True)
     # pytest.deprecated_call(g.set_max, 0, limit=True)
-    pytest.deprecated_call(Gauge.value.fget, g)
-    pytest.deprecated_call(Gauge.value.fset, g, 10)
-    pytest.deprecated_call(Gauge.set_at.fget, g)
-    pytest.deprecated_call(Gauge.set_at.fset, g, 10)
+    # removed since v0.2.0
+    # pytest.deprecated_call(g.current, 0)
+    # pytest.deprecated_call(Gauge.value.fget, g)
+    # pytest.deprecated_call(Gauge.value.fset, g, 10)
+    # pytest.deprecated_call(Gauge.set_at.fget, g)
+    # pytest.deprecated_call(Gauge.set_at.fset, g, 10)
+    pytest.skip()
 
 
 def test_in_range():
