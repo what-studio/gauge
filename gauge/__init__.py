@@ -58,7 +58,25 @@ class Gauge(object):
         self._determination = Determination(self)
         return self._determination
 
-    def _linked_gauges(self):
+    def invalidate(self):
+        """Invalidates the cached determination.  If you touches the
+        determination at the next first time, that will be redetermined.
+
+        You don't need to call this method because all mutating methods such as
+        :meth:`incr` or :meth:`add_momentum` calls it.
+        """
+        # invalidate linked gauges together.  A linked gauge refers this gauge
+        # as a limit.
+        for gauge in self.linked_gauges():
+            gauge.invalidate()
+        # remove the cached determination.
+        try:
+            del self._determination
+        except AttributeError:
+            pass
+
+    def linked_gauges(self):
+        """Yields linked gauges.  It removes dead links during an iteration."""
         try:
             links = list(self._links)
         except AttributeError:
@@ -70,23 +88,6 @@ class Gauge(object):
                     self._links.remove(gauge_ref)
                     continue
                 yield gauge
-
-    def invalidate(self):
-        """Invalidates the cached determination.  If you touches the
-        determination at the next first time, that will be redetermined.
-
-        You don't need to call this method because all mutating methods such as
-        :meth:`incr` or :meth:`add_momentum` calls it.
-        """
-        # invalidate linked gauges together.  A linked gauge refers this gauge
-        # as a limit.
-        for gauge in self._linked_gauges():
-            gauge.invalidate()
-        # remove the cached determination.
-        try:
-            del self._determination
-        except AttributeError:
-            pass
 
     @property
     def max(self):
@@ -173,6 +174,7 @@ class Gauge(object):
     def clamp(self, value, at=None):
         """Clamps by the limits at the given time.
 
+        :param value: the value to clamp.
         :param at: the time to get limits.  (default: now)
         """
         at = now_or(at)
@@ -386,6 +388,18 @@ class Gauge(object):
             raise ValueError('{0} not in the gauge'.format(momentum))
         self.invalidate()
 
+    def momentum_events(self):
+        """Yields momentum adding and removing events.  An event is a tuple of
+        ``(time, ADD|REMOVE, momentum)``.
+        """
+        yield (self.base[TIME], None, None)
+        for time, method, momentum in list(self._events):
+            if momentum not in self.momenta:
+                self._events.remove((time, method, momentum))
+                continue
+            yield time, method, momentum
+        yield (+inf, None, None)
+
     def _coerce_and_remove_momenta(self, value=None, at=None,
                                    start=None, stop=None):
         """Coerces to set the value and removes the momenta between indexes of
@@ -416,18 +430,6 @@ class Gauge(object):
         """
         return self._coerce_and_remove_momenta(value, at)
 
-    def events(self):
-        """Yields momentum adding and removing events.  An event is a tuple of
-        ``(time, ADD|REMOVE, momentum)``.
-        """
-        yield (self.base[TIME], None, None)
-        for time, method, momentum in list(self._events):
-            if momentum not in self.momenta:
-                self._events.remove((time, method, momentum))
-                continue
-            yield time, method, momentum
-        yield (+inf, None, None)
-
     def forget_past(self, value=None, at=None):
         """Discards the momenta which doesn't effect anymore.
 
@@ -435,7 +437,7 @@ class Gauge(object):
         :param at: the time base.  (default: now)
         """
         at = now_or(at)
-        for gauge in self._linked_gauges():
+        for gauge in self.linked_gauges():
             gauge.forget_past(at=at)
         start = self.momenta.bisect_right((+inf, +inf, -inf))
         stop = self.momenta.bisect_left((-inf, -inf, at))
@@ -447,8 +449,8 @@ class Gauge(object):
         return (self.base, self._max, self._min, momenta)
 
     def __setstate__(self, state):
-        base, max, min, momenta = state
-        self.__init__(base[VALUE], max=max, min=min, at=base[TIME])
+        base, max_, min_, momenta = state
+        self.__init__(base[VALUE], max=max_, min=min_, at=base[TIME])
         for momentum in momenta:
             self.add_momentum(*momentum)
 

@@ -759,14 +759,14 @@ def test_thin_momenta():
         assert 0 <= g.get(x / 10.) <= g.get(y / 10.) <= 100
 
 
-def test_clear_events():
+def test_clear_momentum_events():
     g = Gauge(0, 10, at=0)
     m = g.add_momentum(+1, since=10, until=20)
-    assert list(g.events()) == \
+    assert list(g.momentum_events()) == \
         [(0, None, None), (10, ADD, m), (20, REMOVE, m), (+inf, None, None)]
     assert len(g._events) == 2
     g.remove_momentum(m)
-    assert list(g.events()) == [(0, None, None), (+inf, None, None)]
+    assert list(g.momentum_events()) == [(0, None, None), (+inf, None, None)]
     assert len(g._events) == 0
 
 

@@ -14,9 +14,7 @@ from collections import namedtuple
 from gauge import Gauge, Momentum, now_or
 
 
-class NamedMomentum(namedtuple('_', 'velocity, since, until, name'), Momentum):
-
-    pass
+__all__ = [b'NamedGauge', b'NamedMomentum']
 
 
 class NamedGauge(Gauge):
@@ -96,6 +94,11 @@ class NamedGauge(Gauge):
         at = now_or(at)
         self.forget_past(at=at)
         return self.update_momentum_by_name(name, velocity=velocity, since=at)
+
+
+class NamedMomentum(namedtuple('_', 'velocity, since, until, name'), Momentum):
+
+    pass
 
 
 def test_basic():
