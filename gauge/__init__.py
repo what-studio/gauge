@@ -400,10 +400,10 @@ class Gauge(object):
             yield time, method, momentum
         yield (+inf, None, None)
 
-    def _coerce_and_remove_momenta(self, value=None, at=None,
+    def _rebase_and_remove_momenta(self, value=None, at=None,
                                    start=None, stop=None):
-        """Coerces to set the value and removes the momenta between indexes of
-        ``start`` and ``stop``.
+        """Sets the base and removes momenta between indexes of ``start`` and
+        ``stop``.
 
         :param value: the value to set coercively.  (default: the current
                       value)
@@ -428,7 +428,7 @@ class Gauge(object):
         :param value: the value to set coercively.
         :param at: the time base.  (default: now)
         """
-        return self._coerce_and_remove_momenta(value, at)
+        return self._rebase_and_remove_momenta(value, at)
 
     def forget_past(self, value=None, at=None):
         """Discards the momenta which doesn't effect anymore.
@@ -441,7 +441,7 @@ class Gauge(object):
             gauge.forget_past(at=at)
         start = self.momenta.bisect_right((+inf, +inf, -inf))
         stop = self.momenta.bisect_left((-inf, -inf, at))
-        value = self._coerce_and_remove_momenta(value, at, start, stop)
+        value = self._rebase_and_remove_momenta(value, at, start, stop)
         return value
 
     def __getstate__(self):

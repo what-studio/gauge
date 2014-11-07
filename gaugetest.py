@@ -261,7 +261,7 @@ def test_clear_momenta():
     g.clear_momenta(at=10)
     assert g.get(10) == 15
     assert list(g.determination) == [(10, 15)]
-    # coerce to set a value with Gauge.clear_momenta()
+    # rebase by Gauge.clear_momenta()
     g.clear_momenta(100)
     assert g.get() == 100
 
