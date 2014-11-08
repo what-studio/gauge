@@ -439,7 +439,8 @@ class Gauge(object):
         """
         at = now_or(at)
         for gauge in self.linked_gauges():
-            gauge.forget_past(at=at)
+            if gauge.base[TIME] < at:
+                gauge.forget_past(at=at)
         x = self.momenta.bisect_left((-inf, -inf, at))
         value = self._rebase(value, at=at, remove_momenta_before=x)
         return value

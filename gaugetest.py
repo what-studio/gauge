@@ -793,7 +793,7 @@ def test_decr_max():
     assert g.get(10) == 10
     assert g.get(15) == 5
     assert g.get(20) == 5
-    # skewed yper-gauge
+    # skewed hyper-gauge
     g = Gauge(0, Gauge(10, 100, at=10), at=0)
     g.add_momentum(+2)
     g.add_momentum(-1)
@@ -804,6 +804,23 @@ def test_decr_max():
     assert g.get(10) == 10
     assert g.get(15) == 5
     assert g.get(20) == 5
+    # decr max earlier than the gauge's base time.
+    g = Gauge(0, Gauge(10, 100, at=10), at=5)
+    g.add_momentum(+1)
+    assert g.base[TIME] == 5
+    assert g.get(0) == 0
+    assert g.get(10) == 5
+    assert g.get(20) == 10
+    g.max.decr(5, at=0)
+    assert g.base[TIME] == 5
+    assert g.get(0) == 0
+    assert g.get(10) == 5
+    g.max.incr(10, at=10)
+    assert g.base[TIME] == 10
+    assert g.get(0) == 5
+    assert g.get(10) == 5
+    assert g.get(20) == 15
+    assert g.get(30) == 15
 
 
 def test_hypergauge_past_bugs(zigzag, bidir):
