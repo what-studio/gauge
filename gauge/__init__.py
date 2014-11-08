@@ -186,12 +186,10 @@ class Gauge(object):
             return min
         return value
 
-    def _value_and_velocity(self, at=None):
+    def _predict(self, at=None):
         at = now_or(at)
         determination = self.determination
-        try:
-            determination[1]
-        except IndexError:
+        if len(determination) == 1:
             # skip bisect_left() because it is expensive
             x = 0
         else:
@@ -217,7 +215,7 @@ class Gauge(object):
 
         :param at: the time to observe.  (default: now)
         """
-        value, velocity = self._value_and_velocity(at)
+        value, velocity = self._predict(at)
         return value
 
     def velocity(self, at=None):
@@ -225,8 +223,12 @@ class Gauge(object):
 
         :param at: the time to observe.  (default: now)
         """
-        value, velocity = self._value_and_velocity(at)
+        value, velocity = self._predict(at)
         return velocity
+
+    def goal(self):
+        """Predicts the final value."""
+        return self.determination[-1][VALUE]
 
     def incr(self, delta, over=False, clamp=False, at=None):
         """Increases the value by the given delta immediately.  The
@@ -400,8 +402,7 @@ class Gauge(object):
             yield time, method, momentum
         yield (+inf, None, None)
 
-    def _rebase_and_remove_momenta(self, value=None, at=None,
-                                   start=None, stop=None):
+    def _rebase(self, value=None, at=None, remove_momenta_before=None):
         """Sets the base and removes momenta between indexes of ``start`` and
         ``stop``.
 
@@ -417,7 +418,7 @@ class Gauge(object):
         if value is None:
             value = self.get(at=at)
         self.base = (at, value)
-        del self.momenta[start:stop]
+        del self.momenta[:remove_momenta_before]
         self.invalidate()
         return value
 
@@ -428,7 +429,7 @@ class Gauge(object):
         :param value: the value to set coercively.
         :param at: the time base.  (default: now)
         """
-        return self._rebase_and_remove_momenta(value, at)
+        return self._rebase(value, at=at)
 
     def forget_past(self, value=None, at=None):
         """Discards the momenta which doesn't effect anymore.
@@ -439,9 +440,8 @@ class Gauge(object):
         at = now_or(at)
         for gauge in self.linked_gauges():
             gauge.forget_past(at=at)
-        start = self.momenta.bisect_right((+inf, +inf, -inf))
-        stop = self.momenta.bisect_left((-inf, -inf, at))
-        value = self._rebase_and_remove_momenta(value, at, start, stop)
+        x = self.momenta.bisect_left((-inf, -inf, at))
+        value = self._rebase(value, at=at, remove_momenta_before=x)
         return value
 
     def __getstate__(self):

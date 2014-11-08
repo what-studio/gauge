@@ -980,3 +980,14 @@ def test_false_accusation():
     assert g.get(15) == -3
     g.incr(0, at=14.803740162409365)
     assert g.get(15) == -3
+
+
+def test_goal():
+    g = Gauge(100, 100, at=0)
+    assert g.goal() == 100
+    g.add_momentum(-1)
+    assert g.goal() == 0
+    g.add_momentum(+1)
+    assert g.goal() == 100
+    g.add_momentum(-1, since=10000, until=10001)
+    assert g.goal() == 99
