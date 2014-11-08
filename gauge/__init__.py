@@ -409,10 +409,8 @@ class Gauge(object):
         :param value: the value to set coercively.  (default: the current
                       value)
         :param at: the time to set.  (default: now)
-        :param start: the starting index of momentum removal.
-                      (default: the first)
-        :param stop: the stopping index of momentum removal.
-                     (default: the last)
+        :param remove_momenta_before: the stopping index of momentum removal.
+                                      (default: the last)
         """
         at = now_or(at)
         if value is None:
