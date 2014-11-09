@@ -284,6 +284,8 @@ class Gauge(object):
         :raises ValueError: the value is out of the range.
         """
         at = now_or(at)
+        if clamp:
+            value = self.clamp(value, at=at)
         delta = value - self.get(at=at)
         return self.incr(delta, over=over, clamp=clamp, at=at)
 

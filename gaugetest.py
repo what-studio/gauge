@@ -195,6 +195,8 @@ def test_clamp():
     assert g.get() == 100
     g.decr(3, clamp=True)
     assert g.get() == 97
+    g.set(97, clamp=True)
+    assert g.get() == 10
 
 
 def test_set_min_max():
