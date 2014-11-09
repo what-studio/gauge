@@ -15,11 +15,11 @@ class FrozenGauge(Gauge):
 
     @property
     def base(self):
-        raise TypeError('Frozen gauge doesn\'t keep the base')
+        raise TypeError('FrozenGauge doesn\'t keep the base')
 
     @property
     def momenta(self):
-        raise TypeError('Frozen gauge doesn\'t keep the momenta')
+        raise TypeError('FrozenGauge doesn\'t keep the momenta')
 
     def __getstate__(self):
         return (self._max, self._min, self._determination)
@@ -28,10 +28,10 @@ class FrozenGauge(Gauge):
         self._max, self._min, self._determination = state
 
     def invalidate(self):
-        raise AssertionError('Frozen gauge cannot be invalidated')
+        raise AssertionError('FrozenGauge cannot be invalidated')
 
     def _set_limits(self, *args, **kwargs):
-        raise TypeError('Frozen gauge is immutable')
+        raise TypeError('FrozenGauge is immutable')
 
 
 def test_same_determination():
