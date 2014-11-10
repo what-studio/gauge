@@ -9,7 +9,6 @@
     :license: BSD, see LICENSE for more details.
 """
 from __future__ import absolute_import
-import numbers
 import operator
 
 from .common import ADD, REMOVE, TIME, VALUE, inf, now_or
@@ -28,25 +27,18 @@ class Determination(list):
     inside_since = None
 
     @staticmethod
-    def walk_lines(gauge, number_or_gauge):
-        """Yields :class:`Line`s on the graph from `number_or_gauge`.  If
-        `number_or_gauge` is a gauge, the graph is the determination of the
-        gauge.  Otherwise, just a Horizon line which has the number as the
-        Y-intercept.
-        """
-        if isinstance(number_or_gauge, numbers.Number):
-            # just a number.
-            value = number_or_gauge
-            yield Horizon(gauge.base[TIME], +inf, value)
-        else:
-            determination = number_or_gauge.determination
-            first, last = determination[0], determination[-1]
-            if gauge.base[TIME] < first[TIME]:
-                yield Horizon(gauge.base[TIME], first[TIME], first[VALUE])
-            zipped_determination = zip(determination[:-1], determination[1:])
-            for (time1, value1), (time2, value2) in zipped_determination:
-                yield Segment(time1, time2, value1, value2)
-            yield Horizon(last[TIME], +inf, last[VALUE])
+    def walk_lines_from_value(gauge, value):
+        yield Horizon(gauge.base[TIME], +inf, value)
+
+    @staticmethod
+    def walk_lines_on_determination(gauge, determination):
+        first, last = determination[0], determination[-1]
+        if gauge.base[TIME] < first[TIME]:
+            yield Horizon(gauge.base[TIME], first[TIME], first[VALUE])
+        zipped_determination = zip(determination[:-1], determination[1:])
+        for (time1, value1), (time2, value2) in zipped_determination:
+            yield Segment(time1, time2, value1, value2)
+        yield Horizon(last[TIME], +inf, last[VALUE])
 
     def determine(self, time, value, inside=True):
         try:
@@ -66,8 +58,14 @@ class Determination(list):
         velocity, velocities = 0, []
         bound, overlapped = None, False
         # boundaries.
-        ceil = Boundary(self.walk_lines(gauge, gauge.max), operator.lt)
-        floor = Boundary(self.walk_lines(gauge, gauge.min), operator.gt)
+        ceil = Boundary(
+            self.walk_lines_on_determination(gauge, gauge.max.determination)
+            if gauge._is_max_gauge else
+            self.walk_lines_from_value(gauge, gauge.max), operator.lt)
+        floor = Boundary(
+            self.walk_lines_on_determination(gauge, gauge.min.determination)
+            if gauge._is_min_gauge else
+            self.walk_lines_from_value(gauge, gauge.min), operator.gt)
         boundaries = [ceil, floor]
         for boundary in boundaries:
             # skip past boundaries.
