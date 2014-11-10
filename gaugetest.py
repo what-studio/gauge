@@ -1010,3 +1010,12 @@ def test_goal():
     assert g.goal() == 100
     g.add_momentum(-1, since=10000, until=10001)
     assert g.goal() == 99
+
+
+def test_hypergauge_flags():
+    g = Gauge(10, 100, at=0)
+    assert not g._is_max_gauge
+    assert not g._is_min_gauge
+    g.max = Gauge(100, 100, at=0)
+    assert g._is_max_gauge
+    assert not g._is_min_gauge

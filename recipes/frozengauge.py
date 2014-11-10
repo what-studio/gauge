@@ -8,9 +8,11 @@ __all__ = [b'FrozenGauge']
 class FrozenGauge(Gauge):
 
     def __init__(self, gauge):
-        cls, _max, _min = type(self), gauge.max, gauge.min
-        self._max = cls(_max) if isinstance(_max, Gauge) else _max
-        self._min = cls(_min) if isinstance(_min, Gauge) else _min
+        cls, max_, min_ = type(self), gauge.max, gauge.min
+        self._is_max_gauge = isinstance(max_, Gauge)
+        self._is_min_gauge = isinstance(min_, Gauge)
+        self._max = cls(max_) if self._is_max_gauge else max_
+        self._min = cls(min_) if self._is_min_gauge else min_
         self._determination = gauge.determination
 
     @property

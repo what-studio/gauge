@@ -105,19 +105,13 @@ class Gauge(object):
     def min(self, min):
         self.set_min(min)
 
-    def _get_limit(self, limit, at=None):
-        if isinstance(limit, Gauge):
-            return limit.get(at)
-        else:
-            return limit
-
     def get_max(self, at=None):
         """Predicts the current maximum value."""
-        return self._get_limit(self.max, at=at)
+        return self._max.get(at) if self._is_max_gauge else self._max
 
     def get_min(self, at=None):
         """Predicts the current minimum value."""
-        return self._get_limit(self.min, at=at)
+        return self._min.get(at) if self._is_min_gauge else self._min
 
     def _set_limits(self, max_=None, min_=None, clamp=False, at=None,
                     forget_past=True):
@@ -143,6 +137,7 @@ class Gauge(object):
         for limit, attr in limit_attrs:
             # set the internal attribute.
             setattr(self, attr, limit)
+            setattr(self, '_is' + attr + '_gauge', isinstance(limit, Gauge))
         self.invalidate()
         if not forget_past:
             return
@@ -178,12 +173,12 @@ class Gauge(object):
         :param at: the time to get limits.  (default: now)
         """
         at = now_or(at)
-        max = self.get_max(at)
-        if value > max:
-            return max
-        min = self.get_min(at)
-        if value < min:
-            return min
+        max_ = self.get_max(at)
+        if value > max_:
+            return max_
+        min_ = self.get_min(at)
+        if value < min_:
+            return min_
         return value
 
     def _predict(self, at=None):
@@ -201,9 +196,8 @@ class Gauge(object):
         except IndexError:
             return (determination[-1][VALUE], 0.)
         time1, value1 = determination[x - 1]
-        seg = Segment(time1, time2, value1, value2)
-        value, velocity = seg.get(at), seg.velocity
-        # clamp if the node is inside of or overlapped on the boundaries.
+        value = Segment._calc_value(at, time1, time2, value1, value2)
+        velocity = Segment._calc_velocity(time1, time2, value1, value2)
         if determination.inside_since is None:
             pass
         elif determination.inside_since <= time1:

@@ -290,25 +290,31 @@ class Segment(Line):
     #: The value at `until`.
     final = None
 
+    @staticmethod
+    def _calc_value(at, time1, time2, value1, value2):
+        if at == time1:
+            return value1
+        elif at == time2:
+            return value2
+        rate = float(at - time1) / (time2 - time1)
+        return value1 + rate * (value2 - value1)
+
+    @staticmethod
+    def _calc_velocity(time1, time2, value1, value2):
+        return (value2 - value1) / (time2 - time1)
+
     @property
     def velocity(self):
-        value_delta = self.final - self.value
-        time_delta = self.until - self.since
-        return value_delta / time_delta
+        return self._calc_velocity(self.since, self.until,
+                                   self.value, self.final)
 
     def __init__(self, since, until, value, final):
         super(Segment, self).__init__(since, until, value)
         self.final = final
 
     def _get(self, at):
-        if at == self.since:
-            # rate: 0
-            return self.value
-        elif at == self.until:
-            # rate: 1
-            return self.final
-        rate = float(at - self.since) / (self.until - self.since)
-        return self.value + rate * (self.final - self.value)
+        return self._calc_value(at, self.since, self.until,
+                                self.value, self.final)
 
     def _earlier(self, at):
         return self.value
