@@ -27,18 +27,18 @@ class Determination(list):
     inside_since = None
 
     @staticmethod
-    def walk_lines_from_value(gauge, value):
-        yield Horizon(gauge.base[TIME], +inf, value)
-
-    @staticmethod
-    def walk_lines_on_determination(gauge, determination):
-        first, last = determination[0], determination[-1]
-        if gauge.base[TIME] < first[TIME]:
-            yield Horizon(gauge.base[TIME], first[TIME], first[VALUE])
-        zipped_determination = zip(determination[:-1], determination[1:])
-        for (time1, value1), (time2, value2) in zipped_determination:
-            yield Segment(time1, time2, value1, value2)
-        yield Horizon(last[TIME], +inf, last[VALUE])
+    def walk_lines(gauge, src, is_gauge=False):
+        if is_gauge:
+            determination = src.determination
+            first, last = determination[0], determination[-1]
+            if gauge.base[TIME] < first[TIME]:
+                yield Horizon(gauge.base[TIME], first[TIME], first[VALUE])
+            zipped_determination = zip(determination[:-1], determination[1:])
+            for (time1, value1), (time2, value2) in zipped_determination:
+                yield Segment(time1, time2, value1, value2)
+            yield Horizon(last[TIME], +inf, last[VALUE])
+        else:
+            yield Horizon(gauge.base[TIME], +inf, src)
 
     def determine(self, time, value, inside=True):
         try:
@@ -58,14 +58,11 @@ class Determination(list):
         velocity, velocities = 0, []
         bound, overlapped = None, False
         # boundaries.
-        ceil = Boundary(
-            self.walk_lines_on_determination(gauge, gauge.max.determination)
-            if gauge._is_max_gauge else
-            self.walk_lines_from_value(gauge, gauge.max), operator.lt)
-        floor = Boundary(
-            self.walk_lines_on_determination(gauge, gauge.min.determination)
-            if gauge._is_min_gauge else
-            self.walk_lines_from_value(gauge, gauge.min), operator.gt)
+        g = gauge
+        ceil_lines_iter = self.walk_lines(g, g.max, is_gauge=g._is_max_gauge)
+        floor_lines_iter = self.walk_lines(g, g.min, is_gauge=g._is_min_gauge)
+        ceil = Boundary(ceil_lines_iter, operator.lt)
+        floor = Boundary(floor_lines_iter, operator.gt)
         boundaries = [ceil, floor]
         for boundary in boundaries:
             # skip past boundaries.
