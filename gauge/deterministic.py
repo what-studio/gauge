@@ -41,11 +41,8 @@ class Determination(list):
             yield Horizon(gauge.base[TIME], +inf, src)
 
     def determine(self, time, value, inside=True):
-        try:
-            if self[-1][TIME] == time:
-                return
-        except IndexError:
-            pass
+        if self and self[-1][TIME] == time:
+            return
         if inside and self.inside_since is None:
             self.inside_since = time
         self.append((time, value))
