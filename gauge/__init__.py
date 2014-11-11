@@ -229,7 +229,8 @@ class Gauge(object):
         determination would be changed.
 
         :param delta: the value to increase.
-        :param limit: checks if the value is in the range.  (default: ``True``)
+        :param over: allow out of the range.
+        :param clamp: clamp the value in the range.
         :param at: the time to increase.  (default: now)
 
         :raises ValueError: the value is out of the range.
@@ -260,7 +261,8 @@ class Gauge(object):
         determination would be changed.
 
         :param delta: the value to decrease.
-        :param limit: checks if the value is in the range.  (default: ``True``)
+        :param over: allow out of the range.
+        :param clamp: clamp the value in the range.
         :param at: the time to decrease.  (default: now)
 
         :raises ValueError: the value is out of the range.
@@ -272,13 +274,14 @@ class Gauge(object):
         changed.
 
         :param value: the value to set.
-        :param limit: checks if the value is in the range.  (default: ``True``)
+        :param over: allow out of the range.
+        :param clamp: clamp the value in the range.
         :param at: the time to set.  (default: now)
 
         :raises ValueError: the value is out of the range.
         """
         at = now_or(at)
-        if clamp:
+        if clamp and not over:
             value = self.clamp(value, at=at)
         delta = value - self.get(at=at)
         return self.incr(delta, over=over, clamp=clamp, at=at)
