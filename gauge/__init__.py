@@ -20,7 +20,7 @@ from .deterministic import Determination, Segment
 
 
 __all__ = ['Gauge', 'Momentum', 'inf', 'now_or']
-__version__ = '0.2.0-dev'
+__version__ = '0.2.0'
 
 
 class Gauge(object):
