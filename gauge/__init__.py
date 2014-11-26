@@ -13,6 +13,7 @@ from bisect import bisect_left
 from collections import namedtuple
 import weakref
 
+from six.moves import map, zip
 from sortedcontainers import SortedList, SortedListWithKey
 
 from .common import ADD, REMOVE, TIME, VALUE, inf, now_or
@@ -115,36 +116,40 @@ class Gauge(object):
 
     def _set_limits(self, max_=None, min_=None, clamp=False, at=None,
                     forget_past=True):
-        limit_attrs = [(limit, attr) for limit, attr in
-                       [(max_, '_max'), (min_, '_min')]
-                       if limit is not None]
+        limit_attrs = [x for x in [
+            (max_, '_max', '_is_max_gauge'),
+            (min_, '_min', '_is_min_gauge'),
+        ] if x[0] is not None]
         at = now_or(at)
         forget_until = at
-        for limit, attr in limit_attrs:
+        flags = []
+        for limit, attr, flag_attr in limit_attrs:
             try:
                 prev_limit = getattr(self, attr)
             except AttributeError:
                 prev_limit = None
-            if isinstance(prev_limit, Gauge):
-                # unlink this gauge from the previous limiting gauge.
-                prev_limit._links.discard(weakref.ref(self))
-            if isinstance(limit, Gauge):
+            else:
+                if getattr(self, flag_attr):
+                    # unlink this gauge from the previous limiting gauge.
+                    prev_limit._links.discard(weakref.ref(self))
+            is_gauge = isinstance(limit, Gauge)
+            flags.append(is_gauge)
+            if is_gauge:
                 # link this gauge to the new limiting gauge.
                 limit._links.add(weakref.ref(self))
                 forget_until = min(forget_until, limit.base[TIME])
         if forget_past:
             value = self.get(at=forget_until)
-        for limit, attr in limit_attrs:
+        for (limit, attr, flag_attr), flag in zip(limit_attrs, flags):
             # set the internal attribute.
             setattr(self, attr, limit)
-            setattr(self, '_is' + attr + '_gauge', isinstance(limit, Gauge))
+            setattr(self, flag_attr, flag)
         self.invalidate()
-        if not forget_past:
-            return
         if clamp:
             value = self.clamp(value, at=at)
             forget_until = at
-        self.forget_past(value, at=forget_until)
+        if forget_past:
+            self.forget_past(value, at=forget_until)
 
     def set_max(self, max, clamp=False, at=None):
         """Changes the maximum.
@@ -443,11 +448,13 @@ class Gauge(object):
         return value
 
     def __getstate__(self):
+        limits = (self._max, self._min)
         momenta = list(map(tuple, self.momenta))
-        return (self.base, self._max, self._min, momenta)
+        return (self.base, limits, momenta)
 
     def __setstate__(self, state):
-        base, max_, min_, momenta = state
+        base, limits, momenta = state
+        max_, min_ = limits
         self.__init__(base[VALUE], max=max_, min=min_, at=base[TIME])
         for momentum in momenta:
             self.add_momentum(*momentum)
