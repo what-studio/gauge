@@ -17,6 +17,7 @@ class FrozenGauge(Gauge):
             else:
                 setattr(self, gauge_attr, cls(limit_gauge))
         self._determination = gauge.determination
+        self.linked_gauges = ()
 
     @property
     def base(self):
@@ -27,13 +28,13 @@ class FrozenGauge(Gauge):
         raise TypeError('FrozenGauge doesn\'t keep the momenta')
 
     def __getstate__(self):
-        return (self.max_value, self.max_gauge,
-                self.min_value, self.min_gauge,
-                self._determination)
+        return (self._determination, self.max_value, self.max_gauge,
+                self.min_value, self.min_gauge)
 
     def __setstate__(self, state):
-        self.max_value, self.max_gauge, self.min_value, self.min_gauge, \
-            self._determination = state
+        self._determination, \
+            self.max_value, self.max_gauge, \
+            self.min_value, self.min_gauge = state
 
     def invalidate(self):
         raise AssertionError('FrozenGauge cannot be invalidated')

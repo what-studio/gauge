@@ -703,19 +703,18 @@ def test_hypergauge_with_different_base_time():
     assert g.get(110) == 10
 
 
-def test_hypergauge_links():
+def test_linked_gauges():
     max_g = Gauge(10, 100, at=0)
     g = Gauge(0, max_g, at=0)
-    assert weakref.ref(g) in max_g._links
+    assert g in max_g.linked_gauges
     g.set_max(10, at=0)
-    assert weakref.ref(g) not in max_g._links
+    assert g not in max_g.linked_gauges
     # clear dead links.
     g.set_max(max_g, at=0)
+    assert len(max_g.linked_gauges) == 1
     del g
     gc.collect()
-    assert list(max_g._links)[0]() is None
-    max_g.invalidate()
-    assert not max_g._links
+    assert len(max_g.linked_gauges) == 0
 
 
 def test_over_max_on_hypergauge():

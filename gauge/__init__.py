@@ -56,9 +56,9 @@ class Gauge(object):
 
     def __preinit__(self):
         """Called by :meth:`__init__` and :meth:`__setstate__`."""
+        self.linked_gauges = weakref.WeakSet()
         self.momenta = SortedListWithKey(key=lambda m: m[2])  # sort by until
         self._events = SortedList()
-        self._links = set()
 
     @property
     def determination(self):
@@ -85,27 +85,13 @@ class Gauge(object):
         """
         # invalidate linked gauges together.  A linked gauge refers this gauge
         # as a limit.
-        for gauge in self.linked_gauges():
+        for gauge in self.linked_gauges:
             gauge.invalidate()
         # remove the cached determination.
         try:
             del self._determination
         except AttributeError:
             pass
-
-    def linked_gauges(self):
-        """Yields linked gauges.  It removes dead links during an iteration."""
-        try:
-            links = list(self._links)
-        except AttributeError:
-            pass
-        else:
-            for gauge_ref in links:
-                gauge = gauge_ref()
-                if gauge is None:
-                    self._links.remove(gauge_ref)
-                    continue
-                yield gauge
 
     def get_max(self, at=None):
         """Predicts the current maximum value."""
@@ -136,7 +122,7 @@ class Gauge(object):
         else:
             setattr(self, value_attr, None)
             setattr(self, gauge_attr, limit_gauge)
-            limit_gauge._links.add(weakref.ref(self))
+            limit_gauge.linked_gauges.add(self)
 
     def _set_limits(self, max_=None, min_=None, at=None,
                     _incomplete=False):
@@ -153,7 +139,7 @@ class Gauge(object):
                 continue
             # unlink from the previous limit gauge.
             if prev_limit_gauge is not None:
-                prev_limit_gauge._links.discard(weakref.ref(self))
+                prev_limit_gauge.linked_gauges.discard(self)
             is_gauge = isinstance(limit, Gauge)
             if is_gauge:
                 limit_gauge, limit_value = limit, limit.get(at)
@@ -301,7 +287,7 @@ class Gauge(object):
             elif delta < 0 and value < min_:
                 raise ValueError('The value to set is smaller than the '
                                  'minimum ({0} < {1})'.format(value, min_))
-        for gauge in self.linked_gauges():
+        for gauge in self.linked_gauges:
             gauge._clamp_by_limit_gauge(self, value, at=at)
         self.forget_past(value, at=at)
         return value
@@ -485,7 +471,7 @@ class Gauge(object):
         :param at: the time base.  (default: now)
         """
         at = now_or(at)
-        for gauge in self.linked_gauges():
+        for gauge in self.linked_gauges:
             if gauge.base[TIME] < at:
                 gauge.forget_past(at=at)
         x = self.momenta.bisect_left((-inf, -inf, at))
