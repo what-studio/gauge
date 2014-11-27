@@ -11,6 +11,7 @@
 from __future__ import absolute_import
 from bisect import bisect_left
 from collections import namedtuple
+import operator
 import weakref
 
 from six.moves import map, zip
@@ -21,7 +22,7 @@ from .deterministic import Determination, Segment
 
 
 __all__ = ['Gauge', 'Momentum', 'inf', 'now_or']
-__version__ = '0.2.1'
+__version__ = '0.3.0'
 
 
 class Gauge(object):
@@ -229,6 +230,22 @@ class Gauge(object):
         """Predicts the final value."""
         return self.determination[-1][VALUE]
 
+    def _clamp_by_limit(self, limit_gauge, limit_value, at=None):
+        if self.determination.inside_since is None:
+            return
+        at = now_or(at)
+        if at != self.base[TIME] and at < self.determination.inside_since:
+            return
+        if limit_gauge is self._max:
+            cmp_ = operator.gt
+        elif limit_gauge is self._min:
+            cmp_ = operator.lt
+        else:
+            raise ValueError('The limit is neither max nor min')
+        value = self.get(at)
+        if cmp_(value, limit_value):
+            self.set(limit_value, at=at)
+
     def incr(self, delta, over=False, clamp=False, at=None):
         """Increases the value by the given delta immediately.  The
         determination would be changed.
@@ -258,6 +275,9 @@ class Gauge(object):
             elif delta < 0 and value < min_:
                 raise ValueError('The value to set is smaller than the '
                                  'minimum ({0} < {1})'.format(value, min_))
+        if clamp:
+            for gauge in self.linked_gauges():
+                gauge._clamp_by_limit(self, value, at=at)
         self.forget_past(value, at=at)
         return value
 

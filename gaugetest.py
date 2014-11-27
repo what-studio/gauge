@@ -206,24 +206,22 @@ def test_clamp():
 def test_set_min_max():
     # without momentum
     g = Gauge(5, 10)
-    assert g.max == 10
-    assert g.min == 0
+    assert g.get_max() == 10
+    assert g.get_min() == 0
     assert g.get() == 5
-    g.max = 100
-    g.min = 10
-    assert g.max == 100
-    assert g.min == 10
+    g.set_limits(max=100, min=10)
+    assert g.get_max() == 100
+    assert g.get_min() == 10
     assert g.get() == 5
-    g.set_min(10, clamp=True)
+    g.set_min(10)
     assert g.get() == 10
-    g.set_min(5, clamp=True)  # to test meaningless clamping
+    g.set_min(5)
     assert g.get() == 10
-    g.min = 0
-    g.max = 5
-    assert g.max == 5
-    assert g.min == 0
+    g.set_limits(max=5, min=0)
+    assert g.get_max() == 5
+    assert g.get_min() == 0
     assert g.get() == 10
-    g.set_max(5, clamp=True)
+    g.set_max(5)
     assert g.get() == 5
     # with momentum
     g = Gauge(5, 10, at=0)
@@ -231,7 +229,7 @@ def test_set_min_max():
     assert list(g.determination) == [(0, 5), (5, 10)]
     g.set_max(50, at=0)
     assert list(g.determination) == [(0, 5), (45, 50)]
-    g.set_min(40, clamp=True, at=0)
+    g.set_min(40, at=0)
     assert list(g.determination) == [(0, 40), (10, 50)]
 
 
@@ -572,10 +570,10 @@ def test_boundary():
 def zigzag():
     g = Gauge(1, Gauge(2, 3, 2, at=0), Gauge(1, 1, 0, at=0), at=0)
     for x in range(6):
-        g.max.add_momentum(+1, since=x * 2, until=x * 2 + 1)
-        g.max.add_momentum(-1, since=x * 2 + 1, until=x * 2 + 2)
-        g.min.add_momentum(-1, since=x * 2, until=x * 2 + 1)
-        g.min.add_momentum(+1, since=x * 2 + 1, until=x * 2 + 2)
+        g.max_gauge.add_momentum(+1, since=x * 2, until=x * 2 + 1)
+        g.max_gauge.add_momentum(-1, since=x * 2 + 1, until=x * 2 + 2)
+        g.min_gauge.add_momentum(-1, since=x * 2, until=x * 2 + 1)
+        g.min_gauge.add_momentum(+1, since=x * 2 + 1, until=x * 2 + 2)
     for x in range(3):
         t = sum(y * 2 for y in range(x + 1))
         g.add_momentum(+1, since=t, until=t + (x + 1))
@@ -590,10 +588,10 @@ def bidir():
     g.add_momentum(-1, since=3, until=6)
     g.add_momentum(+1, since=6, until=9)
     g.add_momentum(-1, since=9, until=12)
-    g.max.add_momentum(-1, since=0, until=4)
-    g.max.add_momentum(+1, since=6, until=7)
-    g.min.add_momentum(+1, since=1, until=6)
-    g.min.add_momentum(-1, since=6, until=8)
+    g.max_gauge.add_momentum(-1, since=0, until=4)
+    g.max_gauge.add_momentum(+1, since=6, until=7)
+    g.min_gauge.add_momentum(+1, since=1, until=6)
+    g.min_gauge.add_momentum(-1, since=6, until=8)
     return g
 
 
@@ -602,15 +600,15 @@ def test_hypergauge():
     g.add_momentum(+1, since=1, until=6)
     g.add_momentum(-1, since=3, until=8)
     # case 1
-    g.max = Gauge(15, 15, at=0)
-    g.max.add_momentum(-1, until=5)
+    g.set_max(Gauge(15, 15, at=0), at=0)
+    g.max_gauge.add_momentum(-1, until=5)
     assert list(g.determination) == [
         (0, 12), (1, 12), (2, 13), (3, 12), (5, 10), (6, 10), (8, 8)]
-    assert list(g.max.determination) == [(0, 15), (5, 10)]
+    assert list(g.max_gauge.determination) == [(0, 15), (5, 10)]
     # case 2
-    g.max = Gauge(15, 15, at=0)
-    g.max.add_momentum(-1, until=4)
-    g.max.add_momentum(+1, since=4, until=6)
+    g.set_max(Gauge(15, 15, at=0), at=0)
+    g.max_gauge.add_momentum(-1, until=4)
+    g.max_gauge.add_momentum(+1, since=4, until=6)
     assert list(g.determination) == [
         (0, 12), (1, 12), (2, 13), (3, 12), (4, 11), (6, 11), (8, 9)]
     # case 3
@@ -621,8 +619,8 @@ def test_hypergauge():
     assert list(g.determination) == [
         (0, 12), (1, 12), (3, 12), (5, 10), (6, 10), (8, 8)]
     # case 4
-    g.max = Gauge(15, 15, at=0)
-    g.max.add_momentum(-1)
+    g.set_max(Gauge(15, 15, at=0), at=0)
+    g.max_gauge.add_momentum(-1)
     assert list(g.determination) == [
         (0, 12), (1, 12), (2, 13), (3, 12), (6, 9), (8, 7), (15, 0)]
     # bidirectional hyper-gauge
@@ -648,10 +646,10 @@ def test_hypergauge():
     # zigzag 2
     g = Gauge(2, Gauge(3, 5, 3, at=0), Gauge(2, 2, 0, at=0), at=0)
     for x in range(5):
-        g.max.add_momentum(+1, since=x * 4, until=x * 4 + 2)
-        g.max.add_momentum(-1, since=x * 4 + 2, until=x * 4 + 4)
-        g.min.add_momentum(-1, since=x * 4, until=x * 4 + 2)
-        g.min.add_momentum(+1, since=x * 4 + 2, until=x * 4 + 4)
+        g.max_gauge.add_momentum(+1, since=x * 4, until=x * 4 + 2)
+        g.max_gauge.add_momentum(-1, since=x * 4 + 2, until=x * 4 + 4)
+        g.min_gauge.add_momentum(-1, since=x * 4, until=x * 4 + 2)
+        g.min_gauge.add_momentum(+1, since=x * 4 + 2, until=x * 4 + 4)
     for x in range(4):
         t = sum(y * 2 for y in range(x + 1))
         g.add_momentum(+1, since=t, until=t + (x + 1))
@@ -659,20 +657,21 @@ def test_hypergauge():
     assert list(g.determination) == [
         (0, 2), (1, 3), (2, 2), (3.5, 3.5), (4, 3), (6, 1), (8, 3), (9, 4),
         (11.5, 1.5), (12, 2), (14.5, 4.5), (16, 3), (18.5, 0.5), (20, 2)]
-    # hybrid 1: same velocity of `g` and `g.max`.  (suggested by @hybrid0)
+    # hybrid 1: same velocity of `g` and `g.max_gauge`.
+    # (suggested by @hybrid0)
     g = Gauge(0, Gauge(1, 5, at=0), at=0)
     g.add_momentum(+1)
-    g.max.add_momentum(+1, since=1)
+    g.max_gauge.add_momentum(+1, since=1)
     assert list(g.determination) == [(0, 0), (1, 1), (5, 5)]
-    # hybrid 2: velocity of `g.max` is faster than `g`'s.
+    # hybrid 2: velocity of `g.max_gauge` is faster than `g`'s.
     g = Gauge(0, Gauge(1, 5, at=0), at=0)
     g.add_momentum(+1)
-    g.max.add_momentum(+2, since=1)
+    g.max_gauge.add_momentum(+2, since=1)
     assert list(g.determination) == [(0, 0), (1, 1), (5, 5)]
-    # hybrid 3: velocity of `g.max` is slower than `g`'s.
+    # hybrid 3: velocity of `g.max_gauge` is slower than `g`'s.
     g = Gauge(0, Gauge(1, 5, at=0), at=0)
     g.add_momentum(+1)
-    g.max.add_momentum(+0.5, since=1)
+    g.max_gauge.add_momentum(+0.5, since=1)
     assert list(g.determination) == [(0, 0), (1, 1), (9, 5)]
 
 
@@ -697,11 +696,11 @@ def test_hyper_hypergauge(zigzag, bidir):
 def test_hypergauge_with_different_base_time():
     g = Gauge(0, Gauge(10, 100, at=100), at=0)
     g.add_momentum(+1)
-    assert g.max.get(0) == 10
+    assert g.max_gauge.get(0) == 10
     assert g.get(10) == 10
     g = Gauge(0, Gauge(10, 100, at=0), at=100)
     g.add_momentum(+1)
-    assert g.max.get(100) == 10
+    assert g.max_gauge.get(100) == 10
     assert g.get(110) == 10
 
 
@@ -713,11 +712,11 @@ def test_hypergauge_links():
     assert g.get(100) == 10
     max_g.set(100, at=0)
     assert g.get(100) == 100
-    g.max = 10
+    g.set_max(10, at=0)
     assert g.get(100) == 100
     assert weakref.ref(g) not in max_g._links
     # clear dead links.
-    g.max = max_g
+    g.set_max(max_g, at=0)
     del g
     gc.collect()
     assert list(max_g._links)[0]() is None
@@ -727,7 +726,7 @@ def test_hypergauge_links():
 
 def test_over_max_on_hypergauge():
     g = Gauge(1, Gauge(10, 20, at=0), at=0)
-    g.max.add_momentum(+1)
+    g.max_gauge.add_momentum(+1)
     with pytest.raises(ValueError):
         g.set(20, at=0)
     g.set(20, at=0, over=True)
@@ -742,11 +741,11 @@ def test_pickle_hypergauge():
     g = Gauge(12, 100, at=0)
     g.add_momentum(+1, since=1, until=6)
     g.add_momentum(-1, since=3, until=8)
-    g.max = Gauge(15, 15, at=0)
-    g.max.add_momentum(-1, until=5)
+    g.set_max(Gauge(15, 15, at=0), at=0)
+    g.max_gauge.add_momentum(-1, until=5)
     assert list(g.determination) == [
         (0, 12), (1, 12), (2, 13), (3, 12), (5, 10), (6, 10), (8, 8)]
-    assert list(g.max.determination) == [(0, 15), (5, 10)]
+    assert list(g.max_gauge.determination) == [(0, 15), (5, 10)]
     data = pickle.dumps(g)
     g2 = pickle.loads(data)
     assert list(g2.determination) == [
@@ -794,7 +793,7 @@ def test_decr_max():
     g.add_momentum(-1)
     assert g.base[TIME] == 0
     assert g.get(10) == 10
-    g.max.decr(5, at=10)
+    g.max_gauge.decr(5, at=10)
     assert g.base[TIME] == 10
     assert g.get(10) == 10
     assert g.get(15) == 5
@@ -805,7 +804,7 @@ def test_decr_max():
     g.add_momentum(-1)
     assert g.base[TIME] == 0
     assert g.get(10) == 10
-    g.max.decr(5, at=10)
+    g.max_gauge.decr(5, at=10)
     assert g.base[TIME] == 10
     assert g.get(10) == 10
     assert g.get(15) == 5
@@ -817,11 +816,11 @@ def test_decr_max():
     assert g.get(0) == 0
     assert g.get(10) == 5
     assert g.get(20) == 10
-    g.max.decr(5, at=0)
+    g.max_gauge.decr(5, at=0)
     assert g.base[TIME] == 5
     assert g.get(0) == 0
     assert g.get(10) == 5
-    g.max.incr(10, at=10)
+    g.max_gauge.incr(10, at=10)
     assert g.base[TIME] == 10
     assert g.get(0) == 5
     assert g.get(10) == 5
@@ -1020,6 +1019,22 @@ def test_hypergauge_flags():
     g = Gauge(10, 100, at=0)
     assert not g._is_max_gauge
     assert not g._is_min_gauge
-    g.max = Gauge(100, 100, at=0)
+    g.set_max(Gauge(100, 100, at=0), at=0)
     assert g._is_max_gauge
     assert not g._is_min_gauge
+
+
+def test_clamped_by_max_gauge():
+    # inside, decr max -> clamp
+    g = Gauge(10, Gauge(20, 20, at=0), at=0)
+    assert g.get(0) == 10
+    g.max_gauge.set(5, at=0)
+    assert g.get(0) == 5
+    # inside, incr max -> not clamp
+    g.max_gauge.set(15, at=0)
+    assert g.get(0) == 5
+    # outside, decr max -> not clamp
+    g.set(20, over=True, at=0)
+    assert g.get(0) == 20
+    g.max_gauge.set(10, at=0)
+    assert g.get(0) == 20
