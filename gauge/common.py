@@ -12,7 +12,8 @@ from time import time as now
 import warnings
 
 
-__all__ = ['ADD', 'REMOVE', 'TIME', 'VALUE', 'inf', 'now_or', 'deprecate']
+__all__ = ['ADD', 'REMOVE', 'TIME', 'VALUE', 'MAX', 'MIN',
+           'inf', 'now_or', 'deprecate']
 
 
 # events
@@ -23,6 +24,11 @@ REMOVE = -1
 # indices
 TIME = 0
 VALUE = 1
+
+
+# limits
+MAX = +1
+MIN = -1
 
 
 inf = float('inf')

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from gauge import Gauge, TIME, VALUE
+from gauge import Gauge
 
 
 __all__ = [b'StaticGauge']
@@ -22,12 +22,14 @@ class StaticGauge(Gauge):
             raise TypeError('StaticGauge cannot be a hyper-gauge')
         super(StaticGauge, self)._set_limits(max_, min_, *args, **kwargs)
 
+    '''
     def __getstate__(self):
         return (self.base, self._max, self._min)
 
     def __setstate__(self, state):
         base, max_, min_ = state
         self.__init__(base[VALUE], max=max_, min=min_, at=base[TIME])
+    '''
 
 
 def test_static_gauge():
@@ -47,9 +49,5 @@ def test_static_gauge():
         g.add_momentum(+1)
     with pytest.raises(TypeError):
         g.remove_momentum(+1)
-    with pytest.raises(TypeError):
-        g.max = Gauge(100, 100)
-    g.max = 50
-    assert g.max == 50
     g.set(g.get(), clamp=True)
-    assert g.get() == 50
+    assert g.get() == 100

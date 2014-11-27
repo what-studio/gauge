@@ -8,11 +8,14 @@ __all__ = [b'FrozenGauge']
 class FrozenGauge(Gauge):
 
     def __init__(self, gauge):
-        cls, max_, min_ = type(self), gauge.max, gauge.min
-        self._is_max_gauge = isinstance(max_, Gauge)
-        self._is_min_gauge = isinstance(min_, Gauge)
-        self._max = cls(max_) if self._is_max_gauge else max_
-        self._min = cls(min_) if self._is_min_gauge else min_
+        cls = type(self)
+        limit_attrs = [('max_value', 'max_gauge'), ('min_value', 'min_gauge')]
+        for value_attr, gauge_attr in limit_attrs:
+            limit_gauge = getattr(gauge, gauge_attr)
+            if limit_gauge is None:
+                setattr(self, value_attr, getattr(gauge, value_attr))
+            else:
+                setattr(self, gauge_attr, cls(limit_gauge))
         self._determination = gauge.determination
 
     @property
@@ -24,10 +27,13 @@ class FrozenGauge(Gauge):
         raise TypeError('FrozenGauge doesn\'t keep the momenta')
 
     def __getstate__(self):
-        return (self._max, self._min, self._determination)
+        return (self.max_value, self.max_gauge,
+                self.min_value, self.min_gauge,
+                self._determination)
 
     def __setstate__(self, state):
-        self._max, self._min, self._determination = state
+        self.max_value, self.max_gauge, self.min_value, self.min_gauge, \
+            self._determination = state
 
     def invalidate(self):
         raise AssertionError('FrozenGauge cannot be invalidated')
@@ -64,9 +70,5 @@ def test_immutability():
         fg.add_momentum(+1, since=10, until=20)
     with pytest.raises(TypeError):
         fg.remove_momentum(+1, since=10, until=20)
-    with pytest.raises(TypeError):
-        fg.max = 10
-    with pytest.raises(TypeError):
-        fg.min = 10
     with pytest.raises(TypeError):
         fg.forget_past(at=10)

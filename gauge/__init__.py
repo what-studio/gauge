@@ -17,7 +17,7 @@ import weakref
 from six.moves import map, zip
 from sortedcontainers import SortedList, SortedListWithKey
 
-from .common import ADD, REMOVE, TIME, VALUE, inf, now_or
+from .common import ADD, REMOVE, TIME, VALUE, MAX, MIN, inf, now_or
 from .deterministic import Determination, Segment
 
 
@@ -36,11 +36,27 @@ class Gauge(object):
     #: A sorted list of momenta.  The items are :class:`Momentum` objects.
     momenta = None
 
+    #: The constant maximum value.
+    max_value = None
+
+    #: The gauge to indicate maximum value.
+    max_gauge = None
+
+    #: The constant minimum value.
+    min_value = None
+
+    #: The gauge to indicate minimum value.
+    min_gauge = None
+
     def __init__(self, value, max, min=0, at=None):
+        self.__preinit__()
         at = now_or(at)
         self.base = (at, value)
+        self._set_limits(max, min, at=at, _incomplete=True)
+
+    def __preinit__(self):
+        """Called by :meth:`__init__` and :meth:`__setstate__`."""
         self.momenta = SortedListWithKey(key=lambda m: m[2])  # sort by until
-        self._set_limits(max_=max, min_=min, at=at, forget_past=False)
         self._events = SortedList()
         self._links = set()
 
@@ -91,86 +107,94 @@ class Gauge(object):
                     continue
                 yield gauge
 
-    @property
-    def max(self):
-        return self._max
-
-    @max.setter
-    def max(self, max):
-        self.set_max(max)
-
-    @property
-    def min(self):
-        return self._min
-
-    @min.setter
-    def min(self, min):
-        self.set_min(min)
-
     def get_max(self, at=None):
         """Predicts the current maximum value."""
-        return self._max.get(at) if self._is_max_gauge else self._max
+        if self.max_gauge is None:
+            return self.max_value
+        else:
+            return self.max_gauge.get(at)
 
     def get_min(self, at=None):
         """Predicts the current minimum value."""
-        return self._min.get(at) if self._is_min_gauge else self._min
+        if self.min_gauge is None:
+            return self.min_value
+        else:
+            return self.min_gauge.get(at)
 
-    def _set_limits(self, max_=None, min_=None, clamp=False, at=None,
-                    forget_past=True):
-        limit_attrs = [x for x in [
-            (max_, '_max', '_is_max_gauge'),
-            (min_, '_min', '_is_min_gauge'),
-        ] if x[0] is not None]
+    #: The alias of :meth:`get_max`.
+    max = get_max
+
+    #: The alias of :meth:`get_min`.
+    min = get_min
+
+    def _set_limit(self, limit_type, limit_value=None, limit_gauge=None):
+        name = {MAX: 'max', MIN: 'min'}[limit_type]
+        value_attr, gauge_attr = name + '_value', name + '_gauge'
+        if limit_gauge is None:
+            setattr(self, value_attr, limit_value)
+            setattr(self, gauge_attr, None)
+        else:
+            setattr(self, value_attr, None)
+            setattr(self, gauge_attr, limit_gauge)
+            limit_gauge._links.add(weakref.ref(self))
+
+    def _set_limits(self, max_=None, min_=None, at=None,
+                    _incomplete=False):
         at = now_or(at)
         forget_until = at
-        flags = []
-        for limit, attr, flag_attr in limit_attrs:
-            try:
-                prev_limit = getattr(self, attr)
-            except AttributeError:
-                prev_limit = None
-            else:
-                if getattr(self, flag_attr):
-                    # unlink this gauge from the previous limiting gauge.
-                    prev_limit._links.discard(weakref.ref(self))
+        if not _incomplete:
+            value = self.get(at)
+            inside_since = self.determination.inside_since
+        for limit_type, clamp, limit, prev_limit_gauge in [
+            (MAX, min, max_, self.max_gauge),
+            (MIN, max, min_, self.min_gauge),
+        ]:
+            if limit is None:
+                continue
+            # unlink from the previous limit gauge.
+            if prev_limit_gauge is not None:
+                prev_limit_gauge._links.discard(weakref.ref(self))
             is_gauge = isinstance(limit, Gauge)
-            flags.append(is_gauge)
             if is_gauge:
-                # link this gauge to the new limiting gauge.
-                limit._links.add(weakref.ref(self))
-                forget_until = min(forget_until, limit.base[TIME])
-        if forget_past:
-            value = self.get(at=forget_until)
-        for (limit, attr, flag_attr), flag in zip(limit_attrs, flags):
-            # set the internal attribute.
-            setattr(self, attr, limit)
-            setattr(self, flag_attr, flag)
-        self.invalidate()
-        if clamp:
-            value = self.clamp(value, at=at)
-            forget_until = at
-        if forget_past:
-            self.forget_past(value, at=forget_until)
+                limit_gauge, limit_value = limit, limit.get(at)
+                forget_until = min(forget_until, limit_gauge.base[TIME])
+            else:
+                limit_gauge, limit_value = None, limit
+            self._set_limit(limit_type, limit_value, limit_gauge)
+            if _incomplete:
+                continue
+            elif inside_since is None:
+                continue
+            elif inside_since <= at:
+                value = clamp(value, limit_value)
+        if _incomplete:
+            return
+        self.forget_past(value, at=forget_until)
 
-    def set_max(self, max, clamp=False, at=None):
+    def set_limits(self, max=None, min=None, at=None):
+        """Changes the maximum and minimum at once.
+
+        :param max: a number or gauge to set as the maximum.  (optional)
+        :param min: a number or gauge to set as the minimum.  (optional)
+        :param at: the time to change.  (default: now)
+        """
+        return self._set_limits(max, min, at=at)
+
+    def set_max(self, max, at=None):
         """Changes the maximum.
 
         :param max: a number or gauge to set as the maximum.
-        :param clamp: limits the current value to be below the new maximum.
-                      (default: ``True``)
         :param at: the time to change.  (default: now)
         """
-        self._set_limits(max_=max, clamp=clamp, at=at)
+        self._set_limits(max_=max, at=at)
 
-    def set_min(self, min, clamp=False, at=None):
+    def set_min(self, min, at=None):
         """Changes the minimum.
 
         :param min: a number or gauge to set as the minimum.
-        :param clamp: limits the current value to be above the new minimum.
-                      (default: ``True``)
         :param at: the time to change.  (default: now)
         """
-        self._set_limits(min_=min, clamp=clamp, at=at)
+        self._set_limits(min_=min, at=at)
 
     def clamp(self, value, at=None):
         """Clamps by the limits at the given time.
@@ -230,19 +254,21 @@ class Gauge(object):
         """Predicts the final value."""
         return self.determination[-1][VALUE]
 
-    def _clamp_by_limit(self, limit_gauge, limit_value, at=None):
+    def _clamp_by_limit_gauge(self, limit_gauge, limit_value=None, at=None):
         if self.determination.inside_since is None:
             return
         at = now_or(at)
         if at != self.base[TIME] and at < self.determination.inside_since:
             return
-        if limit_gauge is self._max:
+        if limit_gauge is self.max_gauge:
             cmp_ = operator.gt
-        elif limit_gauge is self._min:
+        elif limit_gauge is self.min_gauge:
             cmp_ = operator.lt
         else:
             raise ValueError('The limit is neither max nor min')
         value = self.get(at)
+        if limit_value is None:
+            limit_value = limit_gauge.get(at)
         if cmp_(value, limit_value):
             self.set(limit_value, at=at)
 
@@ -275,9 +301,8 @@ class Gauge(object):
             elif delta < 0 and value < min_:
                 raise ValueError('The value to set is smaller than the '
                                  'minimum ({0} < {1})'.format(value, min_))
-        if clamp:
-            for gauge in self.linked_gauges():
-                gauge._clamp_by_limit(self, value, at=at)
+        for gauge in self.linked_gauges():
+            gauge._clamp_by_limit_gauge(self, value, at=at)
         self.forget_past(value, at=at)
         return value
 
@@ -468,14 +493,16 @@ class Gauge(object):
         return value
 
     def __getstate__(self):
-        limits = (self._max, self._min)
-        momenta = list(map(tuple, self.momenta))
-        return (self.base, limits, momenta)
+        return (self.base, list(map(tuple, self.momenta)),
+                self.max_value, self.max_gauge,
+                self.min_value, self.min_gauge)
 
     def __setstate__(self, state):
-        base, limits, momenta = state
-        max_, min_ = limits
-        self.__init__(base[VALUE], max=max_, min=min_, at=base[TIME])
+        base, momenta, max_value, max_gauge, min_value, min_gauge = state
+        self.__preinit__()
+        self.base = base
+        self.max_value, self.max_gauge = max_value, max_gauge
+        self.min_value, self.min_gauge = min_value, min_gauge
         for momentum in momenta:
             self.add_momentum(*momentum)
 
@@ -491,14 +518,16 @@ class Gauge(object):
         value = self.get(at=at)
         hyper = False
         limit_reprs = []
-        for limit in [self.max, self.min]:
-            if isinstance(limit, Gauge):
-                hyper = True
-                limit_reprs.append('{0!r}'.format(limit))
+        limit_items = [(self.max_value, self.max_gauge),
+                       (self.min_value, self.min_gauge)]
+        for limit_value, limit_gauge in limit_items:
+            if limit_gauge is None:
+                limit_reprs.append('{0:.2f}'.format(limit_value))
             else:
-                limit_reprs.append('{0:.2f}'.format(limit))
+                hyper = True
+                limit_reprs.append('{0!r}'.format(limit_gauge))
         form = '<{0} {1:.2f}'
-        if not hyper and self.min == 0:
+        if not hyper and self.min_value == 0:
             form += '/{2}>'
         else:
             form += ' between {3}~{2}>'

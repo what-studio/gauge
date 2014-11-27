@@ -55,9 +55,14 @@ class Determination(list):
         velocity, velocities = 0, []
         bound, overlapped = None, False
         # boundaries.
-        g = gauge
-        ceil_lines_iter = self.walk_lines(g, g.max, is_gauge=g._is_max_gauge)
-        floor_lines_iter = self.walk_lines(g, g.min, is_gauge=g._is_min_gauge)
+        ceil_lines_iter = \
+            self.walk_lines(gauge, gauge.max_value) \
+            if gauge.max_gauge is None else \
+            self.walk_lines(gauge, gauge.max_gauge, is_gauge=True)
+        floor_lines_iter = \
+            self.walk_lines(gauge, gauge.min_value) \
+            if gauge.min_gauge is None else \
+            self.walk_lines(gauge, gauge.min_gauge, is_gauge=True)
         ceil = Boundary(ceil_lines_iter, operator.lt)
         floor = Boundary(floor_lines_iter, operator.gt)
         boundaries = [ceil, floor]
