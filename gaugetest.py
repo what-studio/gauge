@@ -7,7 +7,6 @@ import random
 from random import Random
 import time
 import types
-import weakref
 
 import pytest
 
