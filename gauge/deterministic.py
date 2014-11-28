@@ -27,18 +27,19 @@ class Determination(list):
     inside_since = None
 
     @staticmethod
-    def walk_lines(gauge, src, is_gauge=False):
-        if is_gauge:
-            determination = src.determination
-            first, last = determination[0], determination[-1]
-            if gauge.base[TIME] < first[TIME]:
-                yield Horizon(gauge.base[TIME], first[TIME], first[VALUE])
-            zipped_determination = zip(determination[:-1], determination[1:])
-            for (time1, value1), (time2, value2) in zipped_determination:
-                yield Segment(time1, time2, value1, value2)
-            yield Horizon(last[TIME], +inf, last[VALUE])
-        else:
-            yield Horizon(gauge.base[TIME], +inf, src)
+    def value_lines(gauge, value):
+        yield Horizon(gauge.base[TIME], +inf, value)
+
+    @staticmethod
+    def gauge_lines(gauge, other_gauge):
+        determination = other_gauge.determination
+        first, last = determination[0], determination[-1]
+        if gauge.base[TIME] < first[TIME]:
+            yield Horizon(gauge.base[TIME], first[TIME], first[VALUE])
+        zipped_determination = zip(determination[:-1], determination[1:])
+        for (time1, value1), (time2, value2) in zipped_determination:
+            yield Segment(time1, time2, value1, value2)
+        yield Horizon(last[TIME], +inf, last[VALUE])
 
     def determine(self, time, value, inside=True):
         if self and self[-1][TIME] == time:
@@ -55,14 +56,12 @@ class Determination(list):
         velocity, velocities = 0, []
         bound, overlapped = None, False
         # boundaries.
-        ceil_lines_iter = \
-            self.walk_lines(gauge, gauge.max_value) \
-            if gauge.max_gauge is None else \
-            self.walk_lines(gauge, gauge.max_gauge, is_gauge=True)
-        floor_lines_iter = \
-            self.walk_lines(gauge, gauge.min_value) \
-            if gauge.min_gauge is None else \
-            self.walk_lines(gauge, gauge.min_gauge, is_gauge=True)
+        ceil_lines_iter = (self.value_lines(gauge, gauge.max_value)
+                           if gauge.max_gauge is None else
+                           self.gauge_lines(gauge, gauge.max_gauge))
+        floor_lines_iter = (self.value_lines(gauge, gauge.min_value)
+                            if gauge.min_gauge is None else
+                            self.gauge_lines(gauge, gauge.min_gauge))
         ceil = Boundary(ceil_lines_iter, operator.lt)
         floor = Boundary(floor_lines_iter, operator.gt)
         boundaries = [ceil, floor]
