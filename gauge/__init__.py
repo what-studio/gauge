@@ -11,11 +11,10 @@
 from __future__ import absolute_import
 from bisect import bisect_left
 from collections import namedtuple
-import sys
-if sys.version_info < (2, 7):
-    from weakrefset import WeakSet
-else:
+try:
     from weakref import WeakSet
+except ImportError:
+    from weakrefset import WeakSet
 
 from six.moves import map, zip
 from sortedcontainers import SortedList, SortedListWithKey
