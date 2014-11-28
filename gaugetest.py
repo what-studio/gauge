@@ -11,8 +11,8 @@ import types
 import pytest
 
 import gauge
-from gauge import Gauge, Momentum
-from gauge.common import ADD, REMOVE, TIME, VALUE, inf
+from gauge import Gauge, Momentum, OK, ONCE, CLAMP, inf
+from gauge.common import ADD, REMOVE, TIME, VALUE
 from gauge.deterministic import Line, Horizon, Ray, Segment, Boundary
 
 
@@ -173,33 +173,41 @@ def test_over():
         g.decr(100)
     g.set(10)
     assert g.get() == 10
-    g.set(11, over=True)
+    g.set(11, outside=OK)
     assert g.get() == 11
 
 
 def test_clamp():
     g = Gauge(1, 10)
-    g.set(11, clamp=True)
+    g.set(11, outside=CLAMP)
     assert g.get() == 10
-    g.incr(100, clamp=True)
+    g.incr(100, outside=CLAMP)
     assert g.get() == 10
-    g.decr(100, clamp=True)
+    g.decr(100, outside=CLAMP)
     assert g.get() == 0
-    g.incr(3, clamp=True)
+    g.incr(3, outside=CLAMP)
     assert g.get() == 3
-    g.decr(1, clamp=True)
+    g.decr(1, outside=CLAMP)
     assert g.get() == 2
-    g.set(100, over=True)
-    g.incr(3, clamp=True)
+    g.set(100, outside=OK)
+    g.incr(3, outside=CLAMP)
     assert g.get() == 100
-    g.incr(3, over=True, clamp=True)  # ignores clamp=True
-    assert g.get() == 103
-    g.decr(6, clamp=True)
+    g.decr(3, outside=CLAMP)
     assert g.get() == 97
-    g.set(97, clamp=True)
-    assert g.get() == 10
-    g.set(97, over=True, clamp=True)  # ignores clamp=True
+    g.set(98, outside=CLAMP)
     assert g.get() == 97
+    g.set(97, outside=CLAMP)
+    assert g.get() == 97
+    g.set(96, outside=CLAMP)
+    assert g.get() == 96
+
+
+def test_once():
+    g = Gauge(1, 10)
+    assert g.incr(5, outside=ONCE) == 6
+    assert g.incr(5, outside=ONCE) == 11
+    with pytest.raises(ValueError):
+        g.incr(1, outside=ONCE)
 
 
 def test_set_min_max():
@@ -258,7 +266,7 @@ def test_clear_momenta():
     assert list(g.determination) == [(5, 5)]
     # clear momenta when the value is out of the range
     g.add_momentum(+1)
-    g.set(15, over=True, at=10)
+    g.set(15, outside=OK, at=10)
     g.clear_momenta(at=10)
     assert g.get(10) == 15
     assert list(g.determination) == [(10, 15)]
@@ -362,7 +370,7 @@ def test_case3():
     assert g.get(0) == 0
     g.add_momentum(+1, since=0)
     assert g.get(10) == 10
-    g.incr(3, over=True, at=11)
+    g.incr(3, outside=OK, at=11)
     assert g.get(11) == 13
     g.add_momentum(-1, since=13)
     assert g.get(13) == 13
@@ -610,7 +618,7 @@ def test_hypergauge():
         (0, 12), (1, 12), (2, 13), (3, 12), (4, 11), (6, 11), (8, 9)]
     # case 3
     g.set_max(10, at=0)
-    g.set(12, over=True, at=0)
+    g.set(12, outside=OK, at=0)
     assert list(g.determination) == [
         (0, 12), (1, 12), (3, 12), (5, 10), (6, 10), (8, 8)]
     g.set_max(Gauge(10, 100, at=0), at=0)
@@ -721,7 +729,7 @@ def test_over_max_on_hypergauge():
     g.max_gauge.add_momentum(+1)
     with pytest.raises(ValueError):
         g.set(20, at=0)
-    g.set(20, at=0, over=True)
+    g.set(20, at=0, outside=OK)
     assert g.get(at=0) == 20
     g.set(20, at=10)
     assert g.get(at=10) == 20
@@ -776,7 +784,7 @@ def test_decr_max():
     assert g.base[TIME] == 0
     assert g.get(10) == 10
     g.set_max(5, at=10)
-    g.set(10, over=True, at=10)
+    g.set(10, outside=OK, at=10)
     assert g.base[TIME] == 10
     assert g.get(10) == 10
     assert g.get(15) == 5
@@ -1010,7 +1018,7 @@ def test_clamped_by_max_gauge():
     g.max_gauge.set(15, at=0)
     assert g.get(0) == 5
     # outside, decr max -> not clamp
-    g.set(20, over=True, at=0)
+    g.set(20, outside=OK, at=0)
     assert g.get(0) == 20
     g.max_gauge.set(10, at=0)
     assert g.get(0) == 20

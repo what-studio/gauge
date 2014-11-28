@@ -12,17 +12,25 @@ from time import time as now
 import warnings
 
 
-__all__ = ['ADD', 'REMOVE', 'TIME', 'VALUE', 'inf', 'now_or', 'deprecate']
+__all__ = ['ADD', 'REMOVE', 'TIME', 'VALUE', 'ERROR', 'OK', 'ONCE', 'CLAMP',
+           'inf', 'now_or', 'deprecate']
 
 
-# events
+# events.
 ADD = +1
 REMOVE = -1
 
 
-# indices
+# indices.
 TIME = 0
 VALUE = 1
+
+
+# strategies to control modification to out of the limits.
+ERROR = 0
+OK = 1
+ONCE = 2
+CLAMP = 3
 
 
 inf = float('inf')

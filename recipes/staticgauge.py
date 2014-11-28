@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from gauge import Gauge
+from gauge import Gauge, OK, CLAMP
 
 
 __all__ = [b'StaticGauge']
@@ -41,13 +41,11 @@ def test_static_gauge():
     assert g.get() == 20
     with pytest.raises(ValueError):
         g.incr(100)
-    g.incr(100, clamp=True)
+    g.incr(100, outside=CLAMP)
     assert g.get() == 100
-    g.incr(10, over=True)
+    g.incr(10, outside=OK)
     assert g.get() == 110
     with pytest.raises(TypeError):
         g.add_momentum(+1)
     with pytest.raises(TypeError):
         g.remove_momentum(+1)
-    g.set(g.get(), clamp=True)
-    assert g.get() == 100

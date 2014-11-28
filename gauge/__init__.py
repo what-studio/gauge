@@ -19,11 +19,13 @@ except ImportError:
 from six.moves import map, zip
 from sortedcontainers import SortedList, SortedListWithKey
 
-from .common import ADD, REMOVE, TIME, VALUE, inf, now_or
+from .common import ADD, REMOVE, TIME, VALUE
+from .common import ERROR, OK, ONCE, CLAMP, inf, now_or  # to export
 from .deterministic import Determination, Segment
 
 
-__all__ = ['Gauge', 'Momentum', 'inf', 'now_or']
+__all__ = ['Gauge', 'Momentum',
+           'ERROR', 'OK', 'ONCE', 'CLAMP', 'inf', 'now_or']
 __version__ = '0.3.1-dev'
 
 
@@ -238,67 +240,69 @@ class Gauge(object):
         """Predicts the final value."""
         return self.determination[-1][VALUE]
 
-    def incr(self, delta, over=False, clamp=False, at=None):
+    def incr(self, delta, outside=ERROR, at=None):
         """Increases the value by the given delta immediately.  The
         determination would be changed.
 
         :param delta: the value to increase.
-        :param over: allow out of the range.
-        :param clamp: clamp the value in the range.
+        :param outside: the strategy to control modification to out of the
+                        limits.  (default: ERROR)
         :param at: the time to increase.  (default: now)
 
-        :raises ValueError: the value is out of the range.
+        :raises ValueError: the value is out of the limits.
         """
         at = now_or(at)
         prev_value = self.get(at=at)
         value = prev_value + delta
-        max_, min_ = self.get_max(at), self.get_min(at)
-        if over:
+        if outside == ONCE:
+            outside = OK if self.is_inside(at) else ERROR
+        if outside == OK:
             pass
-        elif clamp:
-            if delta > 0 and value > max_:
-                value = max(prev_value, max_)
-            elif delta < 0 and value < min_:
-                value = min(prev_value, min_)
-        else:
-            if delta > 0 and value > max_:
-                raise ValueError('The value to set is bigger than the '
-                                 'maximum ({0} > {1})'.format(value, max_))
-            elif delta < 0 and value < min_:
-                raise ValueError('The value to set is smaller than the '
-                                 'minimum ({0} < {1})'.format(value, min_))
-        self.forget_past(value, at=at)
-        return value
+        elif delta > 0:
+            max_ = self.get_max(at)
+            if value > max_:
+                if outside == ERROR:
+                    raise ValueError('The value to set is bigger than the '
+                                     'maximum ({0} > {1})'.format(value, max_))
+                elif outside == CLAMP:
+                    value = max(prev_value, max_)
+        elif delta < 0:
+            min_ = self.get_min(at)
+            if value < min_:
+                if outside == ERROR:
+                    raise ValueError('The value to set is smaller than the '
+                                     'minimum ({0} > {1})'.format(value, min_))
+                elif outside == CLAMP:
+                    value = min(prev_value, min_)
+        return self.forget_past(value, at=at)
 
-    def decr(self, delta, over=False, clamp=False, at=None):
+    def decr(self, delta, outside=ERROR, at=None):
         """Decreases the value by the given delta immediately.  The
         determination would be changed.
 
         :param delta: the value to decrease.
-        :param over: allow out of the range.
-        :param clamp: clamp the value in the range.
+        :param outside: the strategy to control modification to out of the
+                        limits.  (default: ERROR)
         :param at: the time to decrease.  (default: now)
 
-        :raises ValueError: the value is out of the range.
+        :raises ValueError: the value is out of the limits.
         """
-        return self.incr(-delta, over=over, clamp=clamp, at=at)
+        return self.incr(-delta, outside=outside, at=at)
 
-    def set(self, value, over=False, clamp=False, at=None):
+    def set(self, value, outside=ERROR, at=None):
         """Sets the current value immediately.  The determination would be
         changed.
 
         :param value: the value to set.
-        :param over: allow out of the range.
-        :param clamp: clamp the value in the range.
+        :param outside: the strategy to control modification to out of the
+                        limits.  (default: ERROR)
         :param at: the time to set.  (default: now)
 
-        :raises ValueError: the value is out of the range.
+        :raises ValueError: the value is out of the limits.
         """
         at = now_or(at)
-        if clamp and not over:
-            value = self.clamp(value, at=at)
         delta = value - self.get(at=at)
-        return self.incr(delta, over=over, clamp=clamp, at=at)
+        return self.incr(delta, outside=outside, at=at)
 
     def when(self, value, after=0):
         """When the gauge reaches to the goal value.
