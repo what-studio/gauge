@@ -48,6 +48,9 @@ class Gauge(object):
     #: The gauge to indicate minimum value.
     min_gauge = None
 
+    #: A weak set of gauges that refer the gauge as a limit gauge.
+    referring_gauges = None
+
     def __init__(self, value, max, min=0, at=None):
         self.__preinit__()
         at = now_or(at)
@@ -56,7 +59,7 @@ class Gauge(object):
 
     def __preinit__(self):
         """Called by :meth:`__init__` and :meth:`__setstate__`."""
-        self.linked_gauges = weakref.WeakSet()
+        self.referring_gauges = weakref.WeakSet()
         self.momenta = SortedListWithKey(key=lambda m: m[2])  # sort by until
         self._events = SortedList()
 
@@ -85,7 +88,7 @@ class Gauge(object):
         """
         # invalidate linked gauges together.  A linked gauge refers this gauge
         # as a limit.
-        for gauge in self.linked_gauges:
+        for gauge in self.referring_gauges:
             gauge.invalidate()
         # remove the cached determination.
         try:
@@ -122,49 +125,36 @@ class Gauge(object):
         else:
             setattr(self, value_attr, None)
             setattr(self, gauge_attr, limit_gauge)
-            limit_gauge.linked_gauges.add(self)
+            limit_gauge.referring_gauges.add(self)
 
-    def _set_limits(self, max_=None, min_=None, at=None,
-                    _incomplete=False):
+    def _set_limits(self, max_=None, min_=None, at=None, _incomplete=False):
         at = now_or(at)
         forget_until = at
+        # _incomplete=True when __init__() calls it.
         if not _incomplete:
             value = self.get(at)
             inside_since = self.determination.inside_since
-        for limit_type, clamp, limit, prev_limit_gauge in [
-            (MAX, min, max_, self.max_gauge),
-            (MIN, max, min_, self.min_gauge),
-        ]:
+        items = [(MAX, min, max_, self.max_gauge),
+                 (MIN, max, min_, self.min_gauge)]
+        for limit_type, clamp, limit, prev_limit_gauge in items:
             if limit is None:
                 continue
-            # unlink from the previous limit gauge.
             if prev_limit_gauge is not None:
-                prev_limit_gauge.linked_gauges.discard(self)
-            is_gauge = isinstance(limit, Gauge)
-            if is_gauge:
+                # unlink from the previous limit gauge.
+                prev_limit_gauge.referring_gauges.discard(self)
+            if isinstance(limit, Gauge):
                 limit_gauge, limit_value = limit, limit.get(at)
                 forget_until = min(forget_until, limit_gauge.base[TIME])
             else:
                 limit_gauge, limit_value = None, limit
             self._set_limit(limit_type, limit_value, limit_gauge)
-            if _incomplete:
-                continue
-            elif inside_since is None:
+            if _incomplete or inside_since is None:
                 continue
             elif inside_since <= at:
                 value = clamp(value, limit_value)
         if _incomplete:
             return
         self.forget_past(value, at=forget_until)
-
-    def set_limits(self, max=None, min=None, at=None):
-        """Changes the maximum and minimum at once.
-
-        :param max: a number or gauge to set as the maximum.  (optional)
-        :param min: a number or gauge to set as the minimum.  (optional)
-        :param at: the time to change.  (default: now)
-        """
-        return self._set_limits(max, min, at=at)
 
     def set_max(self, max, at=None):
         """Changes the maximum.
@@ -181,6 +171,15 @@ class Gauge(object):
         :param at: the time to change.  (default: now)
         """
         self._set_limits(min_=min, at=at)
+
+    def set_limits(self, max=None, min=None, at=None):
+        """Changes the both of maximum and minimum at once.
+
+        :param max: a number or gauge to set as the maximum.  (optional)
+        :param min: a number or gauge to set as the minimum.  (optional)
+        :param at: the time to change.  (default: now)
+        """
+        return self._set_limits(max, min, at=at)
 
     def clamp(self, value, at=None):
         """Clamps by the limits at the given time.
@@ -240,24 +239,6 @@ class Gauge(object):
         """Predicts the final value."""
         return self.determination[-1][VALUE]
 
-    def _clamp_by_limit_gauge(self, limit_gauge, limit_value=None, at=None):
-        if self.determination.inside_since is None:
-            return
-        at = now_or(at)
-        if at != self.base[TIME] and at < self.determination.inside_since:
-            return
-        if limit_gauge is self.max_gauge:
-            cmp_ = operator.gt
-        elif limit_gauge is self.min_gauge:
-            cmp_ = operator.lt
-        else:
-            raise ValueError('The limit is neither max nor min')
-        value = self.get(at)
-        if limit_value is None:
-            limit_value = limit_gauge.get(at)
-        if cmp_(value, limit_value):
-            self.set(limit_value, at=at)
-
     def incr(self, delta, over=False, clamp=False, at=None):
         """Increases the value by the given delta immediately.  The
         determination would be changed.
@@ -287,8 +268,6 @@ class Gauge(object):
             elif delta < 0 and value < min_:
                 raise ValueError('The value to set is smaller than the '
                                  'minimum ({0} < {1})'.format(value, min_))
-        for gauge in self.linked_gauges:
-            gauge._clamp_by_limit_gauge(self, value, at=at)
         self.forget_past(value, at=at)
         return value
 
@@ -437,6 +416,28 @@ class Gauge(object):
             yield time, method, momentum
         yield (+inf, None, None)
 
+    def _limit_gauge_rebased(self, limit_gauge, limit_value, at=None):
+        """Be clamped by changed limit gauge."""
+        at = max(now_or(at), self.base[TIME])
+        if self.determination.inside_since is None:
+            pass
+        elif at != self.base[TIME] and at < self.determination.inside_since:
+            pass
+        else:
+            if limit_gauge is self.max_gauge:
+                cmp_ = operator.gt
+            elif limit_gauge is self.min_gauge:
+                cmp_ = operator.lt
+            else:
+                raise ValueError('The limit is neither max nor min')
+            value = self.get(at)
+            if limit_value is None:
+                limit_value = limit_gauge.get(at)
+            if cmp_(value, limit_value):
+                self.set(limit_value, at=at)
+                return
+        self.forget_past(at=at)
+
     def _rebase(self, value=None, at=None, remove_momenta_before=None):
         """Sets the base and removes momenta between indexes of ``start`` and
         ``stop``.
@@ -452,6 +453,8 @@ class Gauge(object):
             value = self.get(at=at)
         self.base = (at, value)
         del self.momenta[:remove_momenta_before]
+        for gauge in self.referring_gauges:
+            gauge._limit_gauge_rebased(self, value, at=at)
         self.invalidate()
         return value
 
@@ -471,9 +474,6 @@ class Gauge(object):
         :param at: the time base.  (default: now)
         """
         at = now_or(at)
-        for gauge in self.linked_gauges:
-            if gauge.base[TIME] < at:
-                gauge.forget_past(at=at)
         x = self.momenta.bisect_left((-inf, -inf, at))
         value = self._rebase(value, at=at, remove_momenta_before=x)
         return value

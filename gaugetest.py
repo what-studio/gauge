@@ -702,18 +702,18 @@ def test_hypergauge_with_different_base_time():
     assert g.get(110) == 10
 
 
-def test_linked_gauges():
+def test_referring_gauges():
     max_g = Gauge(10, 100, at=0)
     g = Gauge(0, max_g, at=0)
-    assert g in max_g.linked_gauges
+    assert g in max_g.referring_gauges
     g.set_max(10, at=0)
-    assert g not in max_g.linked_gauges
+    assert g not in max_g.referring_gauges
     # clear dead links.
     g.set_max(max_g, at=0)
-    assert len(max_g.linked_gauges) == 1
+    assert len(max_g.referring_gauges) == 1
     del g
     gc.collect()
-    assert len(max_g.linked_gauges) == 0
+    assert len(max_g.referring_gauges) == 0
 
 
 def test_over_max_on_hypergauge():
@@ -795,29 +795,20 @@ def test_decr_max():
     g = Gauge(0, Gauge(10, 100, at=10), at=0)
     g.add_momentum(+2)
     g.add_momentum(-1)
-    assert g.base[TIME] == 0
+    # assert g.base[TIME] == 0
     assert g.get(10) == 10
     g.max_gauge.decr(5, at=10)
-    assert g.base[TIME] == 10
+    # assert g.base[TIME] == 0
     assert g.get(10) == 5
     assert g.get(20) == 5
     # decr max earlier than the gauge's base time.
     g = Gauge(0, Gauge(10, 100, at=10), at=5)
     g.add_momentum(+1)
-    assert g.base[TIME] == 5
-    assert g.get(0) == 0
-    assert g.get(10) == 5
-    assert g.get(20) == 10
+    assert g.determination == [(5, 0), (15, 10)]
     g.max_gauge.decr(5, at=0)
-    assert g.base[TIME] == 5
-    assert g.get(0) == 0
-    assert g.get(10) == 5
+    assert g.determination == [(5, 0), (10, 5)]
     g.max_gauge.incr(10, at=10)
-    assert g.base[TIME] == 10
-    assert g.get(0) == 5
-    assert g.get(10) == 5
-    assert g.get(20) == 15
-    assert g.get(30) == 15
+    assert g.determination == [(10, 5), (20, 15)]
 
 
 def test_hypergauge_past_bugs(zigzag, bidir):
@@ -1023,3 +1014,8 @@ def test_clamped_by_max_gauge():
     assert g.get(0) == 20
     g.max_gauge.set(10, at=0)
     assert g.get(0) == 20
+    # time-skewed
+    g = Gauge(10, Gauge(20, 20, at=0), at=0)
+    g.max_gauge.set(5, at=10)
+    assert g.base[TIME] == 10
+    assert g.base[VALUE] == 5
