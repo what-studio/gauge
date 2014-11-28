@@ -11,13 +11,12 @@
 from __future__ import absolute_import
 from bisect import bisect_left
 from collections import namedtuple
-import operator
 import weakref
 
 from six.moves import map, zip
 from sortedcontainers import SortedList, SortedListWithKey
 
-from .common import ADD, REMOVE, TIME, VALUE, MAX, MIN, inf, now_or
+from .common import ADD, REMOVE, TIME, VALUE, inf, now_or
 from .deterministic import Determination, Segment
 
 
@@ -116,17 +115,6 @@ class Gauge(object):
     #: The alias of :meth:`get_min`.
     min = get_min
 
-    def _set_limit(self, limit_type, limit_value=None, limit_gauge=None):
-        name = {MAX: 'max', MIN: 'min'}[limit_type]
-        value_attr, gauge_attr = name + '_value', name + '_gauge'
-        if limit_gauge is None:
-            setattr(self, value_attr, limit_value)
-            setattr(self, gauge_attr, None)
-        else:
-            setattr(self, value_attr, None)
-            setattr(self, gauge_attr, limit_gauge)
-            limit_gauge.referring_gauges.add(self)
-
     def _set_limits(self, max_=None, min_=None, at=None, _incomplete=False):
         at = now_or(at)
         forget_until = at
@@ -134,9 +122,9 @@ class Gauge(object):
         if not _incomplete:
             value = self.get(at)
             inside_since = self.determination.inside_since
-        items = [(MAX, min, max_, self.max_gauge),
-                 (MIN, max, min_, self.min_gauge)]
-        for limit_type, clamp, limit, prev_limit_gauge in items:
+        items = [('max', max_, self.max_gauge, min),
+                 ('min', min_, self.min_gauge, max)]
+        for name, limit, prev_limit_gauge, clamp in items:
             if limit is None:
                 continue
             if prev_limit_gauge is not None:
@@ -147,7 +135,15 @@ class Gauge(object):
                 forget_until = min(forget_until, limit_gauge.base[TIME])
             else:
                 limit_gauge, limit_value = None, limit
-            self._set_limit(limit_type, limit_value, limit_gauge)
+            # set limit attrs
+            value_attr, gauge_attr = name + '_value', name + '_gauge'
+            if limit_gauge is None:
+                setattr(self, value_attr, limit_value)
+                setattr(self, gauge_attr, None)
+            else:
+                setattr(self, value_attr, None)
+                setattr(self, gauge_attr, limit_gauge)
+                limit_gauge.referring_gauges.add(self)
             if _incomplete or inside_since is None:
                 continue
             elif inside_since <= at:
@@ -419,24 +415,20 @@ class Gauge(object):
     def _limit_gauge_rebased(self, limit_gauge, limit_value, at=None):
         """Be clamped by changed limit gauge."""
         at = max(now_or(at), self.base[TIME])
+        value = self.get(at)
         if self.determination.inside_since is None:
             pass
         elif at != self.base[TIME] and at < self.determination.inside_since:
             pass
         else:
             if limit_gauge is self.max_gauge:
-                cmp_ = operator.gt
+                clamp = min
             elif limit_gauge is self.min_gauge:
-                cmp_ = operator.lt
+                clamp = max
             else:
                 raise ValueError('The limit is neither max nor min')
-            value = self.get(at)
-            if limit_value is None:
-                limit_value = limit_gauge.get(at)
-            if cmp_(value, limit_value):
-                self.set(limit_value, at=at)
-                return
-        self.forget_past(at=at)
+            value = clamp(value, limit_value)
+        self.forget_past(value, at=at)
 
     def _rebase(self, value=None, at=None, remove_momenta_before=None):
         """Sets the base and removes momenta between indexes of ``start`` and
@@ -453,6 +445,7 @@ class Gauge(object):
             value = self.get(at=at)
         self.base = (at, value)
         del self.momenta[:remove_momenta_before]
+        # TODO: change position
         for gauge in self.referring_gauges:
             gauge._limit_gauge_rebased(self, value, at=at)
         self.invalidate()

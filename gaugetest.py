@@ -1019,3 +1019,16 @@ def test_clamped_by_max_gauge():
     g.max_gauge.set(5, at=10)
     assert g.base[TIME] == 10
     assert g.base[VALUE] == 5
+
+
+def test_set_limits():
+    g = Gauge(0, 100, at=0)
+    g.add_momentum(+1)
+    assert g.determination == [(0, 0), (100, 100)]
+    g.set_limits(Gauge(100, 100, at=0), Gauge(0, 100, at=0), at=0)
+    g.max_gauge.add_momentum(-1, until=40)
+    g.min_gauge.add_momentum(+1, until=40)
+    assert g.determination == [(0, 0), (60, 60)]
+    g.clear_momenta(at=30)
+    g.add_momentum(-1)
+    assert g.determination == [(30, 30), (40, 40)]
