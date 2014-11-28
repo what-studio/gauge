@@ -11,6 +11,7 @@
 from __future__ import absolute_import
 from bisect import bisect_left
 from collections import namedtuple
+import operator
 try:
     from weakref import WeakSet
 except ImportError:
@@ -245,24 +246,25 @@ class Gauge(object):
         value = prev_value + delta
         if outside == ONCE:
             outside = OK if self.is_inside(at) else ERROR
-        if outside == OK:
-            pass
-        elif delta > 0:
-            max_ = self.get_max(at)
-            if value > max_:
+        if outside != OK:
+            items = [(
+                self.get_max, max, operator.gt,
+                'The value to set is bigger than the maximum ({0} > {1})'
+            ), (
+                self.get_min, min, operator.lt,
+                'The value to set is smaller than the minimum ({0} < {1})'
+            )]
+            for get_limit, clamp, cmp_, error_form in items:
+                if not cmp_(delta, 0):
+                    continue
+                limit = get_limit(at)
+                if not cmp_(value, limit):
+                    continue
                 if outside == ERROR:
-                    raise ValueError('The value to set is bigger than the '
-                                     'maximum ({0} > {1})'.format(value, max_))
+                    raise ValueError(error_form.format(value, limit))
                 elif outside == CLAMP:
-                    value = max(prev_value, max_)
-        elif delta < 0:
-            min_ = self.get_min(at)
-            if value < min_:
-                if outside == ERROR:
-                    raise ValueError('The value to set is smaller than the '
-                                     'minimum ({0} > {1})'.format(value, min_))
-                elif outside == CLAMP:
-                    value = min(prev_value, min_)
+                    value = clamp(prev_value, limit)
+                    break
         return self.forget_past(value, at=at)
 
     def decr(self, delta, outside=ERROR, at=None):
@@ -494,8 +496,8 @@ class Gauge(object):
                 self.max_value, self.max_gauge, self.min_value, self.min_gauge)
 
     def __setstate__(self, state):
-        base, momenta, max_value, max_gauge, min_value, min_gauge = state
         self.__preinit__()
+        base, momenta, max_value, max_gauge, min_value, min_gauge = state
         self.base = base
         self.max_value, self.max_gauge = max_value, max_gauge
         self.min_value, self.min_gauge = min_value, min_gauge
