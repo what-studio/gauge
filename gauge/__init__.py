@@ -11,7 +11,11 @@
 from __future__ import absolute_import
 from bisect import bisect_left
 from collections import namedtuple
-import weakref
+import sys
+if sys.version_info < (2, 7):
+    from weakrefset import WeakSet
+else:
+    from weakref import WeakSet
 
 from six.moves import map, zip
 from sortedcontainers import SortedList, SortedListWithKey
@@ -58,7 +62,7 @@ class Gauge(object):
 
     def __preinit__(self):
         """Called by :meth:`__init__` and :meth:`__setstate__`."""
-        self.referring_gauges = weakref.WeakSet()
+        self.referring_gauges = WeakSet()
         self.momenta = SortedListWithKey(key=lambda m: m[2])  # sort by until
         self._events = SortedList()
 

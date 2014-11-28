@@ -5,6 +5,7 @@ from __future__ import with_statement
 import re
 from setuptools import setup
 from setuptools.command.test import test
+import sys
 
 
 # detect the current version
@@ -17,6 +18,11 @@ assert version
 def run_tests(self):
     raise SystemExit(__import__('pytest').main(['-v']))
 test.run_tests = run_tests
+
+
+install_requires = ['six>=1.8.0', 'sortedcontainers>=0.8.2']
+if sys.version_info < (2, 7):
+    install_requires.append('weakrefset>=1.0.0')
 
 
 setup(
@@ -46,7 +52,7 @@ setup(
                  'Programming Language :: Python :: Implementation :: CPython',
                  'Programming Language :: Python :: Implementation :: PyPy',
                  'Topic :: Games/Entertainment'],
-    install_requires=['six', 'sortedcontainers>=0.8.2'],
+    install_requires=install_requires,
     tests_require=['pytest'],
     test_suite='...',
 )
