@@ -163,7 +163,7 @@ def test_no_momentum():
     assert g.get() == 1
 
 
-def test_over():
+def test_ok_outside():
     g = Gauge(1, 10)
     with pytest.raises(ValueError):
         g.set(11)
@@ -177,7 +177,15 @@ def test_over():
     assert g.get() == 11
 
 
-def test_clamp():
+def test_once_outside():
+    g = Gauge(1, 10)
+    assert g.incr(5, outside=ONCE) == 6
+    assert g.incr(5, outside=ONCE) == 11
+    with pytest.raises(ValueError):
+        g.incr(1, outside=ONCE)
+
+
+def test_clamp_outside():
     g = Gauge(1, 10)
     g.set(11, outside=CLAMP)
     assert g.get() == 10
@@ -200,14 +208,6 @@ def test_clamp():
     assert g.get() == 97
     g.set(96, outside=CLAMP)
     assert g.get() == 96
-
-
-def test_once():
-    g = Gauge(1, 10)
-    assert g.incr(5, outside=ONCE) == 6
-    assert g.incr(5, outside=ONCE) == 11
-    with pytest.raises(ValueError):
-        g.incr(1, outside=ONCE)
 
 
 def test_set_min_max():
@@ -1049,3 +1049,10 @@ def test_is_inside():
     g.add_momentum(-1)
     assert not g.is_inside(0)
     assert g.is_inside(20)
+
+
+def test_clamp():
+    g = Gauge(20, max=10, min=0, at=0)
+    assert g.clamp(at=0) == 10
+    g = Gauge(-10, max=10, min=0, at=0)
+    assert g.clamp(at=0) == 0

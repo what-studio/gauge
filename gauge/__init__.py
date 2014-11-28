@@ -155,7 +155,7 @@ class Gauge(object):
                 value = clamp(value, limit_value)
         if _incomplete:
             return
-        self.forget_past(value, at=forget_until)
+        return self.forget_past(value, at=forget_until)
 
     def set_max(self, max, at=None):
         """Changes the maximum.
@@ -163,7 +163,7 @@ class Gauge(object):
         :param max: a number or gauge to set as the maximum.
         :param at: the time to change.  (default: now)
         """
-        self._set_limits(max_=max, at=at)
+        return self._set_limits(max_=max, at=at)
 
     def set_min(self, min, at=None):
         """Changes the minimum.
@@ -171,7 +171,7 @@ class Gauge(object):
         :param min: a number or gauge to set as the minimum.
         :param at: the time to change.  (default: now)
         """
-        self._set_limits(min_=min, at=at)
+        return self._set_limits(min_=min, at=at)
 
     def set_limits(self, max=None, min=None, at=None):
         """Changes the both of maximum and minimum at once.
@@ -182,22 +182,11 @@ class Gauge(object):
         """
         return self._set_limits(max, min, at=at)
 
-    def clamp(self, value, at=None):
-        """Clamps by the limits at the given time.
-
-        :param value: the value to clamp.
-        :param at: the time to get limits.  (default: now)
-        """
-        at = now_or(at)
-        max_ = self.get_max(at)
-        if value > max_:
-            return max_
-        min_ = self.get_min(at)
-        if value < min_:
-            return min_
-        return value
-
     def _predict(self, at=None):
+        """Predicts the current value and velocity.
+
+        :param at: the time to observe.  (default: now)
+        """
         at = now_or(at)
         determination = self.determination
         if len(determination) == 1:
@@ -217,7 +206,7 @@ class Gauge(object):
         if determination.inside_since is None:
             pass
         elif determination.inside_since <= time1:
-            value = self.clamp(value, at=at)
+            value = self._clamp(value, at=at)
         return (value, velocity)
 
     def get(self, at=None):
@@ -304,6 +293,22 @@ class Gauge(object):
         delta = value - self.get(at=at)
         return self.incr(delta, outside=outside, at=at)
 
+    def _clamp(self, value, at=None):
+        at = now_or(at)
+        max_ = self.get_max(at)
+        if value > max_:
+            return max_
+        min_ = self.get_min(at)
+        if value < min_:
+            return min_
+        return value
+
+    def clamp(self, at=None):
+        """Clamps the current value."""
+        at = now_or(at)
+        value = self._clamp(self.get(at), at=at)
+        return self.set(value, outside=OK, at=at)
+
     def when(self, value, after=0):
         """When the gauge reaches to the goal value.
 
@@ -336,6 +341,17 @@ class Gauge(object):
                     continue
                 ratio = (value - value1) / float(value2 - value1)
                 yield (time1 + (time2 - time1) * ratio)
+
+    def is_inside(self, at=None):
+        """Whether the gauge is between the limits at the given time.
+
+        :param at: the time to check.  (default: now)
+        """
+        inside_since = self.determination.inside_since
+        if inside_since is None:
+            return False
+        at = now_or(at)
+        return inside_since <= at
 
     def _make_momentum(self, velocity_or_momentum, since=None, until=None):
         """Makes a :class:`Momentum` object by the given arguments.
@@ -473,21 +489,9 @@ class Gauge(object):
         value = self._rebase(value, at=at, remove_momenta_before=x)
         return value
 
-    def is_inside(self, at=None):
-        """Whether the gauge is between the limits at the given time.
-
-        :param at: the time to check.  (default: now)
-        """
-        inside_since = self.determination.inside_since
-        if inside_since is None:
-            return False
-        at = now_or(at)
-        return inside_since <= at
-
     def __getstate__(self):
         return (self.base, list(map(tuple, self.momenta)),
-                self.max_value, self.max_gauge,
-                self.min_value, self.min_gauge)
+                self.max_value, self.max_gauge, self.min_value, self.min_gauge)
 
     def __setstate__(self, state):
         base, momenta, max_value, max_gauge, min_value, min_gauge = state
