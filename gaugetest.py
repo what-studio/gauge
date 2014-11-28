@@ -1032,3 +1032,12 @@ def test_set_limits():
     g.clear_momenta(at=30)
     g.add_momentum(-1)
     assert g.determination == [(30, 30), (40, 40)]
+
+
+def test_is_inside():
+    g = Gauge(20, 10, at=0)
+    assert not g.is_inside(0)
+    assert not g.is_inside(20)
+    g.add_momentum(-1)
+    assert not g.is_inside(0)
+    assert g.is_inside(20)

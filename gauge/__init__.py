@@ -419,10 +419,7 @@ class Gauge(object):
         """Be clamped by changed limit gauge."""
         at = max(now_or(at), self.base[TIME])
         value = self.get(at)
-        inside_since = self.determination.inside_since
-        if inside_since is None or at != self.base[TIME] and at < inside_since:
-            pass
-        else:
+        if self.is_inside(at):
             if limit_gauge is self.max_gauge:
                 clamp = min
             elif limit_gauge is self.min_gauge:
@@ -471,6 +468,17 @@ class Gauge(object):
         x = self.momenta.bisect_left((-inf, -inf, at))
         value = self._rebase(value, at=at, remove_momenta_before=x)
         return value
+
+    def is_inside(self, at=None):
+        """Whether the gauge is between the limits at the given time.
+
+        :param at: the time to check.  (default: now)
+        """
+        inside_since = self.determination.inside_since
+        if inside_since is None:
+            return False
+        at = now_or(at)
+        return inside_since <= at
 
     def __getstate__(self):
         return (self.base, list(map(tuple, self.momenta)),
