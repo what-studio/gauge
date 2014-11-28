@@ -416,9 +416,8 @@ class Gauge(object):
         """Be clamped by changed limit gauge."""
         at = max(now_or(at), self.base[TIME])
         value = self.get(at)
-        if self.determination.inside_since is None:
-            pass
-        elif at != self.base[TIME] and at < self.determination.inside_since:
+        inside_since = self.determination.inside_since
+        if inside_since is None or at != self.base[TIME] and at < inside_since:
             pass
         else:
             if limit_gauge is self.max_gauge:
@@ -443,11 +442,10 @@ class Gauge(object):
         at = now_or(at)
         if value is None:
             value = self.get(at=at)
-        self.base = (at, value)
-        del self.momenta[:remove_momenta_before]
-        # TODO: change position
         for gauge in self.referring_gauges:
             gauge._limit_gauge_rebased(self, value, at=at)
+        self.base = (at, value)
+        del self.momenta[:remove_momenta_before]
         self.invalidate()
         return value
 
