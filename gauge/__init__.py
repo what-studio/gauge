@@ -24,7 +24,7 @@ from .deterministic import Determination, Segment
 
 
 __all__ = ['Gauge', 'Momentum', 'inf', 'now_or']
-__version__ = '0.3.0'
+__version__ = '0.3.1-dev'
 
 
 class Gauge(object):
