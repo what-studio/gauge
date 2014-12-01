@@ -752,6 +752,7 @@ def test_pickle_hypergauge():
     assert list(g2.determination) == [
         (0, 12), (1, 12), (2, 13), (3, 12), (5, 10), (6, 10), (8, 8)]
     assert list(g2.max_gauge.determination) == [(0, 15), (5, 10)]
+    assert g2 in g2.max_gauge.referring_gauges
 
 
 def test_thin_momenta():

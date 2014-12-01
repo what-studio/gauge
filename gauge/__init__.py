@@ -501,6 +501,10 @@ class Gauge(object):
         self.base = base
         self.max_value, self.max_gauge = max_value, max_gauge
         self.min_value, self.min_gauge = min_value, min_gauge
+        if max_gauge is not None:
+            max_gauge.referring_gauges.add(self)
+        if min_gauge is not None:
+            min_gauge.referring_gauges.add(self)
         for momentum in momenta:
             self.add_momentum(*momentum)
 
