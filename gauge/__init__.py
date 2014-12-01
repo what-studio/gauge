@@ -60,7 +60,7 @@ class Gauge(object):
         self.__preinit__()
         at = now_or(at)
         self.base = (at, value)
-        self._set_limits(max, min, at=at, _incomplete=True)
+        self._set_range(max, min, at=at, _incomplete=True)
 
     def __preinit__(self):
         """Called by :meth:`__init__` and :meth:`__setstate__`."""
@@ -121,13 +121,13 @@ class Gauge(object):
     #: The alias of :meth:`get_min`.
     min = get_min
 
-    def _set_limits(self, max_=None, min_=None, at=None, _incomplete=False):
+    def _set_range(self, max_=None, min_=None, at=None, _incomplete=False):
         at = now_or(at)
         forget_until = at
         # _incomplete=True when __init__() calls it.
         if not _incomplete:
             value = self.get(at)
-            inside_since = self.determination.inside_since
+            in_range_since = self.determination.in_range_since
         items = [('max', max_, self.max_gauge, min),
                  ('min', min_, self.min_gauge, max)]
         for name, limit, prev_limit_gauge, clamp in items:
@@ -150,9 +150,9 @@ class Gauge(object):
                 setattr(self, value_attr, None)
                 setattr(self, gauge_attr, limit_gauge)
                 limit_gauge.referring_gauges.add(self)
-            if _incomplete or inside_since is None:
+            if _incomplete or in_range_since is None:
                 continue
-            elif inside_since <= at:
+            elif in_range_since <= at:
                 value = clamp(value, limit_value)
         if _incomplete:
             return
@@ -164,7 +164,7 @@ class Gauge(object):
         :param max: a number or gauge to set as the maximum.
         :param at: the time to change.  (default: now)
         """
-        return self._set_limits(max_=max, at=at)
+        return self._set_range(max_=max, at=at)
 
     def set_min(self, min, at=None):
         """Changes the minimum.
@@ -172,16 +172,16 @@ class Gauge(object):
         :param min: a number or gauge to set as the minimum.
         :param at: the time to change.  (default: now)
         """
-        return self._set_limits(min_=min, at=at)
+        return self._set_range(min_=min, at=at)
 
-    def set_limits(self, max=None, min=None, at=None):
+    def set_range(self, max=None, min=None, at=None):
         """Changes the both of maximum and minimum at once.
 
         :param max: a number or gauge to set as the maximum.  (optional)
         :param min: a number or gauge to set as the minimum.  (optional)
         :param at: the time to change.  (default: now)
         """
-        return self._set_limits(max, min, at=at)
+        return self._set_range(max, min, at=at)
 
     def _predict(self, at=None):
         """Predicts the current value and velocity.
@@ -204,9 +204,9 @@ class Gauge(object):
         time1, value1 = determination[x - 1]
         value = Segment._calc_value(at, time1, time2, value1, value2)
         velocity = Segment._calc_velocity(time1, time2, value1, value2)
-        if determination.inside_since is None:
+        if determination.in_range_since is None:
             pass
-        elif determination.inside_since <= time1:
+        elif determination.in_range_since <= time1:
             value = self._clamp(value, at=at)
         return (value, velocity)
 
@@ -230,23 +230,23 @@ class Gauge(object):
         """Predicts the final value."""
         return self.determination[-1][VALUE]
 
-    def incr(self, delta, outside=ERROR, at=None):
+    def incr(self, delta, outbound=ERROR, at=None):
         """Increases the value by the given delta immediately.  The
         determination would be changed.
 
         :param delta: the value to increase.
-        :param outside: the strategy to control modification to out of the
-                        limits.  (default: ERROR)
+        :param outbound: the strategy to control modification to out of the
+                         range.  (default: ERROR)
         :param at: the time to increase.  (default: now)
 
-        :raises ValueError: the value is out of the limits.
+        :raises ValueError: the value is out of the range.
         """
         at = now_or(at)
         prev_value = self.get(at=at)
         value = prev_value + delta
-        if outside == ONCE:
-            outside = OK if self.is_inside(at) else ERROR
-        if outside != OK:
+        if outbound == ONCE:
+            outbound = OK if self.in_range(at) else ERROR
+        if outbound != OK:
             items = [(
                 self.get_max, max, operator.gt,
                 'The value to set is bigger than the maximum ({0} > {1})'
@@ -260,40 +260,40 @@ class Gauge(object):
                 limit = get_limit(at)
                 if not cmp_(value, limit):
                     continue
-                if outside == ERROR:
+                if outbound == ERROR:
                     raise ValueError(error_form.format(value, limit))
-                elif outside == CLAMP:
+                elif outbound == CLAMP:
                     value = clamp(prev_value, limit)
                     break
         return self.forget_past(value, at=at)
 
-    def decr(self, delta, outside=ERROR, at=None):
+    def decr(self, delta, outbound=ERROR, at=None):
         """Decreases the value by the given delta immediately.  The
         determination would be changed.
 
         :param delta: the value to decrease.
-        :param outside: the strategy to control modification to out of the
-                        limits.  (default: ERROR)
+        :param outbound: the strategy to control modification to out of the
+                         range.  (default: ERROR)
         :param at: the time to decrease.  (default: now)
 
-        :raises ValueError: the value is out of the limits.
+        :raises ValueError: the value is out of the range.
         """
-        return self.incr(-delta, outside=outside, at=at)
+        return self.incr(-delta, outbound=outbound, at=at)
 
-    def set(self, value, outside=ERROR, at=None):
+    def set(self, value, outbound=ERROR, at=None):
         """Sets the current value immediately.  The determination would be
         changed.
 
         :param value: the value to set.
-        :param outside: the strategy to control modification to out of the
-                        limits.  (default: ERROR)
+        :param outbound: the strategy to control modification to out of the
+                         range.  (default: ERROR)
         :param at: the time to set.  (default: now)
 
-        :raises ValueError: the value is out of the limits.
+        :raises ValueError: the value is out of the range.
         """
         at = now_or(at)
         delta = value - self.get(at=at)
-        return self.incr(delta, outside=outside, at=at)
+        return self.incr(delta, outbound=outbound, at=at)
 
     def _clamp(self, value, at=None):
         at = now_or(at)
@@ -309,7 +309,7 @@ class Gauge(object):
         """Clamps the current value."""
         at = now_or(at)
         value = self._clamp(self.get(at), at=at)
-        return self.set(value, outside=OK, at=at)
+        return self.set(value, outbound=OK, at=at)
 
     def when(self, value, after=0):
         """When the gauge reaches to the goal value.
@@ -344,16 +344,16 @@ class Gauge(object):
                 ratio = (value - value1) / float(value2 - value1)
                 yield (time1 + (time2 - time1) * ratio)
 
-    def is_inside(self, at=None):
-        """Whether the gauge is between the limits at the given time.
+    def in_range(self, at=None):
+        """Whether the gauge is between the range at the given time.
 
         :param at: the time to check.  (default: now)
         """
-        inside_since = self.determination.inside_since
-        if inside_since is None:
+        in_range_since = self.determination.in_range_since
+        if in_range_since is None:
             return False
         at = now_or(at)
-        return inside_since <= at
+        return in_range_since <= at
 
     def _make_momentum(self, velocity_or_momentum, since=None, until=None):
         """Makes a :class:`Momentum` object by the given arguments.
@@ -441,7 +441,7 @@ class Gauge(object):
         """Be clamped by changed limit gauge."""
         at = max(now_or(at), self.base[TIME])
         value = self.get(at)
-        if self.is_inside(at):
+        if self.in_range(at):
             if limit_gauge is self.max_gauge:
                 clamp = min
             elif limit_gauge is self.min_gauge:

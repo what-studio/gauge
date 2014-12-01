@@ -23,8 +23,8 @@ class Determination(list):
     :param determining: a :meth:`Gauge.determine` iterator.
     """
 
-    #: The time when the gauge starts to be inside of the limits.
-    inside_since = None
+    #: The time when the gauge starts to be in_range of the limits.
+    in_range_since = None
 
     @staticmethod
     def value_lines(gauge, value):
@@ -41,11 +41,11 @@ class Determination(list):
             yield Segment(time1, time2, value1, value2)
         yield Horizon(last[TIME], +inf, last[VALUE])
 
-    def determine(self, time, value, inside=True):
+    def determine(self, time, value, in_range=True):
         if self and self[-1][TIME] == time:
             return
-        if inside and self.inside_since is None:
-            self.inside_since = time
+        if in_range and self.in_range_since is None:
+            self.in_range_since = time
         self.append((time, value))
 
     def __init__(self, gauge):
@@ -149,7 +149,7 @@ class Determination(list):
                 break
             # determine the final node in the current itreration.
             value += velocity * (until - since)
-            self.determine(until, value, inside=(bound is None or overlapped))
+            self.determine(until, value, in_range=bound is None or overlapped)
             # prepare the next iteration.
             if method == ADD:
                 velocities.append(momentum.velocity)

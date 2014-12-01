@@ -72,7 +72,7 @@ def test_deprecations():
     pytest.skip()
 
 
-def test_in_range():
+def test_momenta_in_range():
     g = Gauge(12, 100, at=0)
     g.add_momentum(+1, since=1, until=6)
     g.add_momentum(-1, since=3, until=8)
@@ -163,7 +163,7 @@ def test_no_momentum():
     assert g.get() == 1
 
 
-def test_ok_outside():
+def test_ok_outbound():
     g = Gauge(1, 10)
     with pytest.raises(ValueError):
         g.set(11)
@@ -173,40 +173,40 @@ def test_ok_outside():
         g.decr(100)
     g.set(10)
     assert g.get() == 10
-    g.set(11, outside=OK)
+    g.set(11, outbound=OK)
     assert g.get() == 11
 
 
-def test_once_outside():
+def test_once_outbound():
     g = Gauge(1, 10)
-    assert g.incr(5, outside=ONCE) == 6
-    assert g.incr(5, outside=ONCE) == 11
+    assert g.incr(5, outbound=ONCE) == 6
+    assert g.incr(5, outbound=ONCE) == 11
     with pytest.raises(ValueError):
-        g.incr(1, outside=ONCE)
+        g.incr(1, outbound=ONCE)
 
 
-def test_clamp_outside():
+def test_clamp_outbound():
     g = Gauge(1, 10)
-    g.set(11, outside=CLAMP)
+    g.set(11, outbound=CLAMP)
     assert g.get() == 10
-    g.incr(100, outside=CLAMP)
+    g.incr(100, outbound=CLAMP)
     assert g.get() == 10
-    g.decr(100, outside=CLAMP)
+    g.decr(100, outbound=CLAMP)
     assert g.get() == 0
-    g.incr(3, outside=CLAMP)
+    g.incr(3, outbound=CLAMP)
     assert g.get() == 3
-    g.decr(1, outside=CLAMP)
+    g.decr(1, outbound=CLAMP)
     assert g.get() == 2
-    g.set(100, outside=OK)
-    g.incr(3, outside=CLAMP)
+    g.set(100, outbound=OK)
+    g.incr(3, outbound=CLAMP)
     assert g.get() == 100
-    g.decr(3, outside=CLAMP)
+    g.decr(3, outbound=CLAMP)
     assert g.get() == 97
-    g.set(98, outside=CLAMP)
+    g.set(98, outbound=CLAMP)
     assert g.get() == 97
-    g.set(97, outside=CLAMP)
+    g.set(97, outbound=CLAMP)
     assert g.get() == 97
-    g.set(96, outside=CLAMP)
+    g.set(96, outbound=CLAMP)
     assert g.get() == 96
 
 
@@ -216,7 +216,7 @@ def test_set_min_max():
     assert g.get_max() == 10
     assert g.get_min() == 0
     assert g.get() == 5
-    g.set_limits(max=100, min=10)
+    g.set_range(max=100, min=10)
     assert g.get_max() == 100
     assert g.get_min() == 10
     assert g.get() == 10
@@ -224,7 +224,7 @@ def test_set_min_max():
     assert g.get() == 10
     g.set_min(5)
     assert g.get() == 10
-    g.set_limits(max=5, min=0)
+    g.set_range(max=5, min=0)
     assert g.get_max() == 5
     assert g.get_min() == 0
     assert g.get() == 5
@@ -266,7 +266,7 @@ def test_clear_momenta():
     assert list(g.determination) == [(5, 5)]
     # clear momenta when the value is out of the range
     g.add_momentum(+1)
-    g.set(15, outside=OK, at=10)
+    g.set(15, outbound=OK, at=10)
     g.clear_momenta(at=10)
     assert g.get(10) == 15
     assert list(g.determination) == [(10, 15)]
@@ -370,7 +370,7 @@ def test_case3():
     assert g.get(0) == 0
     g.add_momentum(+1, since=0)
     assert g.get(10) == 10
-    g.incr(3, outside=OK, at=11)
+    g.incr(3, outbound=OK, at=11)
     assert g.get(11) == 13
     g.add_momentum(-1, since=13)
     assert g.get(13) == 13
@@ -618,7 +618,7 @@ def test_hypergauge():
         (0, 12), (1, 12), (2, 13), (3, 12), (4, 11), (6, 11), (8, 9)]
     # case 3
     g.set_max(10, at=0)
-    g.set(12, outside=OK, at=0)
+    g.set(12, outbound=OK, at=0)
     assert list(g.determination) == [
         (0, 12), (1, 12), (3, 12), (5, 10), (6, 10), (8, 8)]
     g.set_max(Gauge(10, 100, at=0), at=0)
@@ -729,7 +729,7 @@ def test_over_max_on_hypergauge():
     g.max_gauge.add_momentum(+1)
     with pytest.raises(ValueError):
         g.set(20, at=0)
-    g.set(20, at=0, outside=OK)
+    g.set(20, at=0, outbound=OK)
     assert g.get(at=0) == 20
     g.set(20, at=10)
     assert g.get(at=10) == 20
@@ -758,7 +758,7 @@ def test_thin_momenta():
     g = Gauge(0, 100, at=0)
     for x in range(1000):
         g.add_momentum(+1000000000, since=x, until=x + 1e-10)
-    assert_all_inside(g)
+    assert_all_in_range(g)
     assert g.get(0) == 0
     assert g.get(1001) == 100
     for x, y in zip(range(9999), range(1, 10000)):
@@ -784,7 +784,7 @@ def test_decr_max():
     assert g.base[TIME] == 0
     assert g.get(10) == 10
     g.set_max(5, at=10)
-    g.set(10, outside=OK, at=10)
+    g.set(10, outbound=OK, at=10)
     assert g.base[TIME] == 10
     assert g.get(10) == 10
     assert g.get(15) == 5
@@ -895,15 +895,15 @@ def test_hypergauge_past_bugs(zigzag, bidir):
     assert round(g5.get(4), 1) == 5.0  # not 11.8
 
 
-def assert_all_inside(g, message=None):
-    outside = True
+def assert_all_in_range(g, message=None):
+    outbound = True
     for t, v in g.determination:
         for v in [v, g.get(t)]:
-            inside = g.get_min(t) <= v <= g.get_max(t)
-            if inside:
-                outside = False
+            in_range = g.get_min(t) <= v <= g.get_max(t)
+            if in_range:
+                outbound = False
                 continue
-            elif outside:
+            elif outbound:
                 continue
             # from gaugeplot import show_gauge
             # show_gauge(g)
@@ -949,33 +949,34 @@ def test_randomly():
     for y in range(times):
         seed = random.randrange(maxint)
         g = random_gauge1(Random(seed))
-        assert_all_inside(g, 'random_gauge1(R({0}))'.format(seed))
+        assert_all_in_range(g, 'random_gauge1(R({0}))'.format(seed))
     for y in range(times):
         seed = random.randrange(maxint)
         g = random_gauge1(Random(seed), far=1000)
-        assert_all_inside(g, 'random_gauge1(R({0}), far=1000)'.format(seed))
+        assert_all_in_range(g, 'random_gauge1(R({0}), far=1000)'.format(seed))
     for y in range(times):
         seed = random.randrange(maxint)
         g = random_gauge1(Random(seed), near=1e-10)
-        assert_all_inside(g, 'random_gauge1(R({0}), near=1e-10)'.format(seed))
+        assert_all_in_range(g, 'random_gauge1(R({0}), near=1e-10)'
+                               ''.format(seed))
     for y in range(times):
         seed = random.randrange(maxint)
         g = random_gauge2(Random(seed), far=1e4)
-        assert_all_inside(g, 'random_gauge2(R({0}), far=1e4)'.format(seed))
+        assert_all_in_range(g, 'random_gauge2(R({0}), far=1e4)'.format(seed))
 
 
 def test_repaired_random_gauges():
     # from test_randomly()
-    assert_all_inside(random_gauge1(Random(1098651790867685487)))
-    assert_all_inside(random_gauge1(Random(957826144573409526)))
-    assert_all_inside(random_gauge1(Random(7276062123994486117), near=1e-10))
-    assert_all_inside(random_gauge1(Random(6867673013126676888), near=1e-10))
-    assert_all_inside(random_gauge1(Random(8038810374719555655), near=1e-10))
-    assert_all_inside(random_gauge1(Random(5925612648020704501), near=1e-10))
-    assert_all_inside(random_gauge1(Random(2881266403492433952), far=1000))
-    assert_all_inside(random_gauge1(Random(6468976982055982554), far=1000))
-    assert_all_inside(random_gauge2(Random(3373542927760325757), far=1e6))
-    assert_all_inside(random_gauge2(Random(7588425536572564538), far=1e4))
+    assert_all_in_range(random_gauge1(Random(1098651790867685487)))
+    assert_all_in_range(random_gauge1(Random(957826144573409526)))
+    assert_all_in_range(random_gauge1(Random(7276062123994486117), near=1e-10))
+    assert_all_in_range(random_gauge1(Random(6867673013126676888), near=1e-10))
+    assert_all_in_range(random_gauge1(Random(8038810374719555655), near=1e-10))
+    assert_all_in_range(random_gauge1(Random(5925612648020704501), near=1e-10))
+    assert_all_in_range(random_gauge1(Random(2881266403492433952), far=1000))
+    assert_all_in_range(random_gauge1(Random(6468976982055982554), far=1000))
+    assert_all_in_range(random_gauge2(Random(3373542927760325757), far=1e6))
+    assert_all_in_range(random_gauge2(Random(7588425536572564538), far=1e4))
 
 
 def test_clamp_on_get():
@@ -1009,16 +1010,16 @@ def test_goal():
 
 
 def test_clamped_by_max_gauge():
-    # inside, decr max -> clamp
+    # in_range, decr max -> clamp
     g = Gauge(10, Gauge(20, 20, at=0), at=0)
     assert g.get(0) == 10
     g.max_gauge.set(5, at=0)
     assert g.get(0) == 5
-    # inside, incr max -> not clamp
+    # in_range, incr max -> not clamp
     g.max_gauge.set(15, at=0)
     assert g.get(0) == 5
-    # outside, decr max -> not clamp
-    g.set(20, outside=OK, at=0)
+    # outbound, decr max -> not clamp
+    g.set(20, outbound=OK, at=0)
     assert g.get(0) == 20
     g.max_gauge.set(10, at=0)
     assert g.get(0) == 20
@@ -1029,11 +1030,11 @@ def test_clamped_by_max_gauge():
     assert g.base[VALUE] == 5
 
 
-def test_set_limits():
+def test_set_range():
     g = Gauge(0, 100, at=0)
     g.add_momentum(+1)
     assert g.determination == [(0, 0), (100, 100)]
-    g.set_limits(Gauge(100, 100, at=0), Gauge(0, 100, at=0), at=0)
+    g.set_range(Gauge(100, 100, at=0), Gauge(0, 100, at=0), at=0)
     g.max_gauge.add_momentum(-1, until=40)
     g.min_gauge.add_momentum(+1, until=40)
     assert g.determination == [(0, 0), (60, 60)]
@@ -1042,13 +1043,13 @@ def test_set_limits():
     assert g.determination == [(30, 30), (40, 40)]
 
 
-def test_is_inside():
+def test_in_range():
     g = Gauge(20, 10, at=0)
-    assert not g.is_inside(0)
-    assert not g.is_inside(20)
+    assert not g.in_range(0)
+    assert not g.in_range(20)
     g.add_momentum(-1)
-    assert not g.is_inside(0)
-    assert g.is_inside(20)
+    assert not g.in_range(0)
+    assert g.in_range(20)
 
 
 def test_clamp():
