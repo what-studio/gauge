@@ -41,9 +41,9 @@ def test_static_gauge():
     assert g.get() == 20
     with pytest.raises(ValueError):
         g.incr(100)
-    g.incr(100, outside=CLAMP)
+    g.incr(100, outbound=CLAMP)
     assert g.get() == 100
-    g.incr(10, outside=OK)
+    g.incr(10, outbound=OK)
     assert g.get() == 110
     with pytest.raises(TypeError):
         g.add_momentum(+1)
