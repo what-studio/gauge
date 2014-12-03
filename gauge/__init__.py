@@ -53,9 +53,6 @@ class Gauge(object):
     #: The gauge to indicate minimum value.
     min_gauge = None
 
-    #: A weak set of gauges that refer the gauge as a limit gauge.
-    referring_gauges = None
-
     def __init__(self, value, max, min=0, at=None):
         self.__preinit__()
         at = now_or(at)
@@ -64,9 +61,11 @@ class Gauge(object):
 
     def __preinit__(self):
         """Called by :meth:`__init__` and :meth:`__setstate__`."""
-        self.referring_gauges = WeakSet()
         self.momenta = SortedListWithKey(key=lambda m: m[2])  # sort by until
+        # the momentum events.
         self._events = SortedList()
+        # a weak set of gauges that refer the gauge as a limit gauge.
+        self._limited_gauges = WeakSet()
 
     @property
     def determination(self):
@@ -91,15 +90,14 @@ class Gauge(object):
         You don't need to call this method because all mutating methods such as
         :meth:`incr` or :meth:`add_momentum` calls it.
         """
-        # invalidate linked gauges together.  A linked gauge refers this gauge
-        # as a limit.
-        for gauge in self.referring_gauges:
-            gauge.invalidate()
         # remove the cached determination.
         try:
             del self._determination
         except AttributeError:
             pass
+        # invalidate limited gauges together.
+        for gauge in self._limited_gauges:
+            gauge._limit_gauge_invalidated(self)
 
     def get_max(self, at=None):
         """Predicts the current maximum value."""
@@ -135,7 +133,7 @@ class Gauge(object):
                 continue
             if prev_limit_gauge is not None:
                 # unlink from the previous limit gauge.
-                prev_limit_gauge.referring_gauges.discard(self)
+                prev_limit_gauge._limited_gauges.discard(self)
             if isinstance(limit, Gauge):
                 limit_gauge, limit_value = limit, limit.get(at)
                 forget_until = min(forget_until, limit_gauge.base[TIME])
@@ -149,7 +147,7 @@ class Gauge(object):
             else:
                 setattr(self, value_attr, None)
                 setattr(self, gauge_attr, limit_gauge)
-                limit_gauge.referring_gauges.add(self)
+                limit_gauge._limited_gauges.add(self)
             if _incomplete or in_range_since is None:
                 continue
             elif in_range_since <= at:
@@ -437,20 +435,6 @@ class Gauge(object):
             yield time, method, momentum
         yield (+inf, None, None)
 
-    def _limit_gauge_rebased(self, limit_gauge, limit_value, at=None):
-        """Be clamped by changed limit gauge."""
-        at = max(now_or(at), self.base[TIME])
-        value = self.get(at)
-        if self.in_range(at):
-            if limit_gauge is self.max_gauge:
-                clamp = min
-            elif limit_gauge is self.min_gauge:
-                clamp = max
-            else:
-                raise ValueError('The limit is neither max nor min')
-            value = clamp(value, limit_value)
-        self.forget_past(value, at=at)
-
     def _rebase(self, value=None, at=None, remove_momenta_before=None):
         """Sets the base and removes momenta between indexes of ``start`` and
         ``stop``.
@@ -464,7 +448,7 @@ class Gauge(object):
         at = now_or(at)
         if value is None:
             value = self.get(at=at)
-        for gauge in self.referring_gauges:
+        for gauge in self._limited_gauges:
             gauge._limit_gauge_rebased(self, value, at=at)
         self.base = (at, value)
         del self.momenta[:remove_momenta_before]
@@ -491,6 +475,28 @@ class Gauge(object):
         value = self._rebase(value, at=at, remove_momenta_before=x)
         return value
 
+    def _limit_gauge_invalidated(self, limit_gauge):
+        """The callback function which will be called at a limit gauge is
+        invalidated.
+        """
+        self.invalidate()
+
+    def _limit_gauge_rebased(self, limit_gauge, limit_value, at=None):
+        """The callback function which will be called at a limit gauge is
+        rebased.
+        """
+        at = max(now_or(at), self.base[TIME])
+        value = self.get(at)
+        if self.in_range(at):
+            if limit_gauge is self.max_gauge:
+                clamp = min
+            elif limit_gauge is self.min_gauge:
+                clamp = max
+            else:
+                raise ValueError('The limit is neither max nor min')
+            value = clamp(value, limit_value)
+        self.forget_past(value, at=at)
+
     def __getstate__(self):
         return (self.base, list(map(tuple, self.momenta)),
                 self.max_value, self.max_gauge, self.min_value, self.min_gauge)
@@ -501,10 +507,9 @@ class Gauge(object):
         self.base = base
         self.max_value, self.max_gauge = max_value, max_gauge
         self.min_value, self.min_gauge = min_value, min_gauge
-        if max_gauge is not None:
-            max_gauge.referring_gauges.add(self)
-        if min_gauge is not None:
-            min_gauge.referring_gauges.add(self)
+        for limit_gauge in [max_gauge, min_gauge]:
+            if limit_gauge is not None:
+                limit_gauge._limited_gauges.add(self)
         for momentum in momenta:
             self.add_momentum(*momentum)
 

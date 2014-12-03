@@ -710,18 +710,18 @@ def test_hypergauge_with_different_base_time():
     assert g.get(110) == 10
 
 
-def test_referring_gauges():
+def test_limited_gauges():
     max_g = Gauge(10, 100, at=0)
     g = Gauge(0, max_g, at=0)
-    assert g in max_g.referring_gauges
+    assert g in max_g._limited_gauges
     g.set_max(10, at=0)
-    assert g not in max_g.referring_gauges
+    assert g not in max_g._limited_gauges
     # clear dead links.
     g.set_max(max_g, at=0)
-    assert len(max_g.referring_gauges) == 1
+    assert len(max_g._limited_gauges) == 1
     del g
     gc.collect()
-    assert len(max_g.referring_gauges) == 0
+    assert len(max_g._limited_gauges) == 0
 
 
 def test_over_max_on_hypergauge():
@@ -752,7 +752,7 @@ def test_pickle_hypergauge():
     assert list(g2.determination) == [
         (0, 12), (1, 12), (2, 13), (3, 12), (5, 10), (6, 10), (8, 8)]
     assert list(g2.max_gauge.determination) == [(0, 15), (5, 10)]
-    assert g2 in g2.max_gauge.referring_gauges
+    assert g2 in g2.max_gauge._limited_gauges
 
 
 def test_thin_momenta():
