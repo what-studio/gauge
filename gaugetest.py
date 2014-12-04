@@ -401,19 +401,19 @@ def test_remove_momentum():
     g.add_momentum(+2, since=10)
     g.add_momentum(-3, until=100)
     assert len(g.momenta) == 4
-    g.remove_momentum(m2)
+    assert g.remove_momentum(m2) == m2
     assert len(g.momenta) == 3
     assert m1 in g.momenta
     assert m2 in g.momenta
-    g.remove_momentum(m2)
+    assert g.remove_momentum(m2) == m2
     assert len(g.momenta) == 2
     assert m1 not in g.momenta
     assert m2 not in g.momenta
     with pytest.raises(ValueError):
         g.remove_momentum(+2)
-    g.remove_momentum(+2, since=10)
+    assert g.remove_momentum(+2, since=10) == (+2, 10, +inf)
     assert len(g.momenta) == 1
-    g.remove_momentum(Momentum(-3, until=100))
+    assert g.remove_momentum(Momentum(-3, until=100)) == (-3, -inf, 100)
     assert not g.momenta
 
 

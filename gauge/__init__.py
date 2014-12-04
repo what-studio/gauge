@@ -422,6 +422,7 @@ class Gauge(object):
         except ValueError:
             raise ValueError('{0} not in the gauge'.format(momentum))
         self.invalidate()
+        return momentum
 
     def momentum_events(self):
         """Yields momentum adding and removing events.  An event is a tuple of
