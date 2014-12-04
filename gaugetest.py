@@ -422,7 +422,13 @@ def test_remove_momentum_event_on_remove_momentum():
     g.add_momentum(+1)
     assert g.determination == [(0, 0), (10, 10)]
     g.remove_momentum(+1)
-    assert g.determination == [(0, 0)]
+    g.add_momentum(+1)
+    assert g.determination == [(0, 0), (10, 10)]
+    g.remove_momentum(+1)
+    g.add_momentum(+1)
+    g.add_momentum(+1)
+    assert g.determination == [(0, 0), (5, 10)]
+    g.clear_momenta(at=0)
     g.add_momentum(+1)
     assert g.determination == [(0, 0), (10, 10)]
 

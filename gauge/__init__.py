@@ -421,6 +421,10 @@ class Gauge(object):
             self.momenta.remove(momentum)
         except ValueError:
             raise ValueError('{0} not in the gauge'.format(momentum))
+        since, until = momentum.since, momentum.until
+        self._events.remove((since, ADD, momentum))
+        if until != +inf:
+            self._events.remove((until, REMOVE, momentum))
         self.invalidate()
         return momentum
 
@@ -429,8 +433,9 @@ class Gauge(object):
         ``(time, ADD|REMOVE, momentum)``.
         """
         yield (self.base[TIME], None, None)
+        momentum_ids = set(id(m) for m in self.momenta)
         for time, method, momentum in list(self._events):
-            if momentum not in self.momenta:
+            if id(momentum) not in momentum_ids:
                 self._events.remove((time, method, momentum))
                 continue
             yield time, method, momentum
@@ -463,7 +468,7 @@ class Gauge(object):
         :param value: the value to set coercively.
         :param at: the time base.  (default: now)
         """
-        return self._rebase(value, at=at)
+        return self._rebase(value, at=at, remove_momenta_before=None)
 
     def forget_past(self, value=None, at=None):
         """Discards the momenta which doesn't effect anymore.
@@ -473,8 +478,7 @@ class Gauge(object):
         """
         at = now_or(at)
         x = self.momenta.bisect_left((-inf, -inf, at))
-        value = self._rebase(value, at=at, remove_momenta_before=x)
-        return value
+        return self._rebase(value, at=at, remove_momenta_before=x)
 
     def _limit_gauge_invalidated(self, limit_gauge):
         """The callback function which will be called at a limit gauge is
