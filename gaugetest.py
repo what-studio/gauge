@@ -76,27 +76,27 @@ def test_momenta_in_range():
     g = Gauge(12, 100, at=0)
     g.add_momentum(+1, since=1, until=6)
     g.add_momentum(-1, since=3, until=8)
-    assert list(g.determination) == [
+    assert g.determination == [
         (0, 12), (1, 12), (3, 14), (6, 14), (8, 12)]
 
 
 def test_over_max():
     g = Gauge(8, 10, at=0)
     g.add_momentum(+1, since=0, until=4)
-    assert list(g.determination) == [(0, 8), (2, 10), (4, 10)]
+    assert g.determination == [(0, 8), (2, 10), (4, 10)]
     g = Gauge(12, 10, at=0)
     g.add_momentum(-1, since=0, until=4)
-    assert list(g.determination) == [(0, 12), (2, 10), (4, 8)]
+    assert g.determination == [(0, 12), (2, 10), (4, 8)]
     g = Gauge(12, 10, at=0)
     g.add_momentum(+1, since=0, until=4)
     g.add_momentum(-2, since=0, until=4)
-    assert list(g.determination) == [(0, 12), (1, 10), (4, 7)]
+    assert g.determination == [(0, 12), (1, 10), (4, 7)]
     g = Gauge(12, 10, at=0)
     g.add_momentum(+1, since=1, until=6)
     g.add_momentum(-1, since=3, until=8)
     g.add_momentum(+1, since=10, until=14)
     g.add_momentum(-1, since=13, until=16)
-    assert list(g.determination) == [
+    assert g.determination == [
         (0, 12), (1, 12), (3, 12), (5, 10), (6, 10), (8, 8),
         (10, 8), (12, 10), (13, 10), (14, 10), (16, 8)]
 
@@ -104,20 +104,20 @@ def test_over_max():
 def test_under_min():
     g = Gauge(2, 10, at=0)
     g.add_momentum(-1, since=0, until=4)
-    assert list(g.determination) == [(0, 2), (2, 0), (4, 0)]
+    assert g.determination == [(0, 2), (2, 0), (4, 0)]
     g = Gauge(-2, 10, at=0)
     g.add_momentum(+1, since=0, until=4)
-    assert list(g.determination) == [(0, -2), (2, 0), (4, 2)]
+    assert g.determination == [(0, -2), (2, 0), (4, 2)]
     g = Gauge(-2, 10, at=0)
     g.add_momentum(-1, since=0, until=4)
     g.add_momentum(+2, since=0, until=4)
-    assert list(g.determination) == [(0, -2), (1, 0), (4, 3)]
+    assert g.determination == [(0, -2), (1, 0), (4, 3)]
     g = Gauge(-2, 10, at=0)
     g.add_momentum(-1, since=1, until=6)
     g.add_momentum(+1, since=3, until=8)
     g.add_momentum(-1, since=10, until=14)
     g.add_momentum(+1, since=13, until=16)
-    assert list(g.determination) == [
+    assert g.determination == [
         (0, -2), (1, -2), (3, -2), (5, 0), (6, 0), (8, 2),
         (10, 2), (12, 0), (13, 0), (14, 0), (16, 2)]
 
@@ -125,19 +125,19 @@ def test_under_min():
 def test_permanent():
     g = Gauge(10, 10, at=0)
     g.add_momentum(-1)
-    assert list(g.determination) == [(0, 10), (10, 0)]
+    assert g.determination == [(0, 10), (10, 0)]
     g = Gauge(0, 10, at=0)
     g.add_momentum(+1)
-    assert list(g.determination) == [(0, 0), (10, 10)]
+    assert g.determination == [(0, 0), (10, 10)]
     g = Gauge(12, 10, at=0)
     g.add_momentum(-1)
-    assert list(g.determination) == [(0, 12), (2, 10), (12, 0)]
+    assert g.determination == [(0, 12), (2, 10), (12, 0)]
     g = Gauge(5, 10, at=0)
     g.add_momentum(+1, since=3)
-    assert list(g.determination) == [(0, 5), (3, 5), (8, 10)]
+    assert g.determination == [(0, 5), (3, 5), (8, 10)]
     g = Gauge(5, 10, at=0)
     g.add_momentum(+1, until=8)
-    assert list(g.determination) == [(0, 5), (5, 10), (8, 10)]
+    assert g.determination == [(0, 5), (5, 10), (8, 10)]
 
 
 def test_life():
@@ -159,7 +159,7 @@ def test_life():
 
 def test_no_momentum():
     g = Gauge(1, 10, at=0)
-    assert list(g.determination) == [(0, 1)]
+    assert g.determination == [(0, 1)]
     assert g.get() == 1
 
 
@@ -231,21 +231,21 @@ def test_set_min_max():
     # with momentum
     g = Gauge(5, 10, at=0)
     g.add_momentum(+1)
-    assert list(g.determination) == [(0, 5), (5, 10)]
+    assert g.determination == [(0, 5), (5, 10)]
     g.set_max(50, at=0)
-    assert list(g.determination) == [(0, 5), (45, 50)]
+    assert g.determination == [(0, 5), (45, 50)]
     g.set_min(40, at=0)
-    assert list(g.determination) == [(0, 40), (10, 50)]
+    assert g.determination == [(0, 40), (10, 50)]
 
 
 def test_pickle():
     g = Gauge(0, 10, at=0)
     g.add_momentum(+1, since=0)
     g.add_momentum(-2, since=5, until=7)
-    assert list(g.determination) == [(0, 0), (5, 5), (7, 3), (14, 10)]
+    assert g.determination == [(0, 0), (5, 5), (7, 3), (14, 10)]
     data = pickle.dumps(g)
     g2 = pickle.loads(data)
-    assert list(g2.determination) == [(0, 0), (5, 5), (7, 3), (14, 10)]
+    assert g2.determination == [(0, 0), (5, 5), (7, 3), (14, 10)]
 
 
 def test_make_momentum():
@@ -263,13 +263,13 @@ def test_clear_momenta():
     g.add_momentum(+1)
     g.clear_momenta(at=5)
     assert g.get(5) == 5
-    assert list(g.determination) == [(5, 5)]
+    assert g.determination == [(5, 5)]
     # clear momenta when the value is out of the range
     g.add_momentum(+1)
     g.set(15, outbound=OK, at=10)
     g.clear_momenta(at=10)
     assert g.get(10) == 15
-    assert list(g.determination) == [(10, 15)]
+    assert g.determination == [(10, 15)]
     # rebase by Gauge.clear_momenta()
     g.clear_momenta(100)
     assert g.get() == 100
@@ -353,7 +353,7 @@ def test_case1():
     g.add_momentum(+1)
     g.add_momentum(-2, since=1, until=3)
     g.add_momentum(+1, since=5, until=7)
-    assert list(g.determination) == [
+    assert g.determination == [
         (0, 0), (1, 1), (2, 0), (3, 0), (5, 2), (6.5, 5), (7, 5)]
 
 
@@ -361,7 +361,7 @@ def test_case2():
     g = Gauge(12, 10, at=0)
     g.add_momentum(+2, since=2, until=10)
     g.add_momentum(-1, since=4, until=8)
-    assert list(g.determination) == [
+    assert g.determination == [
         (0, 12), (2, 12), (4, 12), (6, 10), (8, 10), (10, 10)]
 
 
@@ -384,7 +384,7 @@ def test_case4():
     g = Gauge(0, 10, at=0)
     g.add_momentum(+1)
     g.add_momentum(+1)
-    assert list(g.determination) == [(0, 0), (5, 10)]
+    assert g.determination == [(0, 0), (5, 10)]
 
 
 def test_case5():
@@ -415,6 +415,16 @@ def test_remove_momentum():
     assert len(g.momenta) == 1
     assert g.remove_momentum(Momentum(-3, until=100)) == (-3, -inf, 100)
     assert not g.momenta
+
+
+def test_remove_momentum_event_on_remove_momentum():
+    g = Gauge(0, 10, at=0)
+    g.add_momentum(+1)
+    assert g.determination == [(0, 0), (10, 10)]
+    g.remove_momentum(+1)
+    assert g.determination == [(0, 0)]
+    g.add_momentum(+1)
+    assert g.determination == [(0, 0), (10, 10)]
 
 
 def test_momenta_order():
@@ -467,19 +477,19 @@ def test_just_one_momentum():
         return g
     # None ~ None
     g = gen_gauge()
-    assert list(g.determination) == [(0, 5), (50, 10)]
+    assert g.determination == [(0, 5), (50, 10)]
     # 0 ~ None
     g = gen_gauge(since=0)
-    assert list(g.determination) == [(0, 5), (50, 10)]
+    assert g.determination == [(0, 5), (50, 10)]
     # None ~ 100
     g = gen_gauge(until=100)
-    assert list(g.determination) == [(0, 5), (50, 10), (100, 10)]
+    assert g.determination == [(0, 5), (50, 10), (100, 10)]
     # 0 ~ 100
     g = gen_gauge(since=0, until=100)
-    assert list(g.determination) == [(0, 5), (50, 10), (100, 10)]
+    assert g.determination == [(0, 5), (50, 10), (100, 10)]
     # -100 ~ 100
     g = gen_gauge(since=-100, until=100)
-    assert list(g.determination) == [(0, 5), (50, 10), (100, 10)]
+    assert g.determination == [(0, 5), (50, 10), (100, 10)]
 
 
 def test_velocity():
@@ -607,27 +617,27 @@ def test_hypergauge():
     # case 1
     g.set_max(Gauge(15, 15, at=0), at=0)
     g.max_gauge.add_momentum(-1, until=5)
-    assert list(g.determination) == [
+    assert g.determination == [
         (0, 12), (1, 12), (2, 13), (3, 12), (5, 10), (6, 10), (8, 8)]
-    assert list(g.max_gauge.determination) == [(0, 15), (5, 10)]
+    assert g.max_gauge.determination == [(0, 15), (5, 10)]
     # case 2
     g.set_max(Gauge(15, 15, at=0), at=0)
     g.max_gauge.add_momentum(-1, until=4)
     g.max_gauge.add_momentum(+1, since=4, until=6)
-    assert list(g.determination) == [
+    assert g.determination == [
         (0, 12), (1, 12), (2, 13), (3, 12), (4, 11), (6, 11), (8, 9)]
     # case 3
     g.set_max(10, at=0)
     g.set(12, outbound=OK, at=0)
-    assert list(g.determination) == [
+    assert g.determination == [
         (0, 12), (1, 12), (3, 12), (5, 10), (6, 10), (8, 8)]
     g.set_max(Gauge(10, 100, at=0), at=0)
-    assert list(g.determination) == [
+    assert g.determination == [
         (0, 12), (1, 12), (3, 12), (5, 10), (6, 10), (8, 8)]
     # case 4
     g.set_max(Gauge(15, 15, at=0), at=0)
     g.max_gauge.add_momentum(-1)
-    assert list(g.determination) == [
+    assert g.determination == [
         (0, 12), (1, 12), (2, 13), (3, 12), (6, 9), (8, 7), (15, 0)]
     # bidirectional hyper-gauge
     g_max = Gauge(10, 10, at=0)
@@ -641,12 +651,12 @@ def test_hypergauge():
     g.add_momentum(-1, since=3, until=6)
     g.add_momentum(+1, since=6, until=9)
     g.add_momentum(-1, since=9, until=12)
-    assert list(g.determination) == [
+    assert g.determination == [
         (0, 5), (2.5, 7.5), (3, 7), (4, 6), (5.5, 4.5), (6, 5), (8, 7),
         (9, 7), (12, 4)]
     # zigzag 1
     g = zigzag()
-    assert list(g.determination) == [
+    assert g.determination == [
         (0, 1), (1, 2), (2, 1), (3.5, 2.5), (4, 2), (5.5, 0.5), (6, 1),
         (7.5, 2.5), (8, 2), (9, 3), (10, 2), (11.5, 0.5), (12, 1)]
     # zigzag 2
@@ -660,7 +670,7 @@ def test_hypergauge():
         t = sum(y * 2 for y in range(x + 1))
         g.add_momentum(+1, since=t, until=t + (x + 1))
         g.add_momentum(-1, since=t + (x + 1), until=t + 2 * (x + 1))
-    assert list(g.determination) == [
+    assert g.determination == [
         (0, 2), (1, 3), (2, 2), (3.5, 3.5), (4, 3), (6, 1), (8, 3), (9, 4),
         (11.5, 1.5), (12, 2), (14.5, 4.5), (16, 3), (18.5, 0.5), (20, 2)]
     # hybrid 1: same velocity of `g` and `g.max_gauge`.
@@ -668,17 +678,17 @@ def test_hypergauge():
     g = Gauge(0, Gauge(1, 5, at=0), at=0)
     g.add_momentum(+1)
     g.max_gauge.add_momentum(+1, since=1)
-    assert list(g.determination) == [(0, 0), (1, 1), (5, 5)]
+    assert g.determination == [(0, 0), (1, 1), (5, 5)]
     # hybrid 2: velocity of `g.max_gauge` is faster than `g`'s.
     g = Gauge(0, Gauge(1, 5, at=0), at=0)
     g.add_momentum(+1)
     g.max_gauge.add_momentum(+2, since=1)
-    assert list(g.determination) == [(0, 0), (1, 1), (5, 5)]
+    assert g.determination == [(0, 0), (1, 1), (5, 5)]
     # hybrid 3: velocity of `g.max_gauge` is slower than `g`'s.
     g = Gauge(0, Gauge(1, 5, at=0), at=0)
     g.add_momentum(+1)
     g.max_gauge.add_momentum(+0.5, since=1)
-    assert list(g.determination) == [(0, 0), (1, 1), (9, 5)]
+    assert g.determination == [(0, 0), (1, 1), (9, 5)]
 
 
 def test_hyper_hypergauge(zigzag, bidir):
@@ -743,15 +753,15 @@ def test_pickle_hypergauge():
     g.add_momentum(-1, since=3, until=8)
     g.set_max(Gauge(15, 15, at=0), at=0)
     g.max_gauge.add_momentum(-1, until=5)
-    assert list(g.determination) == [
+    assert g.determination == [
         (0, 12), (1, 12), (2, 13), (3, 12), (5, 10), (6, 10), (8, 8)]
-    assert list(g.max_gauge.determination) == [(0, 15), (5, 10)]
+    assert g.max_gauge.determination == [(0, 15), (5, 10)]
     data = pickle.dumps(g)
     g2 = pickle.loads(data)
     assert g2.max_gauge is not None
-    assert list(g2.determination) == [
+    assert g2.determination == [
         (0, 12), (1, 12), (2, 13), (3, 12), (5, 10), (6, 10), (8, 8)]
-    assert list(g2.max_gauge.determination) == [(0, 15), (5, 10)]
+    assert g2.max_gauge.determination == [(0, 15), (5, 10)]
     assert g2 in g2.max_gauge._limited_gauges
 
 
@@ -826,9 +836,9 @@ def test_hypergauge_past_bugs(zigzag, bidir):
     g1 = Gauge(5, Gauge(5, 10, at=0), Gauge(5, 10, at=0), at=0)
     g1.max_gauge.add_momentum(+1)
     g1.min_gauge.add_momentum(-1)
-    assert list(g1.determination) == [(0, 5)]
+    assert g1.determination == [(0, 5)]
     g1.add_momentum(+0.1, until=100)
-    assert list(g1.determination) == [(0, 5), (50, 10), (100, 10)]
+    assert g1.determination == [(0, 5), (50, 10), (100, 10)]
     # floating-point inaccuracy problem 1
     g1 = Gauge(3, bidir, zigzag, at=0)
     g1.add_momentum(+6, since=0, until=1)
@@ -887,7 +897,7 @@ def test_hypergauge_past_bugs(zigzag, bidir):
     g4.min_gauge.add_momentum(+1, until=11)
     g4.add_momentum(-1, until=10)
     assert g4.get(10) == 9  # not -10
-    assert list(g4.determination) == [(0, 0), (1, 0), (10, 9), (11, 10)]
+    assert g4.determination == [(0, 0), (1, 0), (10, 9), (11, 10)]
     # floor is dense than ceil
     r = random.Random(2810856076715324514)
     g5 = Gauge(0, shift_gauge(zigzag, +3), g3, at=0)
