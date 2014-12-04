@@ -9,7 +9,7 @@
     :license: BSD, see LICENSE for more details.
 """
 from __future__ import absolute_import
-from bisect import bisect_left
+from bisect import bisect_right
 from collections import namedtuple
 import operator
 try:
@@ -189,10 +189,10 @@ class Gauge(object):
         at = now_or(at)
         determination = self.determination
         if len(determination) == 1:
-            # skip bisect_left() because it is expensive
+            # skip bisect_right() because it is expensive
             x = 0
         else:
-            x = bisect_left(determination, (at,))
+            x = bisect_right(determination, (at, +inf))
         if x == 0:
             return (determination[0][VALUE], 0.)
         try:

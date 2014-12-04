@@ -503,15 +503,15 @@ def test_velocity():
     g.add_momentum(+1, since=2)
     g.add_momentum(+1, since=4, until=6)
     assert g.velocity(at=0) == 0
-    assert g.velocity(at=2) == 0
+    assert g.velocity(at=2) == +1
     assert g.velocity(at=3) == +1
-    assert g.velocity(at=4) == +1
+    assert g.velocity(at=4) == +2
     assert g.velocity(at=5) == +2
-    assert g.velocity(at=6) == +2
+    assert g.velocity(at=6) == +1
     assert g.velocity(at=7) == +1
     assert g.velocity(at=8) == +1
     assert g.velocity(at=9) == +1
-    assert g.velocity(at=10) == +1
+    assert g.velocity(at=10) == 0
 
 
 def test_lines():
