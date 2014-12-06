@@ -118,7 +118,8 @@ class Determination(list):
                 for boundary in walked_boundaries:
                     # find the intersection with a boundary.
                     try:
-                        intersection = boundary.line.intersect(line)
+                        # intersection = boundary.line.intersect(line)
+                        intersection = line.intersect(boundary.line)
                     except ValueError:
                         continue
                     if intersection[TIME] == since:
@@ -226,24 +227,31 @@ class Line(object):
 
         :raises ValueError: there's no intersection.
         """
-        intercept_delta = line.intercept() - self.intercept()
-        velocity_delta = self.velocity - line.velocity
+        lines = [self, line]
+        lines.sort(key=intersection_reliability, reverse=True)
+        left, right = lines  # right is more reliable.
+        intercept_delta = right.intercept() - left.intercept()
+        velocity_delta = left.velocity - right.velocity
         try:
             time = intercept_delta / velocity_delta
         except ZeroDivisionError:
             raise ValueError('Parallel line given')
-        since = max(self.since, line.since)
-        until = min(self.until, line.until)
+        since = max(left.since, right.since)
+        until = min(left.until, right.until)
         if since <= time <= until:
             pass
         else:
             raise ValueError('Intersection not in the time range')
-        value = self.get(time)
+        value = left.get(time)
         return (time, value)
 
     def intercept(self):
         """Gets the value-intercept. (Y-intercept)"""
         return self.value - self.velocity * self.since
+
+    def __repr__(self, string=''):
+        return ('<{0}{1} for {2!r}~{3!r}>'
+                ''.format(type(self).__name__, string, self.since, self.until))
 
 
 class Horizon(Line):
@@ -259,6 +267,9 @@ class Horizon(Line):
 
     def _later(self, at):
         return self.value
+
+    def __repr__(self):
+        return super(Horizon, self).__repr__(' {0:.2f}'.format(self.value))
 
 
 class Ray(Line):
@@ -278,6 +289,10 @@ class Ray(Line):
 
     def _later(self, at):
         return self._get(self.until)
+
+    def __repr__(self):
+        string = ' {0:.2f}{1:+.2f}/s'.format(self.value, self.velocity)
+        return super(Ray, self).__repr__(string)
 
 
 class Segment(Line):
@@ -317,6 +332,17 @@ class Segment(Line):
 
     def _later(self, at):
         return self.final
+
+    def __repr__(self):
+        string = ' {0:.2f}~{1:.2f}'.format(self.value, self.final)
+        return super(Segment, self).__repr__(string)
+
+
+#: The reliability map of line classes for precise intersection.
+_intersection_reliabilities = {Horizon: 3, Ray: 2, Segment: 1}
+
+#: Sorting key to sort by intersection reliability.
+intersection_reliability = lambda l: _intersection_reliabilities[type(l)]
 
 
 class Boundary(object):
