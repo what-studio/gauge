@@ -394,6 +394,13 @@ def test_case5():
     assert g.get(11) == 0  # adjusted by min=0
 
 
+def test_case6():
+    g = Gauge(1, 10, at=1417868986.94428)
+    g.add_momentum(+0.167)
+    g.add_momentum(-0.417, since=1417863954.884099)
+    assert g.determination[-1][VALUE] == 0
+
+
 def test_remove_momentum():
     g = Gauge(0, 10, at=0)
     m1 = g.add_momentum(+1)

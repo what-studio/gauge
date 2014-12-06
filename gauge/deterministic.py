@@ -118,7 +118,7 @@ class Determination(list):
                 for boundary in walked_boundaries:
                     # find the intersection with a boundary.
                     try:
-                        intersection = line.intersect(boundary.line)
+                        intersection = boundary.line.intersect(line)
                     except ValueError:
                         continue
                     if intersection[TIME] == since:
