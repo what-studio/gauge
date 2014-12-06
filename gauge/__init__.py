@@ -25,9 +25,9 @@ from .common import ERROR, OK, ONCE, CLAMP, inf, now_or  # to export
 from .deterministic import Determination, Segment
 
 
+__version__ = '0.3.1'
 __all__ = ['Gauge', 'Momentum',
            'ERROR', 'OK', 'ONCE', 'CLAMP', 'inf', 'now_or']
-__version__ = '0.3.1-dev'
 
 
 class Gauge(object):
