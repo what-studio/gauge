@@ -17,8 +17,8 @@ __all__ = ['ADD', 'REMOVE', 'TIME', 'VALUE', 'ERROR', 'OK', 'ONCE', 'CLAMP',
 
 
 # events.
-ADD = +1
-REMOVE = -1
+ADD = 0
+REMOVE = 1
 
 
 # indices.

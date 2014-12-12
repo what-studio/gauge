@@ -1081,3 +1081,13 @@ def test_clamp():
     assert g.clamp(at=0) == 10
     g = Gauge(-10, max=10, min=0, at=0)
     assert g.clamp(at=0) == 0
+
+
+def test_momentum_event_order():
+    g = Gauge(0, 100, at=0)
+    m = Momentum(+1, since=10, until=10)
+    g._make_momentum = lambda m: m
+    g.add_momentum(m)
+    assert \
+        list(g.momentum_events()) == \
+        [(0, None, None), (10, ADD, m), (10, REMOVE, m), (+inf, None, None)]

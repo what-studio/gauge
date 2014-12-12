@@ -61,8 +61,9 @@ class Gauge(object):
 
     def __preinit__(self):
         """Called by :meth:`__init__` and :meth:`__setstate__`."""
-        self.momenta = SortedListWithKey(key=lambda m: m[2])  # sort by until
-        # the momentum events.
+        by_until = operator.itemgetter(2)
+        self.momenta = SortedListWithKey(key=by_until)
+        # momentum events.
         self._events = SortedList()
         # a weak set of gauges that refer the gauge as a limit gauge.
         self._limited_gauges = WeakSet()
