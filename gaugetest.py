@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from contextlib import contextmanager
 import gc
+import math
 import operator
 import pickle
 import random
@@ -17,6 +18,23 @@ from gauge.deterministic import Line, Horizon, Ray, Segment, Boundary
 
 
 PRECISION = 8
+
+
+class FakeGauge(Gauge):
+
+    @property
+    def determination(self):
+        return self._determination
+
+    @determination.setter
+    def determination(self, determination):
+        from gauge.deterministic import Determination
+        self._determination = Determination.__new__(Determination)
+        self._determination.extend(determination)
+
+    @determination.deleter
+    def determination(self):
+        del self._determination
 
 
 def round_(x):
@@ -1091,3 +1109,13 @@ def test_momentum_event_order():
     assert \
         list(g.momentum_events()) == \
         [(0, None, None), (10, ADD, m), (10, REMOVE, m), (+inf, None, None)]
+
+
+def test_inf_from_div():
+    assert 0 != 1e-309
+    assert math.isinf(1 / 1e-309)
+    f = FakeGauge(0, 100, at=0)
+    f.determination = [(0, 0), (1e-309, 1)]
+    g = Gauge(0.5, f, at=0)
+    g.add_momentum(-1)
+    assert g.determination == [(0, 0.5), (0.5, 0)]  # no intersection.

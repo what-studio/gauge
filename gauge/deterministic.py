@@ -5,10 +5,11 @@
 
     Determining logics for gauge.
 
-    :copyright: (c) 2013-2014 by What! Studio
+    :copyright: (c) 2013-2015 by What! Studio
     :license: BSD, see LICENSE for more details.
 """
 from __future__ import absolute_import
+import math
 import operator
 
 from .common import ADD, REMOVE, TIME, VALUE, inf, now_or
@@ -238,9 +239,10 @@ class Line(object):
             raise ValueError('Parallel line given')
         since = max(left.since, right.since)
         until = min(left.until, right.until)
-        if since <= time <= until:
-            pass
-        else:
+        if math.isnan(time):
+            # too small velocity_delta.
+            raise ValueError('Almost parallel line given')
+        elif not since <= time <= until:
             raise ValueError('Intersection not in the time range')
         value = left.get(time)
         return (time, value)
