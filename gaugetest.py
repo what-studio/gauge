@@ -22,6 +22,9 @@ PRECISION = 8
 
 class FakeGauge(Gauge):
 
+    def __init__(self, value=0, max=0, min=0, at=None):
+        super(FakeGauge, self).__init__(value, max, min, at)
+
     @property
     def determination(self):
         return self._determination
@@ -1111,12 +1114,32 @@ def test_momentum_event_order():
         [(0, None, None), (10, ADD, m), (10, REMOVE, m), (+inf, None, None)]
 
 
+def test_case7():
+    f = FakeGauge()
+    f.determination = [(0, 0), (1, 1)]
+    g = Gauge(3.5, f, at=-1)
+    g.add_momentum(-2)
+    g.add_momentum(+1)
+    assert g.determination == [(-1, 3.5), (0.5, 0.5), (1, 0)]
+
+
+def test_case7_reversed():
+    f = FakeGauge()
+    f.determination = [(0, 0), (1, -1)]
+    g = Gauge(-3.5, 0, f, at=-1)
+    g.add_momentum(+2)
+    g.add_momentum(-1)
+    assert g.determination == [(-1, -3.5), (0.5, -0.5), (1, 0)]
+
+
 @pytest.mark.xfail
 def test_too_fast_velocity():
     assert 0 != 1e-309
     assert math.isinf(1 / 1e-309)
     f = FakeGauge(0, 100, at=0)
     f.determination = [(0, 0), (1e-309, 1)]
+    assert f.get(0.000000000000000000000) == 0
+    assert f.get(0.000000000000000000001) == 1
     g = Gauge(2.5, f, at=-1)
     g.add_momentum(-2)
     g.add_momentum(+1)

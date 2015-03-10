@@ -85,7 +85,10 @@ class Determination(list):
             while since < until:
                 if again:
                     again = False
-                    walked_boundaries = boundaries
+                    if bound is None:
+                        walked_boundaries = boundaries
+                    else:
+                        walked_boundaries = [bound]
                 else:
                     # stop the loop if all boundaries have been proceeded.
                     if all(b.line.until >= until for b in boundaries):
@@ -119,7 +122,6 @@ class Determination(list):
                 for boundary in walked_boundaries:
                     # find the intersection with a boundary.
                     try:
-                        # intersection = boundary.line.intersect(line)
                         intersection = line.intersect(boundary.line)
                     except ValueError:
                         continue
@@ -233,16 +235,14 @@ class Line(object):
         left, right = lines  # right is more reliable.
         intercept_delta = right.intercept() - left.intercept()
         velocity_delta = left.velocity - right.velocity
-        try:
-            time = intercept_delta / velocity_delta
-        except ZeroDivisionError:
+        if velocity_delta == 0:
             raise ValueError('Parallel line given')
+        elif math.isinf(velocity_delta):
+            raise ValueError('Almost orthogonal line given')
+        time = intercept_delta / velocity_delta
         since = max(left.since, right.since)
         until = min(left.until, right.until)
-        if math.isnan(time):
-            # too small velocity_delta.
-            raise ValueError('Almost parallel line given')
-        elif not since <= time <= until:
+        if not since <= time <= until:
             raise ValueError('Intersection not in the time range')
         value = left.get(time)
         return (time, value)
