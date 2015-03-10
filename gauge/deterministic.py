@@ -233,13 +233,15 @@ class Line(object):
         lines = [self, line]
         lines.sort(key=intersection_reliability, reverse=True)
         left, right = lines  # right is more reliable.
-        intercept_delta = right.intercept() - left.intercept()
-        velocity_delta = left.velocity - right.velocity
-        if velocity_delta == 0:
-            raise ValueError('Parallel line given')
-        elif math.isinf(velocity_delta):
-            raise ValueError('Almost orthogonal line given')
-        time = intercept_delta / velocity_delta
+        if math.isinf(right.velocity):
+            # right is almost vertical.
+            time = (right.since + right.until) / 2
+        else:
+            velocity_delta = left.velocity - right.velocity
+            if velocity_delta == 0:
+                raise ValueError('Parallel line given')
+            intercept_delta = right.intercept() - left.intercept()
+            time = intercept_delta / velocity_delta
         since = max(left.since, right.since)
         until = min(left.until, right.until)
         if not since <= time <= until:

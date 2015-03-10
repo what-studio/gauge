@@ -22,22 +22,11 @@ PRECISION = 8
 
 class FakeGauge(Gauge):
 
-    def __init__(self, value=0, max=0, min=0, at=None):
-        super(FakeGauge, self).__init__(value, max, min, at)
-
-    @property
-    def determination(self):
-        return self._determination
-
-    @determination.setter
-    def determination(self, determination):
+    def __init__(self, determination):
         from gauge.deterministic import Determination
         self._determination = Determination.__new__(Determination)
         self._determination.extend(determination)
-
-    @determination.deleter
-    def determination(self):
-        del self._determination
+        super(FakeGauge, self).__init__(0, 0, 0, 0)
 
 
 def round_(x):
@@ -1115,8 +1104,7 @@ def test_momentum_event_order():
 
 
 def test_case7():
-    f = FakeGauge()
-    f.determination = [(0, 0), (1, 1)]
+    f = FakeGauge([(0, 0), (1, 1)])
     g = Gauge(3.5, f, at=-1)
     g.add_momentum(-2)
     g.add_momentum(+1)
@@ -1124,23 +1112,32 @@ def test_case7():
 
 
 def test_case7_reversed():
-    f = FakeGauge()
-    f.determination = [(0, 0), (1, -1)]
+    f = FakeGauge([(0, 0), (1, -1)])
     g = Gauge(-3.5, 0, f, at=-1)
     g.add_momentum(+2)
     g.add_momentum(-1)
     assert g.determination == [(-1, -3.5), (0.5, -0.5), (1, 0)]
 
 
-@pytest.mark.xfail
-def test_too_fast_velocity():
+def test_intersection_of_vertical_segment():
     assert 0 != 1e-309
     assert math.isinf(1 / 1e-309)
-    f = FakeGauge(0, 100, at=0)
-    f.determination = [(0, 0), (1e-309, 1)]
+    f = FakeGauge([(0, 0), (1e-309, 1)])
     assert f.get(0.000000000000000000000) == 0
     assert f.get(0.000000000000000000001) == 1
     g = Gauge(2.5, f, at=-1)
     g.add_momentum(-2)
     g.add_momentum(+1)
-    assert g.determination == [(-1, 2.5), (0, 0.5), (0.5, 0)]
+    assert \
+        round_determination(g.determination, precision=1) == \
+        [(-1, 2.5), (0, 0.5), (0.5, 0)]
+
+
+def test_intersection_of_vertical_segment_reversed():
+    f = FakeGauge([(0, 0), (1e-309, -1)])
+    g = Gauge(-2.5, 0, f, at=-1)
+    g.add_momentum(+2)
+    g.add_momentum(-1)
+    assert \
+        round_determination(g.determination, precision=1) == \
+        [(-1, -2.5), (0, -0.5), (0.5, 0)]
