@@ -504,12 +504,7 @@ class Gauge(object):
         at = max(now_or(at), self.base[TIME])
         value = self.get(at)
         if self.in_range(at):
-            if limit_gauge is self.max_gauge:
-                clamp = min
-            elif limit_gauge is self.min_gauge:
-                clamp = max
-            else:
-                raise ValueError('The limit is neither max nor min')
+            clamp = {self.max_gauge: min, self.min_gauge: max}[limit_gauge]
             value = clamp(value, limit_value)
         self.forget_past(value, at=at)
 

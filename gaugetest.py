@@ -13,7 +13,7 @@ import pytest
 
 import gauge
 from gauge import CLAMP, Gauge, inf, Momentum, OK, ONCE
-from gauge.common import ADD, REMOVE, TIME, VALUE
+from gauge.common import ADD, deprecate, REMOVE, TIME, VALUE
 from gauge.deterministic import (
     Boundary, Determination, Horizon, Line, Ray, Segment)
 
@@ -358,6 +358,10 @@ def test_repr():
     assert repr(m) == '<Momentum +100.00/s 10.00~>'
     m = Momentum(+100, until=20)
     assert repr(m) == '<Momentum +100.00/s ~20.00>'
+    h = Horizon(10, 20, 30)
+    assert repr(h) == '<Horizon 30.00 for 10~20>'
+    r = Ray(10, 20, 30, 40)
+    assert repr(r) == '<Ray 30.00+40.00/s for 10~20>'
 
 
 def test_case1():
@@ -679,6 +683,8 @@ def test_hypergauge():
     assert g.determination == [
         (0, 5), (2.5, 7.5), (3, 7), (4, 6), (5.5, 4.5), (6, 5), (8, 7),
         (9, 7), (12, 4)]
+    g_min.incr(1, at=5)
+    assert g.determination == [(5, 5), (6, 6), (7, 7), (9, 7), (12, 4)]
     # zigzag 1
     g = zigzag()
     assert g.determination == [
@@ -1145,3 +1151,7 @@ def test_intersection_of_vertical_segment_reversed():
     assert \
         round_determination(g.determination, precision=1) == \
         [(-1, -2.5), (0, -0.5), (0.5, 0)]
+
+
+def test_deprecate():
+    pytest.deprecated_call(deprecate, 'Hello, {0}', 'world')
