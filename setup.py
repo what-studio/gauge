@@ -2,7 +2,9 @@
 """
 """
 from __future__ import with_statement
+
 import re
+
 from setuptools import setup
 from setuptools.command.test import test
 
@@ -57,6 +59,6 @@ setup(
                  'Programming Language :: Python :: Implementation :: PyPy',
                  'Topic :: Games/Entertainment'],
     install_requires=install_requires,
-    tests_require=['pytest', 'pytest-benchmark'],
+    tests_require=['pytest'],
     test_suite='...',
 )
