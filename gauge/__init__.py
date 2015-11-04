@@ -97,9 +97,10 @@ class Gauge(object):
             del self._determination
         except AttributeError:
             pass
-        # invalidate limited gauges together.
-        for gauge in self._limited_gauges:
-            gauge._limit_gauge_invalidated(self)
+        else:
+            # invalidate limited gauges together.
+            for gauge in self._limited_gauges:
+                gauge._limit_gauge_invalidated(self)
 
     def get_max(self, at=None):
         """Predicts the current maximum value."""
@@ -403,13 +404,19 @@ class Gauge(object):
         :raises ValueError: `since` later than or same with `until`.
         """
         momentum = self._make_momentum(*args, **kwargs)
-        since, until = momentum.since, momentum.until
-        self.momenta.add(momentum)
-        self._events.add((since, ADD, momentum))
-        if until != +inf:
-            self._events.add((until, REMOVE, momentum))
-        self.invalidate()
+        self._update_momenta([momentum])
         return momentum
+
+    def _update_momenta(self, momenta):
+        self.momenta.update(momenta)
+        events = []
+        for momentum in momenta:
+            since, until = momentum.since, momentum.until
+            events.append((since, ADD, momentum))
+            if until != +inf:
+                events.append((until, REMOVE, momentum))
+        self._events.update(events)
+        self.invalidate()
 
     def remove_momentum(self, *args, **kwargs):
         """Removes the given momentum.  The determination would be changed.
@@ -506,19 +513,18 @@ class Gauge(object):
 
     def __getstate__(self):
         return (self.base, list(map(tuple, self.momenta)),
-                self.max_value, self.max_gauge, self.min_value, self.min_gauge)
+                self.max_value, self.max_gauge,
+                self.min_value, self.min_gauge)
 
     def __setstate__(self, state):
         self.__preinit__()
-        base, momenta, max_value, max_gauge, min_value, min_gauge = state
-        self.base = base
-        self.max_value, self.max_gauge = max_value, max_gauge
-        self.min_value, self.min_gauge = min_value, min_gauge
-        for limit_gauge in [max_gauge, min_gauge]:
+        (self.base, momenta,
+         self.max_value, self.max_gauge,
+         self.min_value, self.min_gauge) = state
+        for limit_gauge in [self.max_gauge, self.min_gauge]:
             if limit_gauge is not None:
                 limit_gauge._limited_gauges.add(self)
-        for momentum in momenta:
-            self.add_momentum(*momentum)
+        self._update_momenta([self._make_momentum(*m) for m in momenta])
 
     def __repr__(self, at=None):
         """Example strings:
