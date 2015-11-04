@@ -39,23 +39,25 @@ class Gauge(object):
     modified by an user's adjustment or an effective momentum.
     """
 
-    #: The base time and value.
-    base = (None, 0)
-
-    #: A sorted list of momenta.  The items are :class:`Momentum` objects.
-    momenta = None
-
-    #: The constant maximum value.
-    max_value = None
-
-    #: The gauge to indicate maximum value.
-    max_gauge = None
-
-    #: The constant minimum value.
-    min_value = None
-
-    #: The gauge to indicate minimum value.
-    min_gauge = None
+    __slots__ = (
+        #: The base time and value.
+        'base',
+        #: A sorted list of momenta.  The items are :class:`Momentum` objects.
+        'momenta',
+        #: The constant maximum value.
+        'max_value',
+        #: The gauge to indicate maximum value.
+        'max_gauge',
+        #: The constant minimum value.
+        'min_value',
+        #: The gauge to indicate minimum value.
+        'min_gauge',
+        # internal attributes.
+        '_determination',
+        '_events',
+        '_limited_gauges',
+        '__weakref__',
+    )
 
     def __init__(self, value, max, min=0, at=None):
         self.__preinit__()
@@ -65,8 +67,8 @@ class Gauge(object):
 
     def __preinit__(self):
         """Called by :meth:`__init__` and :meth:`__setstate__`."""
+        self.max_gauge = self.min_gauge = None
         self.momenta = SortedListWithKey(key=by_until)
-        # momentum events.
         self._events = SortedList()
         # a weak set of gauges that refer the gauge as a limit gauge.
         self._limited_gauges = WeakSet()
@@ -393,6 +395,27 @@ class Gauge(object):
             raise ValueError('\'since\' should be earlier than \'until\'')
         return momentum
 
+    def add_momenta(self, momenta):
+        """Adds multiple momenta."""
+        for momentum in momenta:
+            self.momenta.add(momentum)
+            self._events.add((momentum.since, ADD, momentum))
+            if momentum.until != +inf:
+                self._events.add((momentum.until, REMOVE, momentum))
+        self.invalidate()
+
+    def remove_momenta(self, momenta):
+        """Removes multiple momenta."""
+        for momentum in momenta:
+            try:
+                self.momenta.remove(momentum)
+            except ValueError:
+                raise ValueError('{0} not in the gauge'.format(momentum))
+            self._events.remove((momentum.since, ADD, momentum))
+            if momentum.until != +inf:
+                self._events.remove((momentum.until, REMOVE, momentum))
+        self.invalidate()
+
     def add_momentum(self, *args, **kwargs):
         """Adds a momentum.  A momentum includes the velocity and the times to
         start to affect and to stop to affect.  The determination would be
@@ -406,17 +429,8 @@ class Gauge(object):
         :raises ValueError: `since` later than or same with `until`.
         """
         momentum = self._make_momentum(*args, **kwargs)
-        self.update_momenta([momentum])
+        self.add_momenta([momentum])
         return momentum
-
-    def update_momenta(self, momenta):
-        """Adds multiple momenta."""
-        for momentum in momenta:
-            self.momenta.add(momentum)
-            self._events.add((momentum.since, ADD, momentum))
-            if momentum.until != +inf:
-                self._events.add((momentum.until, REMOVE, momentum))
-        self.invalidate()
 
     def remove_momentum(self, *args, **kwargs):
         """Removes the given momentum.  The determination would be changed.
@@ -426,15 +440,7 @@ class Gauge(object):
         :raises ValueError: the given momentum not in the gauge.
         """
         momentum = self._make_momentum(*args, **kwargs)
-        try:
-            self.momenta.remove(momentum)
-        except ValueError:
-            raise ValueError('{0} not in the gauge'.format(momentum))
-        since, until = momentum.since, momentum.until
-        self._events.remove((since, ADD, momentum))
-        if until != +inf:
-            self._events.remove((until, REMOVE, momentum))
-        self.invalidate()
+        self.remove_momenta([momentum])
         return momentum
 
     def momentum_events(self):
@@ -525,7 +531,7 @@ class Gauge(object):
             if limit_gauge is not None:
                 limit_gauge._limited_gauges.add(self)
         if momenta:
-            self.update_momenta([self._make_momentum(*m) for m in momenta])
+            self.add_momenta([self._make_momentum(*m) for m in momenta])
 
     def __repr__(self, at=None):
         """Example strings:

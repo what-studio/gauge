@@ -1096,9 +1096,11 @@ def test_clamp():
 
 
 def test_momentum_event_order():
-    g = Gauge(0, 100, at=0)
+    class MyGauge(Gauge):
+        def _make_momentum(self, m):
+            return m
+    g = MyGauge(0, 100, at=0)
     m = Momentum(+1, since=10, until=10)
-    g._make_momentum = lambda m: m
     g.add_momentum(m)
     assert \
         list(g.momentum_events()) == \

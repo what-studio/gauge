@@ -14,8 +14,11 @@ class FrozenGauge(Gauge):
             limit_gauge = getattr(gauge, gauge_attr)
             if limit_gauge is None:
                 setattr(self, value_attr, getattr(gauge, value_attr))
+                none_attr = gauge_attr
             else:
                 setattr(self, gauge_attr, cls(limit_gauge))
+                none_attr = value_attr
+            setattr(self, none_attr, None)
         self._determination = gauge.determination
         self.linked_gauges = ()
 
