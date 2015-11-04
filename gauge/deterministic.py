@@ -9,10 +9,11 @@
     :license: BSD, see LICENSE for more details.
 """
 from __future__ import absolute_import
+
 import math
 import operator
 
-from .common import ADD, REMOVE, TIME, VALUE, inf, now_or
+from .common import ADD, inf, now_or, REMOVE, TIME, VALUE
 
 
 __all__ = ['Determination', 'Line', 'Horizon', 'Ray', 'Segment', 'Boundary']
