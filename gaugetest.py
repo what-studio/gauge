@@ -14,7 +14,8 @@ import pytest
 import gauge
 from gauge import CLAMP, Gauge, inf, Momentum, OK, ONCE
 from gauge.common import ADD, REMOVE, TIME, VALUE
-from gauge.deterministic import Boundary, Horizon, Line, Ray, Segment
+from gauge.deterministic import (
+    Boundary, Determination, Horizon, Line, Ray, Segment)
 
 
 PRECISION = 8
@@ -23,10 +24,9 @@ PRECISION = 8
 class FakeGauge(Gauge):
 
     def __init__(self, determination):
-        from gauge.deterministic import Determination
+        super(FakeGauge, self).__init__(0, 0, 0, 0)
         self._determination = Determination.__new__(Determination)
         self._determination.extend(determination)
-        super(FakeGauge, self).__init__(0, 0, 0, 0)
 
 
 def round_(x):

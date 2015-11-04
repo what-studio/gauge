@@ -69,6 +69,7 @@ class Gauge(object):
         """Called by :meth:`__init__` and :meth:`__setstate__`."""
         self.max_gauge = self.min_gauge = None
         self.momenta = SortedListWithKey(key=by_until)
+        self._determination = None
         self._events = SortedList()
         # a weak set of gauges that refer the gauge as a limit gauge.
         self._limited_gauges = WeakSet()
@@ -81,12 +82,9 @@ class Gauge(object):
         A determination is a sorted list of 2-dimensional points which take
         times as x-values, gauge values as y-values.
         """
-        try:
-            return self._determination
-        except AttributeError:
-            pass
-        # redetermine and cache.
-        self._determination = Determination(self)
+        if self._determination is None:
+            # redetermine and cache.
+            self._determination = Determination(self)
         return self._determination
 
     def invalidate(self):
@@ -96,15 +94,13 @@ class Gauge(object):
         You don't need to call this method because all mutating methods such as
         :meth:`incr` or :meth:`add_momentum` calls it.
         """
+        if self._determination is None:
+            return
         # remove the cached determination.
-        try:
-            del self._determination
-        except AttributeError:
-            pass
-        else:
-            # invalidate limited gauges together.
-            for gauge in self._limited_gauges:
-                gauge._limit_gauge_invalidated(self)
+        self._determination = None
+        # invalidate limited gauges together.
+        for gauge in self._limited_gauges:
+            gauge._limit_gauge_invalidated(self)
 
     def get_max(self, at=None):
         """Predicts the current maximum value."""
