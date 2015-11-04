@@ -174,9 +174,7 @@ class Line(object):
 
     """
 
-    since = None
-    until = None
-    value = None
+    __slots__ = ('since', 'until', 'value')
 
     velocity = NotImplemented
 
@@ -262,6 +260,8 @@ class Line(object):
 class Horizon(Line):
     """A line which has no velocity."""
 
+    __slots__ = ('since', 'until', 'value')
+
     velocity = 0
 
     def _get(self, at):
@@ -280,7 +280,7 @@ class Horizon(Line):
 class Ray(Line):
     """A line based on starting value and velocity."""
 
-    velocity = None
+    __slots__ = ('since', 'until', 'value', 'velocity')
 
     def __init__(self, since, until, value, velocity):
         super(Ray, self).__init__(since, until, value)
@@ -303,8 +303,8 @@ class Ray(Line):
 class Segment(Line):
     """A line based on starting and ending value."""
 
-    #: The value at `until`.
-    final = None
+    __slots__ = ('since', 'until', 'value',
+                 'final')  # the value at `until`.
 
     @staticmethod
     def _calc_value(at, time1, time2, value1, value2):
@@ -352,19 +352,18 @@ intersection_reliability = lambda l: _intersection_reliabilities[type(l)]
 
 class Boundary(object):
 
-    #: The current line.  To select next line, call :meth:`walk`.
-    line = None
-
-    #: The iterator of lines.
-    lines_iter = None
-
-    #: Compares two values.  Choose one of `operator.lt` and `operator.gt`.
-    cmp = None
-
-    #: Returns the best value in an iterable or arguments.  It is indicated
-    #: from :attr:`cmp` function.  `operator.lt` indicates :func:`min` and
-    #: `operator.gt` indicates :func:`max`.
-    best = None
+    __slots__ = (
+        #: The current line.  To select next line, call :meth:`walk`.
+        'line',
+        #: The iterator of lines.
+        'lines_iter',
+        #: Compares two values.  Choose one of `operator.lt` and `operator.gt`.
+        'cmp',
+        #: Returns the best value in an iterable or arguments.  It is indicated
+        #: from :attr:`cmp` function.  `operator.lt` indicates :func:`min` and
+        #: `operator.gt` indicates :func:`max`.
+        'best',
+    )
 
     def __init__(self, lines_iter, cmp=operator.lt):
         assert cmp in [operator.lt, operator.gt]
