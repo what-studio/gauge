@@ -248,17 +248,18 @@ def test_set_min_max():
     assert g.determination == [(0, 40), (10, 50)]
 
 
-def test_pickle(benchmark):
+def test_pickle():  # benchmark):
     g = Gauge(0, 10, at=0)
     r = Random(17171771)
     for x in range(10000):
         since = r.randrange(1000)
         until = since + 1 + r.randrange(1000)
         g.add_momentum(r.uniform(-10, +10), since=since, until=until)
-    @benchmark
+    # @benchmark
     def g2():
         data = pickle.dumps(g)
         return pickle.loads(data)
+    g2 = g2()
     assert g.determination == g2.determination
 
 
