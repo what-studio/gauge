@@ -18,7 +18,7 @@ try:
 except ImportError:
     from weakrefset import WeakSet
 
-from six.moves import map, zip
+from six.moves import zip
 from sortedcontainers import SortedList, SortedListWithKey
 
 from .__about__ import __version__  # noqa
@@ -29,6 +29,9 @@ from .deterministic import Determination, Segment
 
 __all__ = ['Gauge', 'Momentum',
            'ERROR', 'OK', 'ONCE', 'CLAMP', 'inf', 'now_or']
+
+
+by_until = operator.itemgetter(2)
 
 
 class Gauge(object):
@@ -62,7 +65,6 @@ class Gauge(object):
 
     def __preinit__(self):
         """Called by :meth:`__init__` and :meth:`__setstate__`."""
-        by_until = operator.itemgetter(2)
         self.momenta = SortedListWithKey(key=by_until)
         # momentum events.
         self._events = SortedList()
@@ -404,18 +406,16 @@ class Gauge(object):
         :raises ValueError: `since` later than or same with `until`.
         """
         momentum = self._make_momentum(*args, **kwargs)
-        self._update_momenta([momentum])
+        self.update_momenta([momentum])
         return momentum
 
-    def _update_momenta(self, momenta):
-        self.momenta.update(momenta)
-        events = []
+    def update_momenta(self, momenta):
+        """Adds multiple momenta."""
         for momentum in momenta:
-            since, until = momentum.since, momentum.until
-            events.append((since, ADD, momentum))
-            if until != +inf:
-                events.append((until, REMOVE, momentum))
-        self._events.update(events)
+            self.momenta.add(momentum)
+            self._events.add((momentum.since, ADD, momentum))
+            if momentum.until != +inf:
+                self._events.add((momentum.until, REMOVE, momentum))
         self.invalidate()
 
     def remove_momentum(self, *args, **kwargs):
@@ -512,7 +512,7 @@ class Gauge(object):
         self.forget_past(value, at=at)
 
     def __getstate__(self):
-        return (self.base, list(map(tuple, self.momenta)),
+        return (self.base, list(tuple(m) for m in self.momenta),
                 self.max_value, self.max_gauge,
                 self.min_value, self.min_gauge)
 
@@ -524,7 +524,8 @@ class Gauge(object):
         for limit_gauge in [self.max_gauge, self.min_gauge]:
             if limit_gauge is not None:
                 limit_gauge._limited_gauges.add(self)
-        self._update_momenta([self._make_momentum(*m) for m in momenta])
+        if momenta:
+            self.update_momenta([self._make_momentum(*m) for m in momenta])
 
     def __repr__(self, at=None):
         """Example strings:

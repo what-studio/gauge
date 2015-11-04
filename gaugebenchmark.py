@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import pickle
+import cPickle as pickle
 from random import Random
 
 import pytest
@@ -7,7 +7,7 @@ import pytest
 from gauge import Gauge
 
 
-@pytest.mark.parametrize('length', [0, 1, 100, 10000])
+@pytest.mark.parametrize('length', [0, 100])
 def test_pickle(benchmark, length):
     g = Gauge(0, 10, at=0)
     r = Random(length)
