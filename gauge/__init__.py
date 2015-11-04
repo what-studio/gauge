@@ -21,12 +21,12 @@ except ImportError:
 from six.moves import map, zip
 from sortedcontainers import SortedList, SortedListWithKey
 
+from .__about__ import __version__  # noqa
 from .common import ADD, REMOVE, TIME, VALUE
 from .common import CLAMP, ERROR, inf, now_or, OK, ONCE  # to export
 from .deterministic import Determination, Segment
 
 
-__version__ = '0.3.3'
 __all__ = ['Gauge', 'Momentum',
            'ERROR', 'OK', 'ONCE', 'CLAMP', 'inf', 'now_or']
 

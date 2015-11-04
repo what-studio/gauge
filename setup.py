@@ -3,19 +3,20 @@
 """
 from __future__ import with_statement
 
-import re
+import os
 
-from setuptools import setup
+from setuptools import Command, setup
 from setuptools.command.test import test
 
 
-# detect the current version
-with open('gauge/__init__.py') as f:
-    version = re.search(r'__version__\s*=\s*\'(.+?)\'', f.read()).group(1)
-assert version
+# include __about__.py.
+__dir__ = os.path.dirname(__file__)
+about = {}
+with open(os.path.join(__dir__, 'gauge', '__about__.py')) as f:
+    exec(f.read(), about)
 
 
-# use pytest instead
+# use pytest instead.
 def run_tests(self):
     raise SystemExit(__import__('pytest').main(['-v']))
 test.run_tests = run_tests
@@ -33,11 +34,11 @@ else:
 
 setup(
     name='gauge',
-    version=version,
-    license='BSD',
-    author='What! Studio',
-    maintainer='Heungsub Lee',
-    maintainer_email='sub@nexon.co.kr',
+    version=about['__version__'],
+    license=about['__license__'],
+    author=about['__author__'],
+    maintainer=about['__maintainer__'],
+    maintainer_email=about['__maintainer_email__'],
     url='https://github.com/what-studio/gauge',
     description='Deterministic linear gauge library',
     long_description=__doc__,
