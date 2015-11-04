@@ -9,6 +9,7 @@
     :license: BSD, see LICENSE for more details.
 """
 from __future__ import absolute_import
+
 from bisect import bisect_right
 from collections import namedtuple
 import operator
@@ -21,7 +22,7 @@ from six.moves import map, zip
 from sortedcontainers import SortedList, SortedListWithKey
 
 from .common import ADD, REMOVE, TIME, VALUE
-from .common import ERROR, OK, ONCE, CLAMP, inf, now_or  # to export
+from .common import CLAMP, ERROR, inf, now_or, OK, ONCE  # to export
 from .deterministic import Determination, Segment
 
 
