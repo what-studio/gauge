@@ -57,6 +57,6 @@ setup(
                  'Programming Language :: Python :: Implementation :: PyPy',
                  'Topic :: Games/Entertainment'],
     install_requires=install_requires,
-    tests_require=['pytest'],
+    tests_require=['pytest', 'pytest-benchmark'],
     test_suite='...',
 )

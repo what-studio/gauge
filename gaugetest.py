@@ -12,9 +12,9 @@ import types
 import pytest
 
 import gauge
-from gauge import Gauge, Momentum, OK, ONCE, CLAMP, inf
+from gauge import CLAMP, Gauge, inf, Momentum, OK, ONCE
 from gauge.common import ADD, REMOVE, TIME, VALUE
-from gauge.deterministic import Line, Horizon, Ray, Segment, Boundary
+from gauge.deterministic import Boundary, Horizon, Line, Ray, Segment
 
 
 PRECISION = 8
@@ -248,13 +248,15 @@ def test_set_min_max():
     assert g.determination == [(0, 40), (10, 50)]
 
 
-def test_pickle():
+def test_pickle(benchmark):
     g = Gauge(0, 10, at=0)
     g.add_momentum(+1, since=0)
     g.add_momentum(-2, since=5, until=7)
     assert g.determination == [(0, 0), (5, 5), (7, 3), (14, 10)]
-    data = pickle.dumps(g)
-    g2 = pickle.loads(data)
+    @benchmark
+    def g2():
+        data = pickle.dumps(g)
+        return pickle.loads(data)
     assert g2.determination == [(0, 0), (5, 5), (7, 3), (14, 10)]
 
 
