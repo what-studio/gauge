@@ -22,6 +22,15 @@ def run_tests(self):
 test.run_tests = run_tests
 
 
+class Benchmark(Command):
+
+    user_options = []
+    initialize_options = finalize_options = lambda x: None
+
+    def run(self):
+        raise SystemExit(__import__('pytest').main(['gaugebenchmark.py']))
+
+
 install_requires = ['six>=1.8.0', 'sortedcontainers>=0.8.2']
 try:
     from weakref import WeakSet
@@ -62,4 +71,5 @@ setup(
     install_requires=install_requires,
     tests_require=['pytest'],
     test_suite='...',
+    cmdclass={'benchmark': Benchmark},
 )
