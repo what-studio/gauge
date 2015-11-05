@@ -1153,5 +1153,13 @@ def test_intersection_of_vertical_segment_reversed():
         [(-1, -2.5), (0, -0.5), (0.5, 0)]
 
 
+def test_invalidate_returns():
+    g = Gauge(0, 100, at=0)
+    assert not g.invalidate()
+    g.get(0)
+    assert g.invalidate()
+    assert not g.invalidate()
+
+
 def test_deprecate():
     pytest.deprecated_call(deprecate, 'Hello, {0}', 'world')

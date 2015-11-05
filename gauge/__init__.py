@@ -93,14 +93,17 @@ class Gauge(object):
 
         You don't need to call this method because all mutating methods such as
         :meth:`incr` or :meth:`add_momentum` calls it.
+
+        :returns: whether the gauge is invalidated actually.
         """
         if self._determination is None:
-            return
+            return False
         # remove the cached determination.
         self._determination = None
         # invalidate limited gauges together.
         for gauge in self._limited_gauges:
             gauge._limit_gauge_invalidated(self)
+        return True
 
     def get_max(self, at=None):
         """Predicts the current maximum value."""
