@@ -533,22 +533,6 @@ class Gauge(object):
             self.max_value, self.max_gauge, self.min_value, self.min_gauge
         )
 
-#     def __getstate__(self):
-#         return (self.base, list(tuple(m) for m in self.momenta),
-#                 self.max_value, self.max_gauge,
-#                 self.min_value, self.min_gauge)
-
-#     def __setstate__(self, state):
-#         self.__preinit__()
-#         (self.base, momenta,
-#          self.max_value, self.max_gauge,
-#          self.min_value, self.min_gauge) = state
-#         for limit_gauge in [self.max_gauge, self.min_gauge]:
-#             if limit_gauge is not None:
-#                 limit_gauge._limited_gauges.add(self)
-#         if momenta:
-#             self.add_momenta([self._make_momentum(*m) for m in momenta])
-
     def __repr__(self, at=None):
         """Example strings:
 
