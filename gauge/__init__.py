@@ -34,6 +34,21 @@ __all__ = ['Gauge', 'Momentum',
 by_until = operator.itemgetter(2)
 
 
+def restore_gauge(gauge_class, base, momenta,
+                  max_value, max_gauge, min_value, min_gauge):
+    """Restores a gauge from the arguments.  It is used for Pickling."""
+    gauge = gauge_class.__new__(gauge_class)
+    gauge.__preinit__()
+    gauge.base = base
+    gauge.max_value, gauge.max_gauge = max_value, max_gauge
+    gauge.min_value, gauge.min_gauge = min_value, min_gauge
+    max_gauge is not None and max_gauge._limited_gauges.add(gauge)
+    min_gauge is not None and min_gauge._limited_gauges.add(gauge)
+    if momenta:
+        gauge.add_momenta([gauge_class._make_momentum(*m) for m in momenta])
+    return gauge
+
+
 class Gauge(object):
     """Represents a gauge.  A gauge has a value at any moment.  It can be
     modified by an user's adjustment or an effective momentum.
@@ -359,7 +374,8 @@ class Gauge(object):
         at = now_or(at)
         return in_range_since <= at
 
-    def _make_momentum(self, velocity_or_momentum, since=None, until=None):
+    @staticmethod
+    def _make_momentum(velocity_or_momentum, since=None, until=None):
         """Makes a :class:`Momentum` object by the given arguments.
 
         Override this if you want to use your own momentum class.
@@ -511,21 +527,27 @@ class Gauge(object):
             value = clamp(value, limit_value)
         self.forget_past(value, at=at)
 
-    def __getstate__(self):
-        return (self.base, list(tuple(m) for m in self.momenta),
-                self.max_value, self.max_gauge,
-                self.min_value, self.min_gauge)
+    def __reduce__(self):
+        return restore_gauge, (
+            self.__class__, self.base, list(tuple(m) for m in self.momenta),
+            self.max_value, self.max_gauge, self.min_value, self.min_gauge
+        )
 
-    def __setstate__(self, state):
-        self.__preinit__()
-        (self.base, momenta,
-         self.max_value, self.max_gauge,
-         self.min_value, self.min_gauge) = state
-        for limit_gauge in [self.max_gauge, self.min_gauge]:
-            if limit_gauge is not None:
-                limit_gauge._limited_gauges.add(self)
-        if momenta:
-            self.add_momenta([self._make_momentum(*m) for m in momenta])
+#     def __getstate__(self):
+#         return (self.base, list(tuple(m) for m in self.momenta),
+#                 self.max_value, self.max_gauge,
+#                 self.min_value, self.min_gauge)
+
+#     def __setstate__(self, state):
+#         self.__preinit__()
+#         (self.base, momenta,
+#          self.max_value, self.max_gauge,
+#          self.min_value, self.min_gauge) = state
+#         for limit_gauge in [self.max_gauge, self.min_gauge]:
+#             if limit_gauge is not None:
+#                 limit_gauge._limited_gauges.add(self)
+#         if momenta:
+#             self.add_momenta([self._make_momentum(*m) for m in momenta])
 
     def __repr__(self, at=None):
         """Example strings:
