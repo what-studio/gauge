@@ -9,15 +9,10 @@ from gauge.deterministic import Determination
 
 
 r = Random(42)
+pickle_protocols = list(range(pickle.HIGHEST_PROTOCOL + 1))
 
 
-def add_random_momentum(g):
-    since = r.randrange(1000)
-    until = since + 1 + r.randrange(1000)
-    g.add_momentum(r.uniform(-10, +10), since=since, until=until)
-
-
-@pytest.fixture(scope='module', params=[0, 100])
+@pytest.fixture(scope='module', params=[0, 10, 100])
 def g(request):
     length = request.param
     g = Gauge(0, 10, at=0)
@@ -26,12 +21,20 @@ def g(request):
     return g
 
 
-def test_pickle_dump(benchmark, g):
-    benchmark(lambda: pickle.dumps(g))
+def add_random_momentum(g):
+    since = r.randrange(1000)
+    until = since + 1 + r.randrange(1000)
+    g.add_momentum(r.uniform(-10, +10), since=since, until=until)
 
 
-def test_pickle_load(benchmark, g):
-    d = pickle.dumps(g)
+@pytest.mark.parametrize('pickle_protocol', pickle_protocols)
+def test_pickle_dump(benchmark, pickle_protocol, g):
+    benchmark(lambda: pickle.dumps(g, pickle_protocol))
+
+
+@pytest.mark.parametrize('pickle_protocol', pickle_protocols)
+def test_pickle_load(benchmark, pickle_protocol, g):
+    d = pickle.dumps(g, pickle_protocol)
     benchmark(lambda: pickle.loads(d))
 
 
