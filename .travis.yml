@@ -9,6 +9,7 @@ python:
 - pypy
 - pypy3
 install:
+- pip install -e .
 - pip install coveralls
 - pip install pytest-benchmark
 script:
