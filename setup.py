@@ -7,6 +7,7 @@ import os
 
 from setuptools import Command, setup
 from setuptools.command.test import test
+from setuptools.extension import Extension
 
 
 # include __about__.py.
@@ -53,6 +54,7 @@ setup(
     long_description=__doc__,
     platforms='any',
     packages=['gauge'],
+    ext_modules=[Extension('gauge.speedup', ['gauge/speedup.c'])],
     classifiers=['Development Status :: 4 - Beta',
                  'Intended Audience :: Developers',
                  'License :: OSI Approved :: BSD License',
