@@ -34,18 +34,24 @@ __all__ = ['Gauge', 'Momentum',
 by_until = operator.itemgetter(2)
 
 
-def restore_gauge(gauge_class, base, momenta,
-                  max_value, max_gauge, min_value, min_gauge):
-    """Restores a gauge from the arguments.  It is used for Pickling."""
-    gauge = gauge_class.__new__(gauge_class)
-    gauge.__preinit__()
+def restore_into(gauge, base, momenta, max_value,
+                 max_gauge, min_value, min_gauge):
     gauge.base = base
     gauge.max_value, gauge.max_gauge = max_value, max_gauge
     gauge.min_value, gauge.min_gauge = min_value, min_gauge
     max_gauge is not None and max_gauge._limited_gauges.add(gauge)
     min_gauge is not None and min_gauge._limited_gauges.add(gauge)
     if momenta:
-        gauge.add_momenta([gauge_class._make_momentum(*m) for m in momenta])
+        gauge.add_momenta([gauge._make_momentum(*m) for m in momenta])
+
+
+def restore_gauge(gauge_class, base, momenta, max_value,
+                  max_gauge, min_value, min_gauge):
+    """Restores a gauge from the arguments.  It is used for Pickling."""
+    gauge = gauge_class.__new__(gauge_class)
+    gauge.__preinit__()
+    restore_into(gauge, base, momenta, max_value,
+                 max_gauge, min_value, min_gauge)
     return gauge
 
 
