@@ -5,7 +5,7 @@
 
     The common components such as constants or utility functions.
 
-    :copyright: (c) 2013-2015 by What! Studio
+    :copyright: (c) 2013-2016 by What! Studio
     :license: BSD, see LICENSE for more details.
 """
 from time import time as now
