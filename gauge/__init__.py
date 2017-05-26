@@ -535,7 +535,7 @@ class Gauge(object):
 
     def __reduce__(self):
         return restore_gauge, (
-            self.__class__, self.base, list(tuple(m) for m in self.momenta),
+            self.__class__, self.base, [tuple(m) for m in self.momenta],
             self.max_value, self.max_gauge, self.min_value, self.min_gauge
         )
 
