@@ -325,7 +325,6 @@ def test_whenever():
     with pytest.raises(ValueError):
         g.when(3, after=4)
     whenever = g.whenever(3)
-    assert isinstance(whenever, types.GeneratorType)
     assert list(whenever) == [3, 5, 7, 9]
     # inverse
     g = Gauge(10, 10, at=0)
