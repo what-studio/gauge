@@ -10,6 +10,7 @@ python:
 - pypy
 - pypy3
 install:
+- pip install cython
 - pip install -e .
 - pip install coveralls
 - pip install pytest-benchmark
