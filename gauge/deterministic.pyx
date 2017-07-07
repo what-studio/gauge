@@ -55,6 +55,12 @@ class Determination(list):
         """Determines the transformations from the time when the value set to
         the farthest future.
         """
+        cdef double since
+        cdef double until
+        cdef double value
+        cdef double velocity
+        cdef list velocities
+        cdef bint overlapped
         since, value = gauge.base
         velocity, velocities = 0, []
         bound, overlapped = None, False
@@ -78,6 +84,9 @@ class Determination(list):
             boundary_value = boundary.line.guess(since)
             if boundary.cmp(boundary_value, value):
                 bound, overlapped = boundary, False
+        cdef double time
+        cdef int method
+        cdef bint again
         for time, method, momentum in gauge.momentum_events():
             # normalize time.
             until = max(time, gauge.base[TIME])

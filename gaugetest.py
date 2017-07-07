@@ -7,13 +7,12 @@ import pickle
 import random
 from random import Random
 import time
-import types
 
 import pytest
 
 import gauge
 from gauge import CLAMP, Gauge, inf, Momentum, OK, ONCE
-from gauge.common import ADD, deprecate, REMOVE, TIME, VALUE
+from gauge.common import ADD, deprecate, NONE, REMOVE, TIME, VALUE
 from gauge.deterministic import (
     Boundary, Determination, Horizon, Line, Ray, Segment)
 
@@ -810,10 +809,10 @@ def test_clear_momentum_events():
     g = Gauge(0, 10, at=0)
     m = g.add_momentum(+1, since=10, until=20)
     assert list(g.momentum_events()) == \
-        [(0, None, None), (10, ADD, m), (20, REMOVE, m), (+inf, None, None)]
+        [(0, NONE, None), (10, ADD, m), (20, REMOVE, m), (+inf, NONE, None)]
     assert len(g._events) == 2
     g.remove_momentum(m)
-    assert list(g.momentum_events()) == [(0, None, None), (+inf, None, None)]
+    assert list(g.momentum_events()) == [(0, NONE, None), (+inf, NONE, None)]
     assert len(g._events) == 0
 
 
@@ -1109,7 +1108,7 @@ def test_momentum_event_order():
     g.add_momentum(m)
     assert \
         list(g.momentum_events()) == \
-        [(0, None, None), (10, ADD, m), (10, REMOVE, m), (+inf, None, None)]
+        [(0, NONE, None), (10, ADD, m), (10, REMOVE, m), (+inf, NONE, None)]
 
 
 def test_case7():
