@@ -22,10 +22,10 @@ except ImportError:
 from six.moves import zip
 from sortedcontainers import SortedList, SortedListWithKey
 
-from .__about__ import __version__  # noqa
-from .common import ADD, REMOVE, TIME, VALUE
-from .common import CLAMP, ERROR, inf, now_or, OK, ONCE  # to export
-from .deterministic import Determination, Segment
+from gauge.__about__ import __version__  # noqa
+from gauge.common import ADD, REMOVE, TIME, VALUE
+from gauge.common import CLAMP, ERROR, inf, now_or, OK, ONCE  # to export
+from gauge.deterministic import Determination, Segment
 
 
 __all__ = ['Gauge', 'Momentum',
