@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-    gauge.common
-    ~~~~~~~~~~~~
+   gauge.common
+   ~~~~~~~~~~~~
 
-    The common components such as constants or utility functions.
+   The common components such as constants or utility functions.
 
-    :copyright: (c) 2013-2016 by What! Studio
-    :license: BSD, see LICENSE for more details.
+   :copyright: (c) 2013-2017 by What! Studio
+   :license: BSD, see LICENSE for more details.
+
 """
 from time import time as now
 import warnings

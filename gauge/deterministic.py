@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-    gauge.deterministic
-    ~~~~~~~~~~~~~~~~~~~
+   gauge.deterministic
+   ~~~~~~~~~~~~~~~~~~~
 
-    Determining logics for gauge.
+   Determining logics for gauge.
 
-    :copyright: (c) 2013-2016 by What! Studio
-    :license: BSD, see LICENSE for more details.
+   :copyright: (c) 2013-2017 by What! Studio
+   :license: BSD, see LICENSE for more details.
+
 """
 from __future__ import absolute_import
 

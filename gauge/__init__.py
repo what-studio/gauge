@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-    gauge
-    ~~~~~
+   gauge
+   ~~~~~
 
-    Deterministic linear gauge library.
+   Deterministic linear gauge library.
 
-    :copyright: (c) 2013-2016 by What! Studio
-    :license: BSD, see LICENSE for more details.
+   :copyright: (c) 2013-2017 by What! Studio
+   :license: BSD, see LICENSE for more details.
+
 """
 from __future__ import absolute_import
 
