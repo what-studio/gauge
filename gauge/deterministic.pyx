@@ -30,7 +30,7 @@ class Determination(list):
     in_range_since = None
 
     @staticmethod
-    def value_lines(gauge, value):
+    def value_lines(gauge, double value):
         yield Horizon(gauge.base[TIME], +inf, value)
 
     @staticmethod
@@ -44,7 +44,7 @@ class Determination(list):
             yield Segment(time1, time2, value1, value2)
         yield Horizon(last[TIME], +inf, last[VALUE])
 
-    def determine(self, time, value, in_range=True):
+    def determine(self, double time, double value, bint in_range=True):
         if self and self[-1][TIME] == time:
             return
         if in_range and self.in_range_since is None:
@@ -216,19 +216,19 @@ class Line(object):
         else:
             return self.get(at)
 
-    def _get(self, at):
+    def _get(self, double at):
         """Implement at subclass as to calculate the value at the given time
         which is between the time range.
         """
         raise NotImplementedError
 
-    def _earlier(self, at):
+    def _earlier(self, double at):
         """Implement at subclass as to calculate the value at the given time
         which is earlier than `since`.
         """
         raise NotImplementedError
 
-    def _later(self, at):
+    def _later(self, double at):
         """Implement at subclass as to calculate the value at the given time
         which is later than `until`.
         """
@@ -239,6 +239,8 @@ class Line(object):
 
         :raises ValueError: there's no intersection.
         """
+        cdef double time
+        cdef double value
         lines = [self, line]
         lines.sort(key=intersection_reliability, reverse=True)
         left, right = lines  # right is more reliable.
@@ -277,13 +279,13 @@ class Horizon(Line):
 
     velocity = 0
 
-    def _get(self, at):
+    def _get(self, double at):
         return self.value
 
-    def _earlier(self, at):
+    def _earlier(self, double at):
         return self.value
 
-    def _later(self, at):
+    def _later(self, double at):
         return self.value
 
     def __repr__(self):
@@ -299,13 +301,13 @@ class Ray(Line):
         super(Ray, self).__init__(since, until, value)
         self.velocity = velocity
 
-    def _get(self, at):
+    def _get(self, double at):
         return self.value + self.velocity * (at - self.since)
 
-    def _earlier(self, at):
+    def _earlier(self, double at):
         return self.value
 
-    def _later(self, at):
+    def _later(self, double at):
         return self._get(self.until)
 
     def __repr__(self):
@@ -320,16 +322,19 @@ class Segment(Line):
                  'final')  # the value at `until`.
 
     @staticmethod
-    def _calc_value(at, time1, time2, value1, value2):
+    def _calc_value(double at,
+                    double time1, double time2,
+                    double value1, double value2):
         if at == time1:
             return value1
         elif at == time2:
             return value2
-        rate = float(at - time1) / (time2 - time1)
+        cdef double rate = float(at - time1) / (time2 - time1)
         return value1 + rate * (value2 - value1)
 
     @staticmethod
-    def _calc_velocity(time1, time2, value1, value2):
+    def _calc_velocity(double time1, double time2,
+                       double value1, double value2):
         return (value2 - value1) / (time2 - time1)
 
     @property
@@ -337,18 +342,18 @@ class Segment(Line):
         return self._calc_velocity(self.since, self.until,
                                    self.value, self.final)
 
-    def __init__(self, since, until, value, final):
+    def __init__(self, double since, double until, double value, double final):
         super(Segment, self).__init__(since, until, value)
         self.final = final
 
-    def _get(self, at):
+    def _get(self, double at):
         return self._calc_value(at, self.since, self.until,
                                 self.value, self.final)
 
-    def _earlier(self, at):
+    def _earlier(self, double at):
         return self.value
 
-    def _later(self, at):
+    def _later(self, double at):
         return self.final
 
     def __repr__(self):
@@ -389,10 +394,10 @@ class Boundary(object):
         """Choose the next line."""
         self.line = next(self.lines_iter)
 
-    def cmp_eq(self, x, y):
+    def cmp_eq(self, double x, double y):
         return x == y or self.cmp(x, y)
 
-    def cmp_inv(self, x, y):
+    def cmp_inv(self, double x, double y):
         return x != y and not self.cmp(x, y)
 
     def __repr__(self):
