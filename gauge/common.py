@@ -13,13 +13,14 @@ from time import time as now
 import warnings
 
 
-__all__ = ['ADD', 'REMOVE', 'TIME', 'VALUE', 'ERROR', 'OK', 'ONCE', 'CLAMP',
-           'inf', 'now_or', 'deprecate']
+__all__ = ['NONE', 'ADD', 'REMOVE', 'TIME', 'VALUE', 'ERROR', 'OK', 'ONCE',
+           'CLAMP', 'inf', 'now_or', 'deprecate']
 
 
 # events.
-ADD = 0
-REMOVE = 1
+NONE = 0
+ADD = 1
+REMOVE = 2
 
 
 # indices.

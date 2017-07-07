@@ -13,13 +13,12 @@ from six.moves import zip
 from sortedcontainers import SortedList, SortedListWithKey
 
 from gauge.__about__ import __version__  # noqa
-from gauge.common import ADD, REMOVE, TIME, VALUE
-from gauge.common import CLAMP, ERROR, inf, now_or, OK, ONCE  # to export
+from gauge.common import (
+    ADD, CLAMP, ERROR, inf, NONE, now_or, OK, ONCE, REMOVE, TIME, VALUE)
 from gauge.deterministic import Determination, Segment
 
 
-__all__ = ['Gauge', 'Momentum',
-           'ERROR', 'OK', 'ONCE', 'CLAMP', 'inf', 'now_or']
+__all__ = ['Gauge', 'Momentum']
 
 
 by_until = operator.itemgetter(2)
@@ -459,14 +458,14 @@ class Gauge(object):
         """Yields momentum adding and removing events.  An event is a tuple of
         ``(time, ADD|REMOVE, momentum)``.
         """
-        yield (self.base[TIME], None, None)
+        yield (self.base[TIME], NONE, None)
         momentum_ids = set(id(m) for m in self.momenta)
         for time, method, momentum in list(self._events):
             if id(momentum) not in momentum_ids:
                 self._events.remove((time, method, momentum))
                 continue
             yield time, method, momentum
-        yield (+inf, None, None)
+        yield (+inf, NONE, None)
 
     def _rebase(self, value=None, at=None, remove_momenta_before=None):
         """Sets the base and removes momenta between indexes of ``start`` and
