@@ -253,9 +253,12 @@ class Line(object):
         """Gets the value-intercept. (Y-intercept)"""
         return self.value - self.velocity * self.since
 
-    def __repr__(self, string=''):
+    def _repr(self, str string):
         return ('<{0}{1} for {2!r}~{3!r}>'
                 ''.format(type(self).__name__, string, self.since, self.until))
+
+    def __repr__(self):
+        return self._repr('')
 
 
 class Horizon(Line):
@@ -275,7 +278,7 @@ class Horizon(Line):
         return self.value
 
     def __repr__(self):
-        return super(Horizon, self).__repr__(' {0:.2f}'.format(self.value))
+        return super(Horizon, self)._repr(' {0:.2f}'.format(self.value))
 
 
 class Ray(Line):
@@ -298,7 +301,7 @@ class Ray(Line):
 
     def __repr__(self):
         string = ' {0:.2f}{1:+.2f}/s'.format(self.value, self.velocity)
-        return super(Ray, self).__repr__(string)
+        return super(Ray, self)._repr(string)
 
 
 class Segment(Line):
@@ -341,7 +344,7 @@ class Segment(Line):
 
     def __repr__(self):
         string = ' {0:.2f}~{1:.2f}'.format(self.value, self.final)
-        return super(Segment, self).__repr__(string)
+        return super(Segment, self)._repr(string)
 
 
 #: The reliability map of line classes for precise intersection.
