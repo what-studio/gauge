@@ -58,12 +58,11 @@ class Determination(list):
         cdef double since
         cdef double until
         cdef double value
-        cdef double velocity
-        cdef list velocities
-        cdef bint overlapped
+        cdef double velocity = 0
+        cdef list velocities = []
+        cdef bint bounded = False
+        cdef bint overlapped = False
         since, value = gauge.base
-        velocity, velocities = 0, []
-        bound, overlapped = None, False
         # boundaries.
         ceil_lines_iter = (self.value_lines(gauge, gauge.max_value)
                            if gauge.max_gauge is None else
@@ -71,22 +70,26 @@ class Determination(list):
         floor_lines_iter = (self.value_lines(gauge, gauge.min_value)
                             if gauge.min_gauge is None else
                             self.gauge_lines(gauge, gauge.min_gauge))
-        ceil = Boundary(ceil_lines_iter, operator.lt)
-        floor = Boundary(floor_lines_iter, operator.gt)
-        boundaries = [ceil, floor]
+        cdef Boundary bound
+        cdef Boundary boundary
+        cdef ceil = Boundary(ceil_lines_iter, operator.lt)
+        cdef floor = Boundary(floor_lines_iter, operator.gt)
+        cdef boundaries = [ceil, floor]
         for boundary in boundaries:
             # skip past boundaries.
-            while boundary.line.until <= since:
+            while boundary._line.until <= since:
                 boundary.walk()
             # check overflowing.
-            if bound is not None:
+            if bounded:
                 continue
-            boundary_value = boundary.line.guess(since)
-            if boundary.cmp(boundary_value, value):
-                bound, overlapped = boundary, False
+            boundary_value = boundary._line.guess(since)
+            if boundary._cmp(boundary_value, value):
+                bound, bounded, overlapped = boundary, True, False
         cdef double time
         cdef int method
         cdef bint again
+        cdef list walked_boundaries
+        cdef Boundary b
         for time, method, momentum in gauge.momentum_events():
             # normalize time.
             until = max(time, gauge.base[TIME])
@@ -96,67 +99,78 @@ class Determination(list):
             while since < until:
                 if again:
                     again = False
-                    if bound is None:
-                        walked_boundaries = boundaries
-                    else:
+                    if bounded:
                         walked_boundaries = [bound]
+                    else:
+                        walked_boundaries = boundaries
                 else:
                     # stop the loop if all boundaries have been proceeded.
-                    if all(b.line.until >= until for b in boundaries):
+                    # if all(b.line.until >= until for b in boundaries):
+                    #     break
+                    for b in boundaries:
+                        if b._line.until < until:
+                            break
+                    else:
                         break
+                    # ---
                     # choose the next boundary.
-                    boundary = min(boundaries, key=lambda b: b.line.until)
+                    # boundary = min(boundaries, key=lambda b: b.line.until)
+                    boundary = boundaries[0]
+                    for b in boundaries:
+                        if b._line.until < boundary._line.until:
+                            boundary = b
+                    # ---
                     boundary.walk()
                     walked_boundaries = [boundary]
                 # calculate velocity.
-                if bound is None:
+                if not bounded:
                     velocity = sum(velocities)
                 elif overlapped:
-                    velocity = bound.best(sum(velocities), bound.line.velocity)
+                    velocity = bound._best(sum(velocities), bound._line.velocity)
                 else:
-                    velocity = sum(v for v in velocities if bound.cmp(v, 0))
+                    velocity = sum(v for v in velocities if bound._cmp(v, 0))
                 # is still bound?
-                if overlapped and bound.cmp(velocity, bound.line.velocity):
-                    bound, overlapped = None, False
+                if overlapped and bound._cmp(velocity, bound._line.velocity):
+                    bounded, overlapped = False, False
                     again = True
                     continue
                 # current value line.
                 line = Ray(since, until, value, velocity)
                 if overlapped:
-                    bound_until = min(bound.line.until, until)
+                    bound_until = min(bound._line.until, until)
                     if bound_until == +inf:
                         break
                     # released from the boundary.
-                    since, value = (bound_until, bound.line.get(bound_until))
+                    since, value = (bound_until, bound._line.get(bound_until))
                     self.determine(since, value)
                     continue
                 for boundary in walked_boundaries:
                     # find the intersection with a boundary.
                     try:
-                        intersection = line.intersect(boundary.line)
+                        intersection = line.intersect(boundary._line)
                     except ValueError:
                         continue
                     if intersection[TIME] == since:
                         continue
                     again = True  # iterate with same boundaries again.
-                    bound, overlapped = boundary, True
+                    bound, bounded, overlapped = boundary, True, True
                     since, value = intersection
                     # clamp by the boundary.
-                    value = boundary.best(value, boundary.line.guess(since))
+                    value = boundary._best(value, boundary._line.guess(since))
                     self.determine(since, value)
                     break
-                if bound is not None:
+                if bounded:
                     continue  # the intersection was found.
                 for boundary in walked_boundaries:
                     # find missing intersection caused by floating-point
                     # inaccuracy.
-                    bound_until = min(boundary.line.until, until)
+                    bound_until = min(boundary._line.until, until)
                     if bound_until == +inf or bound_until < since:
                         continue
-                    boundary_value = boundary.line.get(bound_until)
+                    boundary_value = boundary._line.get(bound_until)
                     if boundary.cmp_eq(line.get(bound_until), boundary_value):
                         continue
-                    bound, overlapped = boundary, True
+                    bound, bounded, overlapped = boundary, True, True
                     since, value = bound_until, boundary_value
                     self.determine(since, value)
                     break
@@ -164,7 +178,7 @@ class Determination(list):
                 break
             # determine the final node in the current itreration.
             value += velocity * (until - since)
-            self.determine(until, value, in_range=bound is None or overlapped)
+            self.determine(until, value, in_range=not bounded or overlapped)
             # prepare the next iteration.
             if method == ADD:
                 velocities.append(momentum.velocity)
@@ -368,38 +382,42 @@ _intersection_reliabilities = {Horizon: 3, Ray: 2, Segment: 1}
 intersection_reliability = lambda l: _intersection_reliabilities[type(l)]
 
 
-class Boundary(object):
+cdef class Boundary:
 
-    __slots__ = (
-        #: The current line.  To select next line, call :meth:`walk`.
-        'line',
-        #: The iterator of lines.
-        'lines_iter',
-        #: Compares two values.  Choose one of `operator.lt` and `operator.gt`.
-        'cmp',
-        #: Returns the best value in an iterable or arguments.  It is indicated
-        #: from :attr:`cmp` function.  `operator.lt` indicates :func:`min` and
-        #: `operator.gt` indicates :func:`max`.
-        'best',
-    )
+    cdef _line
+    cdef _lines_iter
+    cdef _cmp
+    cdef _best
 
     def __init__(self, lines_iter, cmp=operator.lt):
         assert cmp in [operator.lt, operator.gt]
-        self.lines_iter = lines_iter
-        self.cmp = cmp
-        self.best = {operator.lt: min, operator.gt: max}[cmp]
+        self._lines_iter = lines_iter
+        self._cmp = cmp
+        self._best = {operator.lt: min, operator.gt: max}[cmp]
         self.walk()
+
+    @property
+    def line(self):
+        return self._line
+
+    @property
+    def cmp(self):
+        return self._cmp
+
+    @property
+    def best(self):
+        return self._best
 
     def walk(self):
         """Choose the next line."""
-        self.line = next(self.lines_iter)
+        self._line = next(self._lines_iter)
 
     def cmp_eq(self, double x, double y):
-        return x == y or self.cmp(x, y)
+        return x == y or self._cmp(x, y)
 
     def cmp_inv(self, double x, double y):
-        return x != y and not self.cmp(x, y)
+        return x != y and not self._cmp(x, y)
 
     def __repr__(self):
         return ('<{0} line={1}, cmp={2}>'
-                ''.format(type(self).__name__, self.line, self.cmp))
+                ''.format(type(self).__name__, self._line, self._cmp))
