@@ -64,12 +64,16 @@ class Determination(list):
         cdef bint overlapped = False
         since, value = gauge.base
         # boundaries.
-        ceil_lines_iter = (self.value_lines(gauge, gauge.max_value)
-                           if gauge.max_gauge is None else
-                           self.gauge_lines(gauge, gauge.max_gauge))
-        floor_lines_iter = (self.value_lines(gauge, gauge.min_value)
-                            if gauge.min_gauge is None else
-                            self.gauge_lines(gauge, gauge.min_gauge))
+        cdef ceil_lines_iter = (
+            self.value_lines(gauge, gauge.max_value)
+            if gauge.max_gauge is None else
+            self.gauge_lines(gauge, gauge.max_gauge)
+        )
+        cdef floor_lines_iter = (
+            self.value_lines(gauge, gauge.min_value)
+            if gauge.min_gauge is None else
+            self.gauge_lines(gauge, gauge.min_gauge)
+        )
         cdef Boundary bound
         cdef Boundary boundary
         cdef ceil = Boundary(ceil_lines_iter, operator.lt)
