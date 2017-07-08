@@ -60,7 +60,7 @@ cdef class Determination(list):
         if self._in_range:
             return self._in_range_since
 
-    def determine(self, double time, double value, bint in_range=True):
+    cdef void _determine(self, double time, double value, bint in_range=True):
         if self and self[-1][TIME] == time:
             return
         if in_range and not self._in_range:
@@ -157,7 +157,7 @@ cdef class Determination(list):
                         break
                     # released from the boundary.
                     since, value = (bound_until, bound._line.get(bound_until))
-                    self.determine(since, value)
+                    self._determine(since, value)
                     continue
                 for boundary in walked_boundaries:
                     # find the intersection with a boundary.
@@ -172,7 +172,7 @@ cdef class Determination(list):
                     since, value = intersection
                     # clamp by the boundary.
                     value = boundary._best(value, boundary._line.guess(since))
-                    self.determine(since, value)
+                    self._determine(since, value)
                     break
                 if bounded:
                     continue  # the intersection was found.
@@ -187,19 +187,20 @@ cdef class Determination(list):
                         continue
                     bound, bounded, overlapped = boundary, True, True
                     since, value = bound_until, boundary_value
-                    self.determine(since, value)
+                    self._determine(since, value)
                     break
             if until == +inf:
                 break
             # determine the final node in the current itreration.
             value += velocity * (until - since)
-            self.determine(until, value, in_range=not bounded or overlapped)
+            self._determine(until, value, in_range=not bounded or overlapped)
             # prepare the next iteration.
             if method == ADD:
                 velocities.append(momentum.velocity)
             elif method == REMOVE:
                 velocities.remove(momentum.velocity)
             since = until
+        # close all boundaries.
         for boundary in boundaries:
             boundary._close()
 
