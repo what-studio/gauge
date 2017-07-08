@@ -60,8 +60,6 @@ class Determination(list):
         cdef double value
         cdef double velocity = 0
         cdef list velocities = []
-        cdef bint bounded = False
-        cdef bint overlapped = False
         since, value = gauge.base
         # boundaries.
         cdef ceil_lines_iter = (
@@ -79,6 +77,8 @@ class Determination(list):
         cdef ceil = Boundary(ceil_lines_iter, operator.lt)
         cdef floor = Boundary(floor_lines_iter, operator.gt)
         cdef boundaries = [ceil, floor]
+        cdef bint bounded = False
+        cdef bint overlapped = False
         for boundary in boundaries:
             # skip past boundaries.
             while boundary._line.until <= since:
@@ -130,7 +130,8 @@ class Determination(list):
                 if not bounded:
                     velocity = sum(velocities)
                 elif overlapped:
-                    velocity = bound._best(sum(velocities), bound._line.velocity)
+                    velocity = bound._best(sum(velocities),
+                                           bound._line.velocity)
                 else:
                     velocity = sum(v for v in velocities if bound._cmp(v, 0))
                 # is still bound?
