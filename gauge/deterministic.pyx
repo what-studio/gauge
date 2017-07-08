@@ -78,7 +78,7 @@ class Determination(list):
         for boundary in boundaries:
             # skip past boundaries.
             while boundary._line.until <= since:
-                boundary.walk()
+                boundary._walk()
             # check overflowing.
             if bounded:
                 continue
@@ -120,7 +120,7 @@ class Determination(list):
                         if b._line.until < boundary._line.until:
                             boundary = b
                     # ---
-                    boundary.walk()
+                    boundary._walk()
                     walked_boundaries = [boundary]
                 # calculate velocity.
                 if not bounded:
@@ -168,7 +168,7 @@ class Determination(list):
                     if bound_until == +inf or bound_until < since:
                         continue
                     boundary_value = boundary._line.get(bound_until)
-                    if boundary.cmp_eq(line.get(bound_until), boundary_value):
+                    if boundary._cmp_eq(line.get(bound_until), boundary_value):
                         continue
                     bound, bounded, overlapped = boundary, True, True
                     since, value = bound_until, boundary_value
@@ -389,13 +389,6 @@ cdef class Boundary:
     cdef _cmp
     cdef _best
 
-    def __init__(self, lines_iter, cmp=operator.lt):
-        assert cmp in [operator.lt, operator.gt]
-        self._lines_iter = lines_iter
-        self._cmp = cmp
-        self._best = {operator.lt: min, operator.gt: max}[cmp]
-        self.walk()
-
     @property
     def line(self):
         return self._line
@@ -408,15 +401,31 @@ cdef class Boundary:
     def best(self):
         return self._best
 
-    def walk(self):
+    def __init__(self, lines_iter, cmp=operator.lt):
+        assert cmp in [operator.lt, operator.gt]
+        self._lines_iter = lines_iter
+        self._cmp = cmp
+        self._best = {operator.lt: min, operator.gt: max}[cmp]
+        self._walk()
+
+    cdef _walk(self):
         """Choose the next line."""
         self._line = next(self._lines_iter)
 
-    def cmp_eq(self, double x, double y):
+    cdef bint _cmp_eq(self, double x, double y):
         return x == y or self._cmp(x, y)
 
-    def cmp_inv(self, double x, double y):
+    cdef bint _cmp_inv(self, double x, double y):
         return x != y and not self._cmp(x, y)
+
+    def walk(self):
+        self._walk()
+
+    def cmp_eq(self, double x, double y):
+        return self._cmp_eq(x, y)
+
+    def cmp_inv(self, double x, double y):
+        return self._cmp_inv(x, y)
 
     def __repr__(self):
         return ('<{0} line={1}, cmp={2}>'
