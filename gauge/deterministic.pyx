@@ -190,6 +190,8 @@ class Determination(list):
             elif method == REMOVE:
                 velocities.remove(momentum.velocity)
             since = until
+        for boundary in boundaries:
+            boundary._close()
 
 
 class Line(object):
@@ -416,6 +418,9 @@ cdef class Boundary:
     cdef _walk(self):
         """Choose the next line."""
         self._line = next(self._lines_iter)
+
+    cdef _close(self):
+        self._lines_iter.close()
 
     cdef bint _cmp_eq(self, double x, double y):
         return x == y or self._cmp(x, y)
