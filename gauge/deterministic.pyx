@@ -20,19 +20,35 @@ from gauge.common import ADD, inf, now_or, REMOVE, TIME, VALUE
 __all__ = ['Determination', 'Line', 'Horizon', 'Ray', 'Segment', 'Boundary']
 
 
-cdef inline ITER_LINES(self, gauge, prefix):
+cdef inline ITER_LINES(gauge, prefix):
     cdef str gauge_attr = prefix + '_gauge'
     cdef str value_attr = prefix + '_value'
     if getattr(gauge, gauge_attr) is None:
-        return self.value_lines(gauge, getattr(gauge, value_attr))
+        return value_lines(gauge, getattr(gauge, value_attr))
     else:
-        return self.gauge_lines(gauge, getattr(gauge, gauge_attr))
+        return gauge_lines(gauge, getattr(gauge, gauge_attr))
+
+
+def value_lines(gauge, double value):
+    yield Horizon(gauge.base[TIME], +inf, value)
+
+
+def gauge_lines(gauge, other_gauge):
+    cdef Determination determination = other_gauge.determination
+    first, last = determination[0], determination[-1]
+    if gauge.base[TIME] < first[TIME]:
+        yield Horizon(gauge.base[TIME], first[TIME], first[VALUE])
+    zipped_determination = zip(determination[:-1], determination[1:])
+    for (time1, value1), (time2, value2) in zipped_determination:
+        yield Segment(time1, time2, value1, value2)
+    yield Horizon(last[TIME], +inf, last[VALUE])
 
 
 cdef class Determination(list):
     """Determination of a gauge is a list of `(time, value)` pairs.
 
     :param determining: a :meth:`Gauge.determine` iterator.
+
     """
 
     #: The time when the gauge starts to be in_range of the limits.
@@ -43,21 +59,6 @@ cdef class Determination(list):
     def in_range_since(self):
         if self._in_range:
             return self._in_range_since
-
-    @staticmethod
-    def value_lines(gauge, double value):
-        yield Horizon(gauge.base[TIME], +inf, value)
-
-    @staticmethod
-    def gauge_lines(gauge, other_gauge):
-        determination = other_gauge.determination
-        first, last = determination[0], determination[-1]
-        if gauge.base[TIME] < first[TIME]:
-            yield Horizon(gauge.base[TIME], first[TIME], first[VALUE])
-        zipped_determination = zip(determination[:-1], determination[1:])
-        for (time1, value1), (time2, value2) in zipped_determination:
-            yield Segment(time1, time2, value1, value2)
-        yield Horizon(last[TIME], +inf, last[VALUE])
 
     def determine(self, double time, double value, bint in_range=True):
         if self and self[-1][TIME] == time:
@@ -79,8 +80,8 @@ cdef class Determination(list):
         since, value = gauge.base
         self._in_range = False
         # boundaries.
-        cdef ceil_lines_iter = ITER_LINES(self, gauge, 'max')
-        cdef floor_lines_iter = ITER_LINES(self, gauge, 'min')
+        cdef ceil_lines_iter = ITER_LINES(gauge, 'max')
+        cdef floor_lines_iter = ITER_LINES(gauge, 'min')
         cdef Boundary bound
         cdef Boundary boundary
         cdef ceil = Boundary(ceil_lines_iter, operator.lt)
