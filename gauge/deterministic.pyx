@@ -20,6 +20,15 @@ from gauge.common import ADD, inf, now_or, REMOVE, TIME, VALUE
 __all__ = ['Determination', 'Line', 'Horizon', 'Ray', 'Segment', 'Boundary']
 
 
+cdef inline ITER_LINES(self, gauge, prefix):
+    cdef str gauge_attr = prefix + '_gauge'
+    cdef str value_attr = prefix + '_value'
+    if getattr(gauge, gauge_attr) is None:
+        return self.value_lines(gauge, getattr(gauge, value_attr))
+    else:
+        return self.gauge_lines(gauge, getattr(gauge, gauge_attr))
+
+
 cdef class Determination(list):
     """Determination of a gauge is a list of `(time, value)` pairs.
 
@@ -70,16 +79,8 @@ cdef class Determination(list):
         since, value = gauge.base
         self._in_range = False
         # boundaries.
-        cdef ceil_lines_iter = (
-            self.value_lines(gauge, gauge.max_value)
-            if gauge.max_gauge is None else
-            self.gauge_lines(gauge, gauge.max_gauge)
-        )
-        cdef floor_lines_iter = (
-            self.value_lines(gauge, gauge.min_value)
-            if gauge.min_gauge is None else
-            self.gauge_lines(gauge, gauge.min_gauge)
-        )
+        cdef ceil_lines_iter = ITER_LINES(self, gauge, 'max')
+        cdef floor_lines_iter = ITER_LINES(self, gauge, 'min')
         cdef Boundary bound
         cdef Boundary boundary
         cdef ceil = Boundary(ceil_lines_iter, operator.lt)
