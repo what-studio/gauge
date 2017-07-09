@@ -91,13 +91,13 @@ cdef class Determination(list):
         cdef bint overlapped = False
         for boundary in boundaries:
             # skip past boundaries.
-            while boundary._line.until <= since:
+            while boundary.line.until <= since:
                 boundary._walk()
             # check overflowing.
             if bounded:
                 continue
-            boundary_value = boundary._line.guess(since)
-            if boundary._cmp(boundary_value, value):
+            boundary_value = boundary.line.guess(since)
+            if boundary.cmp(boundary_value, value):
                 bound, bounded, overlapped = boundary, True, False
         cdef double time
         cdef int method
@@ -122,7 +122,7 @@ cdef class Determination(list):
                     # if all(b.line.until >= until for b in boundaries):
                     #     break
                     for b in boundaries:
-                        if b._line.until < until:
+                        if b.line.until < until:
                             break
                     else:
                         break
@@ -131,7 +131,7 @@ cdef class Determination(list):
                     # boundary = min(boundaries, key=lambda b: b.line.until)
                     boundary = boundaries[0]
                     for b in boundaries:
-                        if b._line.until < boundary._line.until:
+                        if b.line.until < boundary.line.until:
                             boundary = b
                     # ---
                     boundary._walk()
@@ -140,29 +140,28 @@ cdef class Determination(list):
                 if not bounded:
                     velocity = sum(velocities)
                 elif overlapped:
-                    velocity = bound._best(sum(velocities),
-                                           bound._line.velocity)
+                    velocity = bound.best(sum(velocities), bound.line.velocity)
                 else:
-                    velocity = sum(v for v in velocities if bound._cmp(v, 0))
+                    velocity = sum(v for v in velocities if bound.cmp(v, 0))
                 # is still bound?
-                if overlapped and bound._cmp(velocity, bound._line.velocity):
+                if overlapped and bound.cmp(velocity, bound.line.velocity):
                     bounded, overlapped = False, False
                     again = True
                     continue
                 # current value line.
                 line = Ray(since, until, value, velocity)
                 if overlapped:
-                    bound_until = min(bound._line.until, until)
+                    bound_until = min(bound.line.until, until)
                     if bound_until == +inf:
                         break
                     # released from the boundary.
-                    since, value = (bound_until, bound._line.get(bound_until))
+                    since, value = (bound_until, bound.line.get(bound_until))
                     self._determine(since, value)
                     continue
                 for boundary in walked_boundaries:
                     # find the intersection with a boundary.
                     try:
-                        intersection = line.intersect(boundary._line)
+                        intersection = line.intersect(boundary.line)
                     except ValueError:
                         continue
                     if intersection[TIME] == since:
@@ -171,7 +170,7 @@ cdef class Determination(list):
                     bound, bounded, overlapped = boundary, True, True
                     since, value = intersection
                     # clamp by the boundary.
-                    value = boundary._best(value, boundary._line.guess(since))
+                    value = boundary.best(value, boundary.line.guess(since))
                     self._determine(since, value)
                     break
                 if bounded:
@@ -179,11 +178,11 @@ cdef class Determination(list):
                 for boundary in walked_boundaries:
                     # find missing intersection caused by floating-point
                     # inaccuracy.
-                    bound_until = min(boundary._line.until, until)
+                    bound_until = min(boundary.line.until, until)
                     if bound_until == +inf or bound_until < since:
                         continue
-                    boundary_value = boundary._line.get(bound_until)
-                    if boundary._cmp_eq(line.get(bound_until), boundary_value):
+                    boundary_value = boundary.line.get(bound_until)
+                    if boundary.cmp_eq(line.get(bound_until), boundary_value):
                         continue
                     bound, bounded, overlapped = boundary, True, True
                     since, value = bound_until, boundary_value
@@ -402,45 +401,37 @@ intersection_reliability = lambda l: _intersection_reliabilities[type(l)]
 
 cdef class Boundary:
 
-    cdef _line
-    cdef _lines_iter
-    cdef _cmp
-    cdef _best
-
-    @property
-    def line(self):
-        return self._line
-
-    @property
-    def cmp(self):
-        return self._cmp
-
-    @property
-    def best(self):
-        return self._best
+    cdef:
+        public line
+        public lines_iter
+        public cmp
+        public best
 
     def __init__(self, lines_iter, cmp=operator.lt):
         assert cmp in [operator.lt, operator.gt]
-        self._lines_iter = lines_iter
-        self._cmp = cmp
-        self._best = {operator.lt: min, operator.gt: max}[cmp]
+        self.lines_iter = lines_iter
+        self.cmp = cmp
+        self.best = {operator.lt: min, operator.gt: max}[cmp]
         self._walk()
 
     cdef _walk(self):
         """Choose the next line."""
-        self._line = next(self._lines_iter)
+        self.line = next(self.lines_iter)
 
     cdef _close(self):
-        self._lines_iter.close()
+        self.lines_iter.close()
 
     cdef bint _cmp_eq(self, double x, double y):
-        return x == y or self._cmp(x, y)
+        return x == y or self.cmp(x, y)
 
     cdef bint _cmp_inv(self, double x, double y):
-        return x != y and not self._cmp(x, y)
+        return x != y and not self.cmp(x, y)
 
     def walk(self):
-        self._walk()
+        return self._walk()
+
+    def close(self):
+        return self._close()
 
     def cmp_eq(self, double x, double y):
         return self._cmp_eq(x, y)
@@ -450,4 +441,4 @@ cdef class Boundary:
 
     def __repr__(self):
         return ('<{0} line={1}, cmp={2}>'
-                ''.format(type(self).__name__, self._line, self._cmp))
+                ''.format(type(self).__name__, self.line, self.cmp))
