@@ -387,6 +387,7 @@ class Gauge(object):
         :raises TypeError: the first argument is a momentum, but other
                            arguments passed.
         """
+        cdef Momentum momentum
         if isinstance(velocity_or_momentum, Momentum):
             if not (since is None and until is None):
                 raise TypeError('Arguments behind the first argument as a '
@@ -408,6 +409,7 @@ class Gauge(object):
 
     def add_momenta(self, momenta):
         """Adds multiple momenta."""
+        cdef Momentum momentum
         for momentum in momenta:
             self.momenta.add(momentum)
             self._events.add((momentum.since, ADD, momentum))
@@ -417,6 +419,7 @@ class Gauge(object):
 
     def remove_momenta(self, momenta):
         """Removes multiple momenta."""
+        cdef Momentum momentum
         for momentum in momenta:
             try:
                 self.momenta.remove(momentum)
@@ -439,7 +442,7 @@ class Gauge(object):
 
         :raises ValueError: `since` later than or same with `until`.
         """
-        momentum = self._make_momentum(*args, **kwargs)
+        cdef Momentum momentum = self._make_momentum(*args, **kwargs)
         self.add_momenta([momentum])
         return momentum
 
@@ -450,7 +453,7 @@ class Gauge(object):
 
         :raises ValueError: the given momentum not in the gauge.
         """
-        momentum = self._make_momentum(*args, **kwargs)
+        cdef Momentum momentum = self._make_momentum(*args, **kwargs)
         self.remove_momenta([momentum])
         return momentum
 
@@ -458,6 +461,7 @@ class Gauge(object):
         """Yields momentum adding and removing events.  An event is a tuple of
         ``(time, ADD|REMOVE, momentum)``.
         """
+        cdef Momentum m
         yield (self.base[TIME], NONE, None)
         momentum_ids = set(id(m) for m in self.momenta)
         for time, method, momentum in list(self._events):
@@ -557,14 +561,25 @@ class Gauge(object):
         return form.format(type(self).__name__, value, *limit_reprs)
 
 
-class Momentum(namedtuple('Momentum', ['velocity', 'since', 'until'])):
+cdef class Momentum:
     """A power of which increases or decreases the gauge continually between a
     specific period.
     """
 
-    def __new__(cls, velocity, since=-inf, until=+inf):
-        velocity = float(velocity)
-        return super(Momentum, cls).__new__(cls, velocity, since, until)
+    def __cinit__(self, double velocity, double since=-inf, double until=+inf):
+        self.velocity = float(velocity)
+        self.since = since
+        self.until = until
+
+    def __getitem__(self, int index):
+        if index == 0:
+            return self.velocity
+        elif index == 1:
+            return self.since
+        elif index == 2:
+            return self.until
+        else:
+            raise IndexError
 
     def __repr__(self):
         string = '<{0} {1:+.2f}/s'.format(type(self).__name__, self.velocity)

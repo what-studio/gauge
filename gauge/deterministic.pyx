@@ -15,6 +15,7 @@ import math
 import operator
 
 from gauge.common import ADD, inf, now_or, REMOVE, TIME, VALUE
+from gauge.gauge cimport Momentum
 
 
 __all__ = ['Determination', 'Line', 'Horizon', 'Ray', 'Segment', 'Boundary']
@@ -103,6 +104,7 @@ cdef class Determination(list):
                 bound, bounded, overlapped = boundary, True, False
         cdef double time
         cdef int method
+        cdef Momentum momentum
         cdef bint again
         cdef list walked_boundaries
         cdef Boundary b
