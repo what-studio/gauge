@@ -223,7 +223,7 @@ cdef class Line:
         self.value = value
         self.extra = extra
 
-    cdef (double, double) intersect(self, Line line):
+    cdef intersect(self, Line line):
         """Gets the intersection with the given line.
 
         :raises ValueError: there's no intersection.
@@ -242,7 +242,6 @@ cdef class Line:
         else:
             velocity_delta = left.velocity() - right.velocity()
             if velocity_delta == 0:
-                print left, right
                 raise ValueError('Parallel line given')
             intercept_delta = right.intercept() - left.intercept()
             time = intercept_delta / velocity_delta
