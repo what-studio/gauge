@@ -24,11 +24,11 @@ __all__ = ['Gauge', 'Momentum']
 by_until = operator.itemgetter(2)
 
 
-def restore_into(gauge, base, momenta, max_value,
+def restore_into(Gauge gauge, base, momenta, max_value,
                  max_gauge, min_value, min_gauge):
-    gauge.base = base
-    gauge.max_value, gauge.max_gauge = max_value, max_gauge
-    gauge.min_value, gauge.min_gauge = min_value, min_gauge
+    gauge._base_time, gauge._base_value = base
+    gauge._max_value, gauge._max_gauge = max_value, max_gauge
+    gauge._min_value, gauge._min_gauge = min_value, min_gauge
     max_gauge is not None and max_gauge._limited_gauges.add(gauge)
     min_gauge is not None and min_gauge._limited_gauges.add(gauge)
     if momenta:
@@ -45,40 +45,44 @@ def restore_gauge(gauge_class, base, momenta, max_value,
     return gauge
 
 
-class Gauge(object):
+cdef class Gauge:
     """Represents a gauge.  A gauge has a value at any moment.  It can be
     modified by an user's adjustment or an effective momentum.
     """
 
-    __slots__ = (
-        #: The base time and value.
-        'base',
-        #: A sorted list of momenta.  The items are :class:`Momentum` objects.
-        'momenta',
-        #: The constant maximum value.
-        'max_value',
-        #: The gauge to indicate maximum value.
-        'max_gauge',
-        #: The constant minimum value.
-        'min_value',
-        #: The gauge to indicate minimum value.
-        'min_gauge',
-        # internal attributes.
-        '_determination',
-        '_events',
-        '_limited_gauges',
-        '__weakref__',
-    )
+    @property
+    def base(self):
+        return (self._base_time, self._base_value)
 
-    def __init__(self, value, max, min=0, at=None):
+    @property
+    def max_value(self):
+        if self._max_gauge is None:
+            return self._max_value
+
+    @property
+    def max_gauge(self):
+        if self._max_gauge is not None:
+            return self._max_gauge
+
+    @property
+    def min_value(self):
+        if self._min_gauge is None:
+            return self._min_value
+
+    @property
+    def min_gauge(self):
+        if self._min_gauge is not None:
+            return self._min_gauge
+
+    def __init__(self, double value, max, min=0, at=None):
         self.__preinit__()
         at = now_or(at)
-        self.base = (at, value)
+        self._base_time, self._base_value = at, value
         self._set_range(max, min, at=at, _incomplete=True)
 
     def __preinit__(self):
         """Called by :meth:`__init__` and :meth:`__setstate__`."""
-        self.max_gauge = self.min_gauge = None
+        self._max_gauge = self._min_gauge = None
         self.momenta = SortedListWithKey(key=by_until)
         self._determination = None
         self._events = SortedList()
@@ -118,17 +122,17 @@ class Gauge(object):
 
     def get_max(self, at=None):
         """Predicts the current maximum value."""
-        if self.max_gauge is None:
-            return self.max_value
+        if self._max_gauge is None:
+            return self._max_value
         else:
-            return self.max_gauge.get(at)
+            return self._max_gauge.get(at)
 
     def get_min(self, at=None):
         """Predicts the current minimum value."""
-        if self.min_gauge is None:
-            return self.min_value
+        if self._min_gauge is None:
+            return self._min_value
         else:
-            return self.min_gauge.get(at)
+            return self._min_gauge.get(at)
 
     #: The alias of :meth:`get_max`.
     max = get_max
@@ -136,39 +140,68 @@ class Gauge(object):
     #: The alias of :meth:`get_min`.
     min = get_min
 
+# cdef inline SET_LIMIT(Gauge gauge, str prefix, limit, clamp, double at, double forget_until):
+#     if limit is None:
+#         return
+#     cdef Gauge prev_limit_gauge = getattr(gauge, '_%s_gauge' % prefix)
+#     if prev_limit_gauge is not None:
+#         # unlink from the previous limit gauge.
+#         prev_limit_gauge._limited_gauges.discard(gauge)
+#     if isinstance(limit, Gauge):
+#         limit_gauge, limit_value = limit, limit.get(at)
+#         forget_until = min(forget_until, limit_gauge._base_time)
+#     else:
+#         limit_gauge, limit_value = None, limit
+#     # set limit attrs
+#     value_attr, gauge_attr = name + '_value', name + '_gauge'
+#     if limit_gauge is None:
+#         setattr(self, value_attr, limit_value)
+#         setattr(self, gauge_attr, None)
+#     else:
+#         setattr(self, value_attr, None)
+#         setattr(self, gauge_attr, limit_gauge)
+#         limit_gauge._limited_gauges.add(self)
+#     if _incomplete or in_range_since is None:
+#         continue
+#     elif in_range_since <= at:
+#         value = clamp(value, limit_value)
+
     def _set_range(self, max_=None, min_=None, at=None, _incomplete=False):
         at = now_or(at)
-        forget_until = at
+        cdef:
+            double forget_until = at
+            double in_range_since
         # _incomplete=True when __init__() calls it.
         if not _incomplete:
             value = self.get(at)
             in_range_since = self.determination.in_range_since
-        items = [('max', max_, self.max_gauge, min),
-                 ('min', min_, self.min_gauge, max)]
-        for name, limit, prev_limit_gauge, clamp in items:
-            if limit is None:
-                continue
-            if prev_limit_gauge is not None:
-                # unlink from the previous limit gauge.
-                prev_limit_gauge._limited_gauges.discard(self)
-            if isinstance(limit, Gauge):
-                limit_gauge, limit_value = limit, limit.get(at)
-                forget_until = min(forget_until, limit_gauge.base[TIME])
+
+        if max_ is not None:
+            if self._max_gauge is not None:
+                self._max_gauge._limited_gauges.discard(self)
+            if isinstance(max_, Gauge):
+                self._max_gauge = max_
+                self._max_value = max_.get(at)
+                forget_until = min(forget_until, max_._base_time)
             else:
-                limit_gauge, limit_value = None, limit
-            # set limit attrs
-            value_attr, gauge_attr = name + '_value', name + '_gauge'
-            if limit_gauge is None:
-                setattr(self, value_attr, limit_value)
-                setattr(self, gauge_attr, None)
+                self._max_gauge = None
+                self._max_value = max_
+            if not (_incomplete or in_range_since is None):
+                value = min(value, self._max_value)
+
+        if min_ is not None:
+            if self._min_gauge is not None:
+                self._min_gauge._limited_gauges.discard(self)
+            if isinstance(min_, Gauge):
+                self._min_gauge = min_
+                self._min_value = min_.get(at)
+                forget_until = min(forget_until, min_._base_time)
             else:
-                setattr(self, value_attr, None)
-                setattr(self, gauge_attr, limit_gauge)
-                limit_gauge._limited_gauges.add(self)
-            if _incomplete or in_range_since is None:
-                continue
-            elif in_range_since <= at:
-                value = clamp(value, limit_value)
+                self._min_gauge = None
+                self._min_value = min_
+            if not (_incomplete or in_range_since is None):
+                value = max(value, self._min_value)
+
         if _incomplete:
             return
         return self.forget_past(value, at=forget_until)
@@ -466,7 +499,7 @@ class Gauge(object):
             Momentum momentum
             double time
             int method
-        events.append((self.base[TIME], NONE, None))
+        events.append((self._base_time, NONE, None))
         momentum_ids = set(id(momentum) for momentum in self.momenta)
         for time, method, momentum in self._events:
             if id(momentum) not in momentum_ids:
@@ -493,7 +526,7 @@ class Gauge(object):
             value = self.get(at=at)
         for gauge in self._limited_gauges:
             gauge._limit_gauge_rebased(self, value, at=at)
-        self.base = (at, value)
+        self._base_time, self._base_value = at, value
         del self.momenta[:remove_momenta_before]
         self.invalidate()
         return value
@@ -527,20 +560,22 @@ class Gauge(object):
         """The callback function which will be called at a limit gauge is
         rebased.
         """
-        at = max(now_or(at), self.base[TIME])
+        at = max(now_or(at), self._base_time)
         value = self.get(at)
         if self.in_range(at):
-            clamp = {self.max_gauge: min, self.min_gauge: max}[limit_gauge]
+            clamp = {self._max_gauge: min, self._min_gauge: max}[limit_gauge]
             value = clamp(value, limit_value)
         self.forget_past(value, at=at)
 
     def __reduce__(self):
         return restore_gauge, (
-            self.__class__, self.base, [tuple(m) for m in self.momenta],
-            self.max_value, self.max_gauge, self.min_value, self.min_gauge
+            self.__class__, (self._base_time, self._base_value),
+            [tuple(m) for m in self.momenta],
+            self._max_value, self._max_gauge,
+            self._min_value, self._min_gauge
         )
 
-    def __repr__(self, at=None):
+    def _repr(self, at=None):
         """Example strings:
 
         - ``<Gauge 0.00/2.00>``
@@ -548,12 +583,14 @@ class Gauge(object):
         - ``<Gauge 0.00 between <Gauge 0.00/2.00>~<Gauge 2.00/2.00>>``
 
         """
+        cdef:
+            Gauge limit_gauge
         at = now_or(at)
         value = self.get(at=at)
         hyper = False
         limit_reprs = []
-        limit_items = [(self.max_value, self.max_gauge),
-                       (self.min_value, self.min_gauge)]
+        limit_items = [(self._max_value, self._max_gauge),
+                       (self._min_value, self._min_gauge)]
         for limit_value, limit_gauge in limit_items:
             if limit_gauge is None:
                 limit_reprs.append('{0:.2f}'.format(limit_value))
@@ -561,11 +598,14 @@ class Gauge(object):
                 hyper = True
                 limit_reprs.append('{0!r}'.format(limit_gauge))
         form = '<{0} {1:.2f}'
-        if not hyper and self.min_value == 0:
+        if not hyper and self._min_value == 0:
             form += '/{2}>'
         else:
             form += ' between {3}~{2}>'
         return form.format(type(self).__name__, value, *limit_reprs)
+
+    def __repr__(self):
+        return self._repr()
 
 
 cdef class Momentum:
