@@ -54,10 +54,6 @@ cdef class Determination(list):
 
     """
 
-    #: The time when the gauge starts to be in_range of the limits.
-    cdef double _in_range_since
-    cdef bint _in_range
-
     @property
     def in_range_since(self):
         if self._in_range:
