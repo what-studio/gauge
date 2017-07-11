@@ -30,8 +30,8 @@ before_install:  # Use PyPy-5.8.0.
     tar -jxvf pypy3-v5.8.0-linux64.tar.bz2
     pushd pypy3-v5.8.0-linux64/bin
       export PATH="$PWD:$PATH"
-      ln -s pypy python
-      ./pypy -m ensurepip
+      ln -s pypy3 python
+      ./pypy3 -m ensurepip
     pushd
   fi
 - cd "$TRAVIS_BUILD_DIR"
