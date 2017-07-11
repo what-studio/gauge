@@ -461,15 +461,17 @@ class Gauge(object):
         """Yields momentum adding and removing events.  An event is a tuple of
         ``(time, ADD|REMOVE, momentum)``.
         """
+        cdef list events = []
         cdef Momentum m
-        yield (self.base[TIME], NONE, None)
+        events.append((self.base[TIME], NONE, None))
         momentum_ids = set(id(m) for m in self.momenta)
         for time, method, momentum in list(self._events):
             if id(momentum) not in momentum_ids:
                 self._events.remove((time, method, momentum))
                 continue
-            yield time, method, momentum
-        yield (+inf, NONE, None)
+            events.append((time, method, momentum))
+        events.append((+inf, NONE, None))
+        return events
 
     def _rebase(self, value=None, at=None, remove_momenta_before=None):
         """Sets the base and removes momenta between indexes of ``start`` and
