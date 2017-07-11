@@ -218,8 +218,8 @@ cdef class Line:
     """
 
     cdef:
-        int type
-        double since, until, value, extra
+        public int type
+        public double since, until, value, extra
 
     def __cinit__(self, int type, double since, double until, double value,
                   double extra=0):
@@ -317,55 +317,51 @@ cdef class Line:
 
     # HORIZON
 
-    cdef double _get_horizon(self, double at):
+    cdef inline double _get_horizon(self, double at):
         return self.value
 
-    cdef double _earlier_horizon(self, double at):
+    cdef inline double _earlier_horizon(self, double at):
         return self.value
 
-    cdef double _later_horizon(self, double at):
+    cdef inline double _later_horizon(self, double at):
         return self.value
 
-    cdef double _velocity_horizon(self):
+    cdef inline double _velocity_horizon(self):
         return 0
 
     # RAY
 
-    cdef double _get_ray(self, double at):
+    cdef inline double _get_ray(self, double at):
         cdef double velocity = self.extra
         return self.value + velocity * (at - self.since)
 
-    cdef double _earlier_ray(self, double at):
+    cdef inline double _earlier_ray(self, double at):
         return self.value
 
-    cdef double _later_ray(self, double at):
+    cdef inline double _later_ray(self, double at):
         return self._get(self.until)
 
-    cdef double _velocity_ray(self):
+    cdef inline double _velocity_ray(self):
         return self.extra
 
     # SEGMENT
 
-    cdef double _get_segment(self, double at):
+    cdef inline double _get_segment(self, double at):
         cdef double final = self.extra
         return SEGMENT_VALUE(at, self.since, self.until, self.value, final)
 
-    cdef double _earlier_segment(self, double at):
+    cdef inline double _earlier_segment(self, double at):
         return self.value
 
-    cdef double _later_segment(self, double at):
+    cdef inline double _later_segment(self, double at):
         cdef double final = self.extra
         return final
 
-    cdef double _velocity_segment(self):
+    cdef inline double _velocity_segment(self):
         cdef double final = self.extra
         return SEGMENT_VELOCITY(self.since, self.until, self.value, final)
 
     # __repr__
-
-    cdef inline str REPR(self, str string):
-        return ('<{0}{1} for {2!r}~{3!r}>'
-                ''.format(type(self).__name__, string, self.since, self.until))
 
     def __repr__(self):
         cdef str string
@@ -375,7 +371,10 @@ cdef class Line:
             string = '[RAY] {0:.2f}{1:+.2f}/s'.format(self.value, self.extra)
         elif self.type == SEGMENT:  # extra is final.
             string = '[SEGMENT] {0:.2f}~{1:.2f}'.format(self.value, self.extra)
-        return self.REPR(string)
+        else:
+            assert 0
+        return ('<{0}{1} for {2!r}~{3!r}>'
+                ''.format(type(self).__name__, string, self.since, self.until))
 
 
 cdef class Boundary:
