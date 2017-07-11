@@ -21,8 +21,14 @@ from gauge.gauge cimport Gauge, Momentum
 __all__ = ['Determination', 'Line', 'Horizon', 'Ray', 'Segment', 'Boundary']
 
 
+# line types:
+DEF HORIZON = 1
+DEF RAY = 2
+DEF SEGMENT = 3
+
+
 cdef inline list VALUE_LINES(Gauge gauge, double value):
-    return [Horizon(gauge._base_time, +inf, value)]
+    return [Line(HORIZON, gauge._base_time, +inf, value)]
 
 
 cdef inline list GAUGE_LINES(Gauge gauge, Gauge other_gauge):
@@ -30,11 +36,11 @@ cdef inline list GAUGE_LINES(Gauge gauge, Gauge other_gauge):
     cdef Determination determination = other_gauge.determination
     first, last = determination[0], determination[-1]
     if gauge._base_time < first[TIME]:
-        lines.append(Horizon(gauge._base_time, first[TIME], first[VALUE]))
+        lines.append(Line(HORIZON, gauge._base_time, first[TIME], first[VALUE]))
     zipped_determination = zip(determination[:-1], determination[1:])
     for (time1, value1), (time2, value2) in zipped_determination:
-        lines.append(Segment(time1, time2, value1, value2))
-    lines.append(Horizon(last[TIME], +inf, last[VALUE]))
+        lines.append(Line(SEGMENT, time1, time2, value1, value2))
+    lines.append(Line(HORIZON, last[TIME], +inf, last[VALUE]))
     return lines
 
 
@@ -99,6 +105,7 @@ cdef class Determination(list):
             Momentum momentum
             bint again
             list walked_boundaries
+            Line line
         for time, method, momentum in gauge.momentum_events():
             # normalize time.
             until = max(time, gauge._base_time)
@@ -130,16 +137,16 @@ cdef class Determination(list):
                 if not bounded:
                     velocity = sum(velocities)
                 elif overlapped:
-                    velocity = bound.best(sum(velocities), bound.line.velocity)
+                    velocity = bound.best(sum(velocities), bound.line.velocity())
                 else:
                     velocity = sum(v for v in velocities if bound.cmp(v, 0))
                 # is still bound?
-                if overlapped and bound.cmp(velocity, bound.line.velocity):
+                if overlapped and bound.cmp(velocity, bound.line.velocity()):
                     bounded, overlapped = False, False
                     again = True
                     continue
                 # current value line.
-                line = Ray(since, until, value, velocity)
+                line = Line(RAY, since, until, value, velocity)
                 if overlapped:
                     bound_until = min(bound.line.until, until)
                     if bound_until == +inf:
@@ -191,7 +198,7 @@ cdef class Determination(list):
             since = until
 
 
-class Line(object):
+cdef class Line:
     """An abstract class to represent lines between 2 times which start from
     `value`.  Subclasses should describe where lines end.
 
@@ -202,72 +209,39 @@ class Line(object):
 
     """
 
-    __slots__ = ('since', 'until', 'value')
+    cdef:
+        int type
+        double since, until, value, extra
 
-    velocity = NotImplemented
-
-    def __init__(self, since, until, value):
+    def __cinit__(self, int type, double since, double until, double value,
+                  double extra=0):
+        assert type in (HORIZON, RAY, SEGMENT)
+        self.type = type
         self.since = since
         self.until = until
         self.value = value
+        self.extra = extra
 
-    def get(self, at=None):
-        """Returns the value at the given time.
-
-        :raises ValueError: the given time is out of the time range.
-        """
-        at = now_or(at)
-        if not self.since <= at <= self.until:
-            raise ValueError('Out of the time range: {0:.2f}~{1:.2f}'
-                             ''.format(self.since, self.until))
-        return self._get(at)
-
-    def guess(self, at=None):
-        """Returns the value at the given time even the time it out of the time
-        range.
-        """
-        at = now_or(at)
-        if at < self.since:
-            return self._earlier(at)
-        elif at > self.until:
-            return self._later(at)
-        else:
-            return self.get(at)
-
-    def _get(self, double at):
-        """Implement at subclass as to calculate the value at the given time
-        which is between the time range.
-        """
-        raise NotImplementedError
-
-    def _earlier(self, double at):
-        """Implement at subclass as to calculate the value at the given time
-        which is earlier than `since`.
-        """
-        raise NotImplementedError
-
-    def _later(self, double at):
-        """Implement at subclass as to calculate the value at the given time
-        which is later than `until`.
-        """
-        raise NotImplementedError
-
-    def intersect(self, line):
+    cdef (double, double) intersect(self, Line line):
         """Gets the intersection with the given line.
 
         :raises ValueError: there's no intersection.
         """
-        cdef double time
-        cdef double value
-        lines = [self, line]
-        lines.sort(key=intersection_reliability, reverse=True)
-        left, right = lines  # right is more reliable.
-        if math.isinf(right.velocity):
+        cdef:
+            double time, value, velocity_delta, intercept_delta, since, until
+            Line left, right
+        # right is more reliable.
+        if self.type < line.type:
+            left, right = line, self
+        else:
+            left, right = self, line
+        if math.isinf(right.velocity()):
             # right is almost vertical.
             time = (right.since + right.until) / 2
         else:
-            velocity_delta = left.velocity - right.velocity
+            velocity_delta = left.velocity() - right.velocity()
             if velocity_delta == 0:
+                print left, right
                 raise ValueError('Parallel line given')
             intercept_delta = right.intercept() - left.intercept()
             time = intercept_delta / velocity_delta
@@ -278,118 +252,231 @@ class Line(object):
         value = left.get(time)
         return (time, value)
 
-    def intercept(self):
+    cdef double intercept(self):
         """Gets the value-intercept. (Y-intercept)"""
-        return self.value - self.velocity * self.since
+        return self.value - self.velocity() * self.since
 
-    def _repr(self, str string):
+    cdef double get(self, at=None):
+        """Returns the value at the given time.
+
+        :raises ValueError: the given time is out of the time range.
+        """
+        at = now_or(at)
+        if not self.since <= at <= self.until:
+            raise ValueError('Out of the time range: {0:.2f}~{1:.2f}'
+                             ''.format(self.since, self.until))
+        if self.type == HORIZON:
+            return self._get_horizon(at)
+        elif self.type == RAY:
+            return self._get_ray(at)
+        elif self.type == SEGMENT:
+            return self._get_segment(at)
+        assert 0
+
+    cdef double guess(self, at=None):
+        """Returns the value at the given time even the time it out of the time
+        range.
+        """
+        at = now_or(at)
+        if at < self.since:
+            if self.type == HORIZON:
+                return self._earlier_horizon(at)
+            elif self.type == RAY:
+                return self._earlier_ray(at)
+            elif self.type == SEGMENT:
+                return self._earlier_segment(at)
+        elif at > self.until:
+            if self.type == HORIZON:
+                return self._later_horizon(at)
+            elif self.type == RAY:
+                return self._later_ray(at)
+            elif self.type == SEGMENT:
+                return self._later_segment(at)
+        else:
+            return self.get(at)
+        assert 0
+
+    cdef double velocity(self):
+        if self.type == HORIZON:
+            return self._velocity_horizon()
+        elif self.type == RAY:
+            return self._velocity_ray()
+        elif self.type == SEGMENT:
+            return self._velocity_segment()
+        assert 0
+
+    # HORIZON
+
+    cdef double _get_horizon(self, double at):
+        return self.value
+
+    cdef double _earlier_horizon(self, double at):
+        return self.value
+
+    cdef double _later_horizon(self, double at):
+        return self.value
+
+    cdef double _velocity_horizon(self):
+        return 0
+
+    # RAY
+
+    cdef double _get_ray(self, double at):
+        cdef double velocity = self.extra
+        return self.value + velocity * (at - self.since)
+
+    cdef double _earlier_ray(self, double at):
+        return self.value
+
+    cdef double _later_ray(self, double at):
+        return self._get(self.until)
+
+    cdef double _velocity_ray(self):
+        return self.extra
+
+    # SEGMENT
+
+    cdef double _get_segment(self, double at):
+        return _calc_segment_value(at, self.since, self.until, self.value, self.extra)
+
+    cdef double _earlier_segment(self, double at):
+        return self.value
+
+    cdef double _later_segment(self, double at):
+        return self.extra  # extra is final.
+
+    cdef double _velocity_segment(self):
+        return _calc_segment_velocity(self.since, self.until, self.value, self.extra)
+
+    cdef inline str REPR(self, str string):
         return ('<{0}{1} for {2!r}~{3!r}>'
                 ''.format(type(self).__name__, string, self.since, self.until))
 
     def __repr__(self):
-        return self._repr('')
+        cdef str string
+        if self.type == HORIZON:
+            string = '[HORIZON] {0:.2f}'.format(self.value)
+        elif self.type == RAY:  # extra is velocity.
+            string = '[RAY] {0:.2f}{1:+.2f}/s'.format(self.value, self.extra)
+        elif self.type == SEGMENT:  # extra is final.
+            string = '[SEGMENT] {0:.2f}~{1:.2f}'.format(self.value, self.extra)
+        return self.REPR(string)
 
 
-class Horizon(Line):
-    """A line which has no velocity."""
-
-    __slots__ = ('since', 'until', 'value')
-
-    velocity = 0
-
-    def _get(self, double at):
-        return self.value
-
-    def _earlier(self, double at):
-        return self.value
-
-    def _later(self, double at):
-        return self.value
-
-    def __repr__(self):
-        return super(Horizon, self)._repr(' {0:.2f}'.format(self.value))
+cdef double _calc_segment_value(double at, double time1, double time2, double value1, double value2):
+    if at == time1:
+        return value1
+    elif at == time2:
+        return value2
+    cdef double rate = float(at - time1) / (time2 - time1)
+    return value1 + rate * (value2 - value1)
 
 
-class Ray(Line):
-    """A line based on starting value and velocity."""
-
-    __slots__ = ('since', 'until', 'value', 'velocity')
-
-    def __init__(self, since, until, value, velocity):
-        super(Ray, self).__init__(since, until, value)
-        self.velocity = velocity
-
-    def _get(self, double at):
-        return self.value + self.velocity * (at - self.since)
-
-    def _earlier(self, double at):
-        return self.value
-
-    def _later(self, double at):
-        return self._get(self.until)
-
-    def __repr__(self):
-        string = ' {0:.2f}{1:+.2f}/s'.format(self.value, self.velocity)
-        return super(Ray, self)._repr(string)
+cdef double _calc_segment_velocity(double time1, double time2, double value1, double value2):
+    return (value2 - value1) / (time2 - time1)
 
 
-class Segment(Line):
-    """A line based on starting and ending value."""
 
-    __slots__ = ('since', 'until', 'value',
-                 'final')  # the value at `until`.
+# cdef class Horizon(Line):
+#     """A line which has no velocity."""
 
-    @staticmethod
-    def _calc_value(double at,
-                    double time1, double time2,
-                    double value1, double value2):
-        if at == time1:
-            return value1
-        elif at == time2:
-            return value2
-        cdef double rate = float(at - time1) / (time2 - time1)
-        return value1 + rate * (value2 - value1)
+#     cdef double velocity
 
-    @staticmethod
-    def _calc_velocity(double time1, double time2,
-                       double value1, double value2):
-        return (value2 - value1) / (time2 - time1)
+#     def __cinit__(self, double since, double until, double value):
+#         self.velocity = 0
 
-    @property
-    def velocity(self):
-        return self._calc_velocity(self.since, self.until,
-                                   self.value, self.final)
+#     cdef double _get(self, double at):
+#         return self.value
 
-    def __init__(self, double since, double until, double value, double final):
-        super(Segment, self).__init__(since, until, value)
-        self.final = final
+#     cdef double _earlier(self, double at):
+#         return self.value
 
-    def _get(self, double at):
-        return self._calc_value(at, self.since, self.until,
-                                self.value, self.final)
+#     cdef double _later(self, double at):
+#         return self.value
 
-    def _earlier(self, double at):
-        return self.value
-
-    def _later(self, double at):
-        return self.final
-
-    def __repr__(self):
-        string = ' {0:.2f}~{1:.2f}'.format(self.value, self.final)
-        return super(Segment, self)._repr(string)
+#     def __repr__(self):
+#         return super(Horizon, self).REPR(' {0:.2f}'.format(self.value))
 
 
-#: The reliability map of line classes for precise intersection.
-_intersection_reliabilities = {Horizon: 3, Ray: 2, Segment: 1}
+# cdef class Ray(Line):
+#     """A line based on starting value and velocity."""
 
-#: Sorting key to sort by intersection reliability.
-intersection_reliability = lambda l: _intersection_reliabilities[type(l)]
+#     cdef double velocity
+
+#     def __cinit__(self, double since, double until,
+#                   double value, double velocity):
+#         self.velocity = velocity
+
+#     cdef double _get(self, double at):
+#         return self.value + self.velocity * (at - self.since)
+
+#     cdef double _earlier(self, double at):
+#         return self.value
+
+#     cdef double _later(self, double at):
+#         return self._get(self.until)
+
+#     def __repr__(self):
+#         string = ' {0:.2f}{1:+.2f}/s'.format(self.value, self.velocity)
+#         return super(Ray, self).REPR(string)
+
+
+# cdef class Segment(Line):
+#     """A line based on starting and ending value."""
+
+#     cdef double final
+
+#     @staticmethod
+#     def _calc_value(double at,
+#                     double time1, double time2,
+#                     double value1, double value2):
+#         if at == time1:
+#             return value1
+#         elif at == time2:
+#             return value2
+#         cdef double rate = float(at - time1) / (time2 - time1)
+#         return value1 + rate * (value2 - value1)
+
+#     @staticmethod
+#     def _calc_velocity(double time1, double time2,
+#                        double value1, double value2):
+#         return (value2 - value1) / (time2 - time1)
+
+#     @property
+#     def velocity(self):
+#         return self._calc_velocity(self.since, self.until,
+#                                    self.value, self.final)
+
+#     def __cinit__(self, double since, double until,
+#                   double value, double final):
+#         self.final = final
+
+#     cdef double _get(self, double at):
+#         return self._calc_value(at, self.since, self.until,
+#                                 self.value, self.final)
+
+#     cdef double _earlier(self, double at):
+#         return self.value
+
+#     cdef double _later(self, double at):
+#         return self.final
+
+#     def __repr__(self):
+#         string = ' {0:.2f}~{1:.2f}'.format(self.value, self.final)
+#         return super(Segment, self)._repr(string)
+
+
+# #: The reliability map of line classes for precise intersection.
+# _intersection_reliabilities = {Horizon: 3, Ray: 2, Segment: 1}
+
+# #: Sorting key to sort by intersection reliability.
+# intersection_reliability = lambda l: _intersection_reliabilities[type(l)]
 
 
 cdef class Boundary:
 
     cdef:
-        public line
+        public Line line
         public lines_iter
         public cmp
         public best
