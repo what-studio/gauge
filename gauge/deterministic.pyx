@@ -29,19 +29,21 @@ cdef inline ITER_LINES(gauge, prefix):
         return gauge_lines(gauge, getattr(gauge, gauge_attr))
 
 
-def value_lines(gauge, double value):
-    yield Horizon(gauge.base[TIME], +inf, value)
+cdef list value_lines(gauge, double value):
+    return [Horizon(gauge.base[TIME], +inf, value)]
 
 
-def gauge_lines(gauge, other_gauge):
+cdef list gauge_lines(gauge, other_gauge):
+    cdef list lines = []
     cdef Determination determination = other_gauge.determination
     first, last = determination[0], determination[-1]
     if gauge.base[TIME] < first[TIME]:
-        yield Horizon(gauge.base[TIME], first[TIME], first[VALUE])
+        lines.append(Horizon(gauge.base[TIME], first[TIME], first[VALUE]))
     zipped_determination = zip(determination[:-1], determination[1:])
     for (time1, value1), (time2, value2) in zipped_determination:
-        yield Segment(time1, time2, value1, value2)
-    yield Horizon(last[TIME], +inf, last[VALUE])
+        lines.append(Segment(time1, time2, value1, value2))
+    lines.append(Horizon(last[TIME], +inf, last[VALUE]))
+    return lines
 
 
 cdef class Determination(list):
@@ -80,12 +82,12 @@ cdef class Determination(list):
         since, value = gauge.base
         self._in_range = False
         # boundaries.
-        cdef ceil_lines_iter = ITER_LINES(gauge, 'max')
-        cdef floor_lines_iter = ITER_LINES(gauge, 'min')
+        cdef list ceil_lines = ITER_LINES(gauge, 'max')
+        cdef list floor_lines = ITER_LINES(gauge, 'min')
         cdef Boundary bound
         cdef Boundary boundary
-        cdef ceil = Boundary(ceil_lines_iter, operator.lt)
-        cdef floor = Boundary(floor_lines_iter, operator.gt)
+        cdef ceil = Boundary(ceil_lines, operator.lt)
+        cdef floor = Boundary(floor_lines, operator.gt)
         cdef boundaries = [ceil, floor]
         cdef bint bounded = False
         cdef bint overlapped = False
@@ -199,9 +201,6 @@ cdef class Determination(list):
             elif method == REMOVE:
                 velocities.remove(momentum.velocity)
             since = until
-        # close all boundaries.
-        for boundary in boundaries:
-            boundary._close()
 
 
 class Line(object):
@@ -407,9 +406,9 @@ cdef class Boundary:
         public cmp
         public best
 
-    def __init__(self, lines_iter, cmp=operator.lt):
+    def __init__(self, list lines, cmp=operator.lt):
         assert cmp in [operator.lt, operator.gt]
-        self.lines_iter = lines_iter
+        self.lines_iter = iter(lines)
         self.cmp = cmp
         self.best = {operator.lt: min, operator.gt: max}[cmp]
         self._walk()
@@ -417,9 +416,6 @@ cdef class Boundary:
     cdef _walk(self):
         """Choose the next line."""
         self.line = next(self.lines_iter)
-
-    cdef _close(self):
-        self.lines_iter.close()
 
     cdef bint _cmp_eq(self, double x, double y):
         return x == y or self.cmp(x, y)
@@ -429,9 +425,6 @@ cdef class Boundary:
 
     def walk(self):
         return self._walk()
-
-    def close(self):
-        return self._close()
 
     def cmp_eq(self, double x, double y):
         return self._cmp_eq(x, y)
