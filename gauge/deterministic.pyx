@@ -15,31 +15,22 @@ import math
 import operator
 
 from gauge.common import ADD, inf, now_or, REMOVE, TIME, VALUE
-from gauge.gauge cimport Momentum
+from gauge.gauge cimport Gauge, Momentum
 
 
 __all__ = ['Determination', 'Line', 'Horizon', 'Ray', 'Segment', 'Boundary']
 
 
-cdef inline ITER_LINES(gauge, prefix):
-    cdef str gauge_attr = prefix + '_gauge'
-    cdef str value_attr = prefix + '_value'
-    if getattr(gauge, gauge_attr) is None:
-        return value_lines(gauge, getattr(gauge, value_attr))
-    else:
-        return gauge_lines(gauge, getattr(gauge, gauge_attr))
+cdef list value_lines(Gauge gauge, double value):
+    return [Horizon(gauge._base_time, +inf, value)]
 
 
-cdef list value_lines(gauge, double value):
-    return [Horizon(gauge.base[TIME], +inf, value)]
-
-
-cdef list gauge_lines(gauge, other_gauge):
+cdef list gauge_lines(Gauge gauge, Gauge other_gauge):
     cdef list lines = []
     cdef Determination determination = other_gauge.determination
     first, last = determination[0], determination[-1]
-    if gauge.base[TIME] < first[TIME]:
-        lines.append(Horizon(gauge.base[TIME], first[TIME], first[VALUE]))
+    if gauge._base_time < first[TIME]:
+        lines.append(Horizon(gauge._base_time, first[TIME], first[VALUE]))
     zipped_determination = zip(determination[:-1], determination[1:])
     for (time1, value1), (time2, value2) in zipped_determination:
         lines.append(Segment(time1, time2, value1, value2))
@@ -67,7 +58,7 @@ cdef class Determination(list):
             self._in_range_since = time
         self.append((time, value))
 
-    def __init__(self, gauge):
+    def __init__(self, Gauge gauge):
         """Determines the transformations from the time when the value set to
         the farthest future.
         """
@@ -76,11 +67,20 @@ cdef class Determination(list):
         cdef double value
         cdef double velocity = 0
         cdef list velocities = []
-        since, value = gauge.base
+        since, value = gauge._base_time, gauge._base_value
         self._in_range = False
         # boundaries.
-        cdef list ceil_lines = ITER_LINES(gauge, 'max')
-        cdef list floor_lines = ITER_LINES(gauge, 'min')
+        cdef list ceil_lines
+        cdef list floor_lines
+        if gauge._max_gauge is None:
+            ceil_lines = value_lines(gauge, gauge._max_value)
+        else:
+            ceil_lines = gauge_lines(gauge, gauge._max_gauge)
+        if gauge._min_gauge is None:
+            floor_lines = value_lines(gauge, gauge._min_value)
+        else:
+            floor_lines = gauge_lines(gauge, gauge._min_gauge)
+
         cdef Boundary bound
         cdef Boundary boundary
         cdef ceil = Boundary(ceil_lines, operator.lt)
@@ -106,7 +106,7 @@ cdef class Determination(list):
         cdef Boundary b
         for time, method, momentum in gauge.momentum_events():
             # normalize time.
-            until = max(time, gauge.base[TIME])
+            until = max(time, gauge._base_time)
             # if True, An iteration doesn't choose next boundaries.  The first
             # iteration doesn't require to choose next boundaries.
             again = True
