@@ -114,21 +114,16 @@ cdef class Determination(list):
                         walked_boundaries = boundaries
                 else:
                     # stop the loop if all boundaries have been proceeded.
-                    # if all(b.line.until >= until for b in boundaries):
-                    #     break
                     for b in boundaries:
                         if b.line.until < until:
                             break
                     else:
                         break
-                    # ---
                     # choose the next boundary.
-                    # boundary = min(boundaries, key=lambda b: b.line.until)
                     boundary = boundaries[0]
                     for b in boundaries:
                         if b.line.until < boundary.line.until:
                             boundary = b
-                    # ---
                     boundary._walk()
                     walked_boundaries = [boundary]
                 # calculate velocity.
