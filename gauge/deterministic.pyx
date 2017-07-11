@@ -117,9 +117,10 @@ cdef class Determination(list):
             double bound_until
             int method
             Momentum momentum
-            bint again
+            bint again, ok
             list walked_boundaries
             Line line
+            (double, double) intersection
         for time, method, momentum in gauge.momentum_events():
             # normalize time.
             until = max(time, gauge._base_time)
@@ -172,11 +173,9 @@ cdef class Determination(list):
                     continue
                 for boundary in walked_boundaries:
                     # find the intersection with a boundary.
-                    intersection = line.intersect(boundary.line)
-                    ok = intersection[0]
+                    ok, intersection = line.intersect(boundary.line)
                     if not ok:
                         continue
-                    intersection = intersection[1:3]
                     if intersection[TIME] == since:
                         continue
                     again = True  # iterate with same boundaries again.
@@ -242,10 +241,10 @@ cdef class Line:
         self.value = value
         self.extra = extra
 
-    cdef (bint, double, double) intersect(self, Line line):
+    cdef (bint, (double, double)) intersect(self, Line line):
         """Gets the intersection with the given line.
 
-        :returns: (ok, time, value)
+        :returns: (ok, (time, value))
 
         """
         cdef:
@@ -269,16 +268,16 @@ cdef class Line:
             velocity_delta = left.velocity() - right.velocity()
             if velocity_delta == 0:
                 # parallel line given.
-                return (False, 0, 0)
+                return (False, (0, 0))
             intercept_delta = right.intercept() - left.intercept()
             time = intercept_delta / velocity_delta
         since = max(left.since, right.since)
         until = min(left.until, right.until)
         if not since <= time <= until:
             # intersection not in the time range.
-            return (False, 0, 0)
+            return (False, (0, 0))
         value = left.get(time)
-        return (True, time, value)
+        return (True, (time, value))
 
     cdef double intercept(self):
         """Gets the value-intercept. (Y-intercept)"""
