@@ -4,6 +4,7 @@ from __future__ import absolute_import
 from bisect import bisect_right
 from collections import namedtuple
 import operator
+from time import time as now
 try:
     from weakref import WeakSet
 except ImportError:
@@ -14,7 +15,7 @@ from sortedcontainers import SortedList, SortedListWithKey
 
 from gauge.__about__ import __version__  # noqa
 from gauge.common import (
-    ADD, CLAMP, ERROR, inf, NONE, now_or, OK, ONCE, REMOVE, TIME, VALUE)
+    ADD, CLAMP, ERROR, inf, NONE, OK, ONCE, REMOVE, TIME, VALUE)
 from gauge.deterministic cimport Determination, SEGMENT_VALUE, SEGMENT_VELOCITY
 
 
@@ -22,6 +23,11 @@ __all__ = ['Gauge', 'Momentum']
 
 
 by_until = operator.itemgetter(2)
+
+
+cdef inline double NOW_OR(time):
+    """Returns the current time if `time` is ``None``."""
+    return now() if time is None else float(time)
 
 
 def restore_into(Gauge gauge, base, momenta, max_value,
@@ -76,7 +82,7 @@ cdef class Gauge:
 
     def __init__(self, double value, max, min=0, at=None):
         self.__preinit__()
-        at = now_or(at)
+        at = NOW_OR(at)
         self._base_time, self._base_value = at, value
         self._set_range(max, min, at=at, _incomplete=True)
 
@@ -141,7 +147,7 @@ cdef class Gauge:
     min = get_min
 
     def _set_range(self, max_=None, min_=None, at=None, _incomplete=False):
-        at = now_or(at)
+        at = NOW_OR(at)
         cdef:
             double forget_until = at
             double in_range_since
@@ -210,7 +216,7 @@ cdef class Gauge:
 
         :param at: the time to observe.  (default: now)
         """
-        at = now_or(at)
+        at = NOW_OR(at)
         determination = self.determination
         if len(determination) == 1:
             # skip bisect_right() because it is expensive
@@ -263,7 +269,7 @@ cdef class Gauge:
 
         :raises ValueError: the value is out of the range.
         """
-        at = now_or(at)
+        at = NOW_OR(at)
         prev_value = self.get(at=at)
         value = prev_value + delta
         if outbound == ONCE:
@@ -313,12 +319,12 @@ cdef class Gauge:
 
         :raises ValueError: the value is out of the range.
         """
-        at = now_or(at)
+        at = NOW_OR(at)
         delta = value - self.get(at=at)
         return self.incr(delta, outbound=outbound, at=at)
 
     def _clamp(self, value, at=None):
-        at = now_or(at)
+        at = NOW_OR(at)
         max_ = self.get_max(at)
         if value > max_:
             return max_
@@ -329,7 +335,7 @@ cdef class Gauge:
 
     def clamp(self, at=None):
         """Clamps the current value."""
-        at = now_or(at)
+        at = NOW_OR(at)
         value = self._clamp(self.get(at), at=at)
         return self.set(value, outbound=OK, at=at)
 
@@ -374,7 +380,7 @@ cdef class Gauge:
         in_range_since = self.determination.in_range_since
         if in_range_since is None:
             return False
-        at = now_or(at)
+        at = NOW_OR(at)
         return in_range_since <= at
 
     @staticmethod
@@ -495,7 +501,7 @@ cdef class Gauge:
         :param remove_momenta_before: the stopping index of momentum removal.
                                       (default: the last)
         """
-        at = now_or(at)
+        at = NOW_OR(at)
         if value is None:
             value = self.get(at=at)
         for gauge in self._limited_gauges:
@@ -520,7 +526,7 @@ cdef class Gauge:
         :param value: the value to set coercively.
         :param at: the time base.  (default: now)
         """
-        at = now_or(at)
+        at = NOW_OR(at)
         x = self.momenta.bisect_left((-inf, -inf, at))
         return self._rebase(value, at=at, remove_momenta_before=x)
 
@@ -534,7 +540,7 @@ cdef class Gauge:
         """The callback function which will be called at a limit gauge is
         rebased.
         """
-        at = max(now_or(at), self._base_time)
+        at = max(NOW_OR(at), self._base_time)
         value = self.get(at)
         if self.in_range(at):
             clamp = {self._max_gauge: min, self._min_gauge: max}[limit_gauge]
@@ -559,7 +565,7 @@ cdef class Gauge:
         """
         cdef:
             Gauge limit_gauge
-        at = now_or(at)
+        at = NOW_OR(at)
         value = self.get(at=at)
         hyper = False
         limit_reprs = []
@@ -603,6 +609,7 @@ cdef class Momentum:
             raise IndexError
 
     def __repr__(self):
+        cdef str string
         string = '<{0} {1:+.2f}/s'.format(type(self).__name__, self.velocity)
         if self.since != -inf or self.until != +inf:
             string += ' ' + '~'.join([

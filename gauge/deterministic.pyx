@@ -14,7 +14,7 @@ from __future__ import absolute_import
 import math
 import operator
 
-from gauge.common import ADD, inf, now_or, REMOVE, TIME, VALUE
+from gauge.common import ADD, inf, REMOVE, TIME, VALUE
 from gauge.deterministic cimport SEGMENT_VALUE, SEGMENT_VELOCITY
 from gauge.gauge cimport Gauge, Momentum
 
@@ -221,7 +221,8 @@ cdef class Line:
         public int type
         public double since, until, value, extra
 
-    def __cinit__(self, int type, double since, double until, double value,
+    def __cinit__(self, int type,
+                  double since, double until, double value,
                   double extra=0):
         assert type in (HORIZON, RAY, SEGMENT)
         self.type = type
@@ -266,12 +267,11 @@ cdef class Line:
         """Gets the value-intercept. (Y-intercept)"""
         return self.value - self.velocity() * self.since
 
-    cdef double get(self, at=None):
+    cdef double get(self, double at):
         """Returns the value at the given time.
 
         :raises ValueError: the given time is out of the time range.
         """
-        at = now_or(at)
         if not self.since <= at <= self.until:
             raise ValueError('Out of the time range: {0:.2f}~{1:.2f}'
                              ''.format(self.since, self.until))
@@ -283,11 +283,10 @@ cdef class Line:
             return self._get_segment(at)
         assert 0
 
-    cdef double guess(self, at=None):
+    cdef double guess(self, double at):
         """Returns the value at the given time even the time it out of the time
         range.
         """
-        at = now_or(at)
         if at < self.since:
             if self.type == HORIZON:
                 return self._earlier_horizon(at)

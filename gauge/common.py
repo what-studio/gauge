@@ -10,11 +10,10 @@
 
 """
 from time import time as now
-import warnings
 
 
 __all__ = ['NONE', 'ADD', 'REMOVE', 'TIME', 'VALUE', 'ERROR', 'OK', 'ONCE',
-           'CLAMP', 'inf', 'now_or', 'deprecate']
+           'CLAMP', 'inf', 'now_or']
 
 
 # events.
@@ -41,7 +40,3 @@ inf = float('inf')
 def now_or(time):
     """Returns the current time if `time` is ``None``."""
     return now() if time is None else float(time)
-
-
-def deprecate(message, *args, **kwargs):
-    warnings.warn(DeprecationWarning(message.format(*args, **kwargs)))

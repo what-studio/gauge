@@ -3,30 +3,34 @@ from gauge.deterministic cimport Determination
 
 cdef class Gauge:
 
-    #: The time at the base.
-    cdef double _base_time
-    #: The value at the base.
-    cdef double _base_value
-    #: A sorted list of momenta.  The items are :class:`Momentum` objects.
-    cdef momenta
-    #: The constant maximum value.
-    cdef double _max_value
-    #: The gauge to indicate maximum value.
-    cdef Gauge _max_gauge
-    #: The constant minimum value.
-    cdef double _min_value
-    #: The gauge to indicate minimum value.
-    cdef Gauge _min_gauge
+    cdef:
+        #: The time at the base.
+        double _base_time
+        #: The value at the base.
+        double _base_value
+        #: The constant maximum value.
+        double _max_value
+        #: The gauge to indicate maximum value.
+        Gauge _max_gauge
+        #: The constant minimum value.
+        double _min_value
+        #: The gauge to indicate minimum value.
+        Gauge _min_gauge
+        #: A sorted list of momenta.  The items are :class:`Momentum` objects.
+        public momenta
 
     # internal attributes:
-    cdef Determination _determination
-    cdef _events
-    cdef _limited_gauges
+    cdef:
+        Determination _determination
+        _events
+        _limited_gauges
 
     cdef list momentum_events(self)
 
 
 cdef class Momentum:
-    cdef double velocity
-    cdef double since
-    cdef double until
+
+    cdef:
+        public double velocity
+        public double since
+        public double until
