@@ -122,6 +122,7 @@ cdef class Gauge:
         # remove the cached determination.
         self._determination = None
         # invalidate limited gauges together.
+        cdef Gauge gauge
         for gauge in self._limited_gauges:
             gauge._limit_gauge_invalidated(self)
         return True
@@ -211,12 +212,11 @@ cdef class Gauge:
         """
         return self._set_range(max, min, at=at)
 
-    def _predict(self, at=None):
+    cdef (double, double) _predict(self, double at):
         """Predicts the current value and velocity.
 
         :param at: the time to observe.  (default: now)
         """
-        at = NOW_OR(at)
         determination = self.determination
         if len(determination) == 1:
             # skip bisect_right() because it is expensive
@@ -243,7 +243,7 @@ cdef class Gauge:
 
         :param at: the time to observe.  (default: now)
         """
-        value, velocity = self._predict(at)
+        value, velocity = self._predict(NOW_OR(at))
         return value
 
     def velocity(self, at=None):
@@ -251,7 +251,7 @@ cdef class Gauge:
 
         :param at: the time to observe.  (default: now)
         """
-        value, velocity = self._predict(at)
+        value, velocity = self._predict(NOW_OR(at))
         return velocity
 
     def goal(self):
@@ -323,8 +323,7 @@ cdef class Gauge:
         delta = value - self.get(at=at)
         return self.incr(delta, outbound=outbound, at=at)
 
-    def _clamp(self, value, at=None):
-        at = NOW_OR(at)
+    cdef double _clamp(self, double value, double at):
         max_ = self.get_max(at)
         if value > max_:
             return max_

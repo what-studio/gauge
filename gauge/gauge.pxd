@@ -25,6 +25,9 @@ cdef class Gauge:
         _events
         _limited_gauges
 
+    cdef (double, double) _predict(self, double at)
+    cdef double _clamp(self, double value, double at)
+
     cdef list momentum_events(self)
 
 
