@@ -140,32 +140,6 @@ cdef class Gauge:
     #: The alias of :meth:`get_min`.
     min = get_min
 
-# cdef inline SET_LIMIT(Gauge gauge, str prefix, limit, clamp, double at, double forget_until):
-#     if limit is None:
-#         return
-#     cdef Gauge prev_limit_gauge = getattr(gauge, '_%s_gauge' % prefix)
-#     if prev_limit_gauge is not None:
-#         # unlink from the previous limit gauge.
-#         prev_limit_gauge._limited_gauges.discard(gauge)
-#     if isinstance(limit, Gauge):
-#         limit_gauge, limit_value = limit, limit.get(at)
-#         forget_until = min(forget_until, limit_gauge._base_time)
-#     else:
-#         limit_gauge, limit_value = None, limit
-#     # set limit attrs
-#     value_attr, gauge_attr = name + '_value', name + '_gauge'
-#     if limit_gauge is None:
-#         setattr(self, value_attr, limit_value)
-#         setattr(self, gauge_attr, None)
-#     else:
-#         setattr(self, value_attr, None)
-#         setattr(self, gauge_attr, limit_gauge)
-#         limit_gauge._limited_gauges.add(self)
-#     if _incomplete or in_range_since is None:
-#         continue
-#     elif in_range_since <= at:
-#         value = clamp(value, limit_value)
-
     def _set_range(self, max_=None, min_=None, at=None, _incomplete=False):
         at = now_or(at)
         cdef:
