@@ -33,15 +33,20 @@ cdef inline list VALUE_LINES(Gauge gauge, double value):
 
 
 cdef inline list GAUGE_LINES(Gauge gauge, Gauge other_gauge):
-    cdef list lines = []
-    cdef Determination determination = other_gauge.determination
+    cdef:
+        Line line
+        list lines = []
+        Determination determination = other_gauge.determination
     first, last = determination[0], determination[-1]
     if gauge._base_time < first[TIME]:
-        lines.append(Line(HORIZON, gauge._base_time, first[TIME], first[VALUE]))
+        line = Line(HORIZON, gauge._base_time, first[TIME], first[VALUE])
+        lines.append(line)
     zipped_determination = zip(determination[:-1], determination[1:])
     for (time1, value1), (time2, value2) in zipped_determination:
-        lines.append(Line(SEGMENT, time1, time2, value1, value2))
-    lines.append(Line(HORIZON, last[TIME], +inf, last[VALUE]))
+        line = Line(SEGMENT, time1, time2, value1, value2)
+        lines.append(line)
+    line = Line(HORIZON, last[TIME], +inf, last[VALUE])
+    lines.append(line)
     return lines
 
 
@@ -138,7 +143,8 @@ cdef class Determination(list):
                 if not bounded:
                     velocity = sum(velocities)
                 elif overlapped:
-                    velocity = bound.best(sum(velocities), bound.line.velocity())
+                    velocity = bound.best(sum(velocities),
+                                          bound.line.velocity())
                 else:
                     velocity = sum(v for v in velocities if bound.cmp(v, 0))
                 # is still bound?
