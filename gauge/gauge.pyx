@@ -475,7 +475,8 @@ cdef class Gauge:
         ``(time, ADD|REMOVE, momentum)``.
         """
         cdef:
-            list events = [], remove = []
+            list events = []
+            list remove = []
             Momentum momentum
             double time
             int method

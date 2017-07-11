@@ -75,8 +75,12 @@ cdef class Determination(list):
         the farthest future.
         """
         cdef:
-            double since, until, value, velocity = 0
+            double since
+            double until
+            double value
+            double velocity = 0
             list velocities = []
+            double boundary_value
         since, value = gauge._base_time, gauge._base_value
         self._in_range = False
         # boundaries.
@@ -90,11 +94,14 @@ cdef class Determination(list):
         else:
             floor_lines = GAUGE_LINES(gauge, gauge._min_gauge)
         cdef:
-            Boundary boundary, bound, b
+            Boundary boundary
+            Boundary bound
+            Boundary b
             ceil = Boundary(ceil_lines, operator.lt)
             floor = Boundary(floor_lines, operator.gt)
             list boundaries = [ceil, floor]
-            bint bounded = False, overlapped = False
+            bint bounded = False
+            bint overlapped = False
         for boundary in boundaries:
             # skip past boundaries.
             while boundary.line.until <= since:
@@ -107,6 +114,7 @@ cdef class Determination(list):
                 bound, bounded, overlapped = boundary, True, False
         cdef:
             double time
+            double bound_until
             int method
             Momentum momentum
             bint again
@@ -219,7 +227,10 @@ cdef class Line:
 
     cdef:
         public int type
-        public double since, until, value, extra
+        public double since
+        public double until
+        public double value
+        public double extra
 
     def __cinit__(self, int type,
                   double since, double until, double value,
@@ -238,8 +249,14 @@ cdef class Line:
 
         """
         cdef:
-            double time, value, velocity_delta, intercept_delta, since, until
-            Line left, right
+            double time
+            double value
+            double since
+            double until
+            double velocity_delta
+            double intercept_delta
+            Line left
+            Line right
         # right is more reliable.
         if self.type < line.type:
             left, right = line, self
