@@ -11,6 +11,7 @@ python:
 - pypy3
 
 before_install:  # Use PyPy-5.8.0.
+- cd "$HOME"
 - |
   if [[ $TRAVIS_PYTHON_VERSION == 'pypy' ]]; then
     deactivate
@@ -33,6 +34,7 @@ before_install:  # Use PyPy-5.8.0.
       ./pypy -m ensurepip
     pushd
   fi
+- cd "$TRAVIS_BUILD_DIR"
 
 install:
 - pip install cython
