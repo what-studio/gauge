@@ -462,14 +462,17 @@ class Gauge(object):
         ``(time, ADD|REMOVE, momentum)``.
         """
         cdef list events = []
+        cdef list remove = []
         cdef Momentum m
         events.append((self.base[TIME], NONE, None))
         momentum_ids = set(id(m) for m in self.momenta)
-        for time, method, momentum in list(self._events):
+        for time, method, momentum in self._events:
             if id(momentum) not in momentum_ids:
-                self._events.remove((time, method, momentum))
+                remove.append((time, method, momentum))
                 continue
             events.append((time, method, momentum))
+        for time, method, momentum in remove:
+            self._events.remove((time, method, momentum))
         events.append((+inf, NONE, None))
         return events
 
