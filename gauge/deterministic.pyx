@@ -440,5 +440,7 @@ cdef class Boundary:
         return self._cmp_inv(x, y)
 
     def __repr__(self):
-        return ('<{0} line={1}, cmp={2}>'
-                ''.format(type(self).__name__, self.line, self.cmp))
+        # NOTE: __name__ is 'Boundary' in CPython, but 'deterministic.Boundary'
+        # in PyPy.  So here it picks only the last word.
+        __, __, name = self.__class__.__name__.rpartition('.')
+        return '<{0} line={1}, cmp={2}>'.format(name, self.line, self.cmp)
