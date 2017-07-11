@@ -30,13 +30,16 @@ cdef inline double NOW_OR(time):
     return now() if time is None else float(time)
 
 
-def restore_into(Gauge gauge, base, momenta, max_value,
-                 max_gauge, min_value, min_gauge):
+cdef inline void RESTORE_INTO(Gauge gauge, (double, double) base, list momenta,
+                              double max_value, Gauge max_gauge,
+                              double min_value, Gauge min_gauge):
     gauge._base_time, gauge._base_value = base
     gauge._max_value, gauge._max_gauge = max_value, max_gauge
     gauge._min_value, gauge._min_gauge = min_value, min_gauge
-    max_gauge is not None and max_gauge._limited_gauges.add(gauge)
-    min_gauge is not None and min_gauge._limited_gauges.add(gauge)
+    if max_gauge is not None:
+        max_gauge._limited_gauges.add(gauge)
+    if min_gauge is not None:
+        min_gauge._limited_gauges.add(gauge)
     if momenta:
         gauge.add_momenta([gauge._make_momentum(*m) for m in momenta])
 
@@ -46,7 +49,7 @@ def restore_gauge(gauge_class, base, momenta, max_value,
     """Restores a gauge from the arguments.  It is used for Pickling."""
     gauge = gauge_class.__new__(gauge_class)
     gauge.__preinit__()
-    restore_into(gauge, base, momenta, max_value,
+    RESTORE_INTO(gauge, base, momenta, max_value,
                  max_gauge, min_value, min_gauge)
     return gauge
 
@@ -549,8 +552,9 @@ cdef class Gauge:
 
     def __reduce__(self):
         return restore_gauge, (
-            self.__class__, (self._base_time, self._base_value),
-            [tuple(m) for m in self.momenta],
+            self.__class__,
+            (self._base_time, self._base_value),
+            [(m.velocity, m.since, m.until) for m in self.momenta],
             self._max_value, self._max_gauge,
             self._min_value, self._min_gauge
         )
