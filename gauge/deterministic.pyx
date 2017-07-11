@@ -21,11 +21,11 @@ from gauge.gauge cimport Gauge, Momentum
 __all__ = ['Determination', 'Line', 'Horizon', 'Ray', 'Segment', 'Boundary']
 
 
-cdef list value_lines(Gauge gauge, double value):
+cdef inline list VALUE_LINES(Gauge gauge, double value):
     return [Horizon(gauge._base_time, +inf, value)]
 
 
-cdef list gauge_lines(Gauge gauge, Gauge other_gauge):
+cdef inline list GAUGE_LINES(Gauge gauge, Gauge other_gauge):
     cdef list lines = []
     cdef Determination determination = other_gauge.determination
     first, last = determination[0], determination[-1]
@@ -62,32 +62,27 @@ cdef class Determination(list):
         """Determines the transformations from the time when the value set to
         the farthest future.
         """
-        cdef double since
-        cdef double until
-        cdef double value
-        cdef double velocity = 0
-        cdef list velocities = []
+        cdef:
+            double since, until, value, velocity = 0
+            list velocities = []
         since, value = gauge._base_time, gauge._base_value
         self._in_range = False
         # boundaries.
-        cdef list ceil_lines
-        cdef list floor_lines
+        cdef list ceil_lines, floor_lines
         if gauge._max_gauge is None:
-            ceil_lines = value_lines(gauge, gauge._max_value)
+            ceil_lines = VALUE_LINES(gauge, gauge._max_value)
         else:
-            ceil_lines = gauge_lines(gauge, gauge._max_gauge)
+            ceil_lines = GAUGE_LINES(gauge, gauge._max_gauge)
         if gauge._min_gauge is None:
-            floor_lines = value_lines(gauge, gauge._min_value)
+            floor_lines = VALUE_LINES(gauge, gauge._min_value)
         else:
-            floor_lines = gauge_lines(gauge, gauge._min_gauge)
-
-        cdef Boundary bound
-        cdef Boundary boundary
-        cdef ceil = Boundary(ceil_lines, operator.lt)
-        cdef floor = Boundary(floor_lines, operator.gt)
-        cdef boundaries = [ceil, floor]
-        cdef bint bounded = False
-        cdef bint overlapped = False
+            floor_lines = GAUGE_LINES(gauge, gauge._min_gauge)
+        cdef:
+            Boundary boundary, bound, b
+            ceil = Boundary(ceil_lines, operator.lt)
+            floor = Boundary(floor_lines, operator.gt)
+            list boundaries = [ceil, floor]
+            bint bounded = False, overlapped = False
         for boundary in boundaries:
             # skip past boundaries.
             while boundary.line.until <= since:
@@ -98,12 +93,12 @@ cdef class Determination(list):
             boundary_value = boundary.line.guess(since)
             if boundary.cmp(boundary_value, value):
                 bound, bounded, overlapped = boundary, True, False
-        cdef double time
-        cdef int method
-        cdef Momentum momentum
-        cdef bint again
-        cdef list walked_boundaries
-        cdef Boundary b
+        cdef:
+            double time
+            int method
+            Momentum momentum
+            bint again
+            list walked_boundaries
         for time, method, momentum in gauge.momentum_events():
             # normalize time.
             until = max(time, gauge._base_time)
