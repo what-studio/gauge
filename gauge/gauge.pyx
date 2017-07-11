@@ -490,7 +490,7 @@ cdef class Gauge:
         self.remove_momenta([momentum])
         return momentum
 
-    def momentum_events(self):
+    cdef list momentum_events(self):
         """Yields momentum adding and removing events.  An event is a tuple of
         ``(time, ADD|REMOVE, momentum)``.
         """

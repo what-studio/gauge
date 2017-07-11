@@ -23,6 +23,8 @@ cdef class Gauge:
     cdef _events
     cdef _limited_gauges
 
+    cdef list momentum_events(self)
+
 
 cdef class Momentum:
     cdef double velocity
