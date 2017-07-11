@@ -15,7 +15,7 @@ from sortedcontainers import SortedList, SortedListWithKey
 from gauge.__about__ import __version__  # noqa
 from gauge.common import (
     ADD, CLAMP, ERROR, inf, NONE, now_or, OK, ONCE, REMOVE, TIME, VALUE)
-from gauge.deterministic cimport Determination, _calc_segment_value, _calc_segment_velocity
+from gauge.deterministic cimport Determination, SEGMENT_VALUE, SEGMENT_VELOCITY
 
 
 __all__ = ['Gauge', 'Momentum']
@@ -250,8 +250,8 @@ cdef class Gauge:
         except IndexError:
             return (determination[-1][VALUE], 0.)
         time1, value1 = determination[x - 1]
-        value = _calc_segment_value(at, time1, time2, value1, value2)
-        velocity = _calc_segment_velocity(time1, time2, value1, value2)
+        value = SEGMENT_VALUE(at, time1, time2, value1, value2)
+        velocity = SEGMENT_VELOCITY(time1, time2, value1, value2)
         if determination.in_range_since is None:
             pass
         elif determination.in_range_since <= time1:

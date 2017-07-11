@@ -15,6 +15,7 @@ import math
 import operator
 
 from gauge.common import ADD, inf, now_or, REMOVE, TIME, VALUE
+from gauge.deterministic cimport SEGMENT_VALUE, SEGMENT_VELOCITY
 from gauge.gauge cimport Gauge, Momentum
 
 
@@ -337,16 +338,21 @@ cdef class Line:
     # SEGMENT
 
     cdef double _get_segment(self, double at):
-        return _calc_segment_value(at, self.since, self.until, self.value, self.extra)
+        cdef double final = self.extra
+        return SEGMENT_VALUE(at, self.since, self.until, self.value, final)
 
     cdef double _earlier_segment(self, double at):
         return self.value
 
     cdef double _later_segment(self, double at):
-        return self.extra  # extra is final.
+        cdef double final = self.extra
+        return final
 
     cdef double _velocity_segment(self):
-        return _calc_segment_velocity(self.since, self.until, self.value, self.extra)
+        cdef double final = self.extra
+        return SEGMENT_VELOCITY(self.since, self.until, self.value, final)
+
+    # __repr__
 
     cdef inline str REPR(self, str string):
         return ('<{0}{1} for {2!r}~{3!r}>'
