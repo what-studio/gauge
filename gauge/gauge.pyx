@@ -461,11 +461,13 @@ class Gauge(object):
         """Yields momentum adding and removing events.  An event is a tuple of
         ``(time, ADD|REMOVE, momentum)``.
         """
-        cdef list events = []
-        cdef list remove = []
-        cdef Momentum m
+        cdef:
+            list events = [], remove = []
+            Momentum momentum
+            double time
+            int method
         events.append((self.base[TIME], NONE, None))
-        momentum_ids = set(id(m) for m in self.momenta)
+        momentum_ids = set(id(momentum) for momentum in self.momenta)
         for time, method, momentum in self._events:
             if id(momentum) not in momentum_ids:
                 remove.append((time, method, momentum))
