@@ -12,8 +12,8 @@
 from __future__ import absolute_import
 
 from gauge.__about__ import __version__  # noqa
+from gauge.constants import CLAMP, ERROR, OK, ONCE
 from gauge.gauge import Gauge, Momentum
-from gauge.common import CLAMP, ERROR, OK, ONCE
 
 
 __all__ = ['Gauge', 'Momentum',
