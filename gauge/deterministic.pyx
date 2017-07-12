@@ -22,19 +22,22 @@ from gauge.gauge cimport Gauge, Momentum
 __all__ = ['Determination', 'Line', 'Horizon', 'Ray', 'Segment', 'Boundary']
 
 
-# line types:
-DEF HORIZON = 1
-DEF RAY = 2
-DEF SEGMENT = 3
-
-
 # indices:
 DEF TIME = 0
 DEF VALUE = 1
 
 
+# line types:
+DEF LN_HORIZON = 1
+DEF LN_RAY = 2
+DEF LN_SEGMENT = 3
+HORIZON = LN_HORIZON
+RAY = LN_RAY
+SEGMENT = LN_SEGMENT
+
+
 cdef inline list VALUE_LINES(Gauge gauge, double value):
-    return [Line(HORIZON, gauge._base_time, +INF, value)]
+    return [Line(LN_HORIZON, gauge._base_time, +INF, value)]
 
 
 cdef inline list GAUGE_LINES(Gauge gauge, Gauge other_gauge):
@@ -44,13 +47,13 @@ cdef inline list GAUGE_LINES(Gauge gauge, Gauge other_gauge):
         Determination determination = other_gauge.determination
     first, last = determination[0], determination[-1]
     if gauge._base_time < first[TIME]:
-        line = Line(HORIZON, gauge._base_time, first[TIME], first[VALUE])
+        line = Line(LN_HORIZON, gauge._base_time, first[TIME], first[VALUE])
         lines.append(line)
     zipped_determination = zip(determination[:-1], determination[1:])
     for (time1, value1), (time2, value2) in zipped_determination:
-        line = Line(SEGMENT, time1, time2, value1, value2)
+        line = Line(LN_SEGMENT, time1, time2, value1, value2)
         lines.append(line)
-    line = Line(HORIZON, last[TIME], +INF, last[VALUE])
+    line = Line(LN_HORIZON, last[TIME], +INF, last[VALUE])
     lines.append(line)
     return lines
 
@@ -167,7 +170,7 @@ cdef class Determination(list):
                     again = True
                     continue
                 # current value line.
-                line = Line(RAY, since, until, value, velocity)
+                line = Line(LN_RAY, since, until, value, velocity)
                 if overlapped:
                     bound_until = min(bound.line.until, until)
                     if bound_until == +INF:
@@ -239,7 +242,7 @@ cdef class Line:
     def __cinit__(self, int type,
                   double since, double until, double value,
                   double extra=0):
-        assert type in (HORIZON, RAY, SEGMENT)
+        assert type in (LN_HORIZON, LN_RAY, LN_SEGMENT)
         self.type = type
         self.since = since
         self.until = until
@@ -296,11 +299,11 @@ cdef class Line:
         if not self.since <= at <= self.until:
             raise ValueError('Out of the time range: {0:.2f}~{1:.2f}'
                              ''.format(self.since, self.until))
-        if self.type == HORIZON:
+        if self.type == LN_HORIZON:
             return self._get_horizon(at)
-        elif self.type == RAY:
+        elif self.type == LN_RAY:
             return self._get_ray(at)
-        elif self.type == SEGMENT:
+        elif self.type == LN_SEGMENT:
             return self._get_segment(at)
         assert 0
 
@@ -309,29 +312,29 @@ cdef class Line:
         range.
         """
         if at < self.since:
-            if self.type == HORIZON:
+            if self.type == LN_HORIZON:
                 return self._earlier_horizon(at)
-            elif self.type == RAY:
+            elif self.type == LN_RAY:
                 return self._earlier_ray(at)
-            elif self.type == SEGMENT:
+            elif self.type == LN_SEGMENT:
                 return self._earlier_segment(at)
         elif at > self.until:
-            if self.type == HORIZON:
+            if self.type == LN_HORIZON:
                 return self._later_horizon(at)
-            elif self.type == RAY:
+            elif self.type == LN_RAY:
                 return self._later_ray(at)
-            elif self.type == SEGMENT:
+            elif self.type == LN_SEGMENT:
                 return self._later_segment(at)
         else:
             return self.get(at)
         assert 0
 
     cdef double velocity(self):
-        if self.type == HORIZON:
+        if self.type == LN_HORIZON:
             return self._velocity_horizon()
-        elif self.type == RAY:
+        elif self.type == LN_RAY:
             return self._velocity_ray()
-        elif self.type == SEGMENT:
+        elif self.type == LN_SEGMENT:
             return self._velocity_segment()
         assert 0
 
@@ -385,11 +388,11 @@ cdef class Line:
 
     def __repr__(self):
         cdef str string
-        if self.type == HORIZON:
+        if self.type == LN_HORIZON:
             string = '[HORIZON] {0:.2f}'.format(self.value)
-        elif self.type == RAY:  # extra is velocity.
+        elif self.type == LN_RAY:  # extra is velocity.
             string = '[RAY] {0:.2f}{1:+.2f}/s'.format(self.value, self.extra)
-        elif self.type == SEGMENT:  # extra is final.
+        elif self.type == LN_SEGMENT:  # extra is final.
             string = '[SEGMENT] {0:.2f}~{1:.2f}'.format(self.value, self.extra)
         else:
             assert 0
