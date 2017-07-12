@@ -160,6 +160,7 @@ cdef class Gauge:
         cdef:
             double forget_until = at
             double in_range_since
+            Gauge limit_gauge
         # _incomplete=True when __init__() calls it.
         if not _incomplete:
             value = self.get(at)
@@ -169,9 +170,10 @@ cdef class Gauge:
             if self._max_gauge is not None:
                 self._max_gauge._limited_gauges.discard(self)
             if isinstance(max_, Gauge):
-                self._max_gauge = max_
-                self._max_value = max_.get(at)
-                forget_until = min(forget_until, max_._base_time)
+                limit_gauge = max_
+                self._max_gauge = limit_gauge
+                self._max_value = limit_gauge.get(at)
+                forget_until = min(forget_until, limit_gauge._base_time)
             else:
                 self._max_gauge = None
                 self._max_value = max_
@@ -182,9 +184,10 @@ cdef class Gauge:
             if self._min_gauge is not None:
                 self._min_gauge._limited_gauges.discard(self)
             if isinstance(min_, Gauge):
-                self._min_gauge = min_
-                self._min_value = min_.get(at)
-                forget_until = min(forget_until, min_._base_time)
+                limit_gauge = min_
+                self._min_gauge = limit_gauge
+                self._min_value = limit_gauge.get(at)
+                forget_until = min(forget_until, limit_gauge._base_time)
             else:
                 self._min_gauge = None
                 self._min_value = min_
