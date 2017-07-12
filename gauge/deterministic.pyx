@@ -396,7 +396,7 @@ cdef class Line:
             string = '[SEGMENT] {0:.2f}~{1:.2f}'.format(self.value, self.extra)
         else:
             assert 0
-        return ('<{0}{1} for {2!r}~{3!r}>'
+        return ('<{0}{1} for {2:.2f}~{3:.2f}>'
                 ''.format(type(self).__name__, string, self.since, self.until))
 
 

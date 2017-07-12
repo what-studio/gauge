@@ -344,9 +344,9 @@ def test_repr():
     m = Momentum(+100, until=20)
     assert repr(m) == '<Momentum +100.00/s ~20.00>'
     h = Horizon(10, 20, 30)
-    assert repr(h) == '<Horizon 30.00 for 10~20>'
+    assert repr(h) == '<Line[HORIZON] 30.00 for 10.00~20.00>'
     r = Ray(10, 20, 30, 40)
-    assert repr(r) == '<Ray 30.00+40.00/s for 10~20>'
+    assert repr(r) == '<Line[RAY] 30.00+40.00/s for 10.00~20.00>'
 
 
 def test_case1():
