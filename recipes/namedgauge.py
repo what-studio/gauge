@@ -10,11 +10,16 @@ Test it by `py.test <http://pytest.org/>`_:
 
 """
 from collections import namedtuple
+from time import time as now
 
-from gauge import Gauge, Momentum, now_or
+from gauge import Gauge, Momentum
 
 
 __all__ = [b'NamedGauge', b'NamedMomentum']
+
+
+def now_or(at=None):
+    return now() if at is None else at
 
 
 class NamedGauge(Gauge):
@@ -96,9 +101,12 @@ class NamedGauge(Gauge):
         return self.update_momentum_by_name(name, velocity=velocity, since=at)
 
 
-class NamedMomentum(namedtuple('_', 'velocity, since, until, name'), Momentum):
+class NamedMomentum(Momentum):
 
-    pass
+    __slots__ = ('name',)
+
+    def __init__(self, velocity, since, until, name):
+        self.name = name
 
 
 def test_basic():
