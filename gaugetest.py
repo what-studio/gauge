@@ -12,7 +12,7 @@ import pytest
 
 import gauge
 from gauge import Gauge, Momentum
-from gauge.constants import ADD, CLAMP, NONE, OK, ONCE, REMOVE
+from gauge.constants import ADD, CLAMP, inf, NONE, OK, ONCE, REMOVE
 from gauge.deterministic import (
     Boundary, Determination, Horizon, Line, Ray, Segment)
 

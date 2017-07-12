@@ -623,6 +623,31 @@ cdef class Momentum:
         else:
             raise IndexError
 
+    def __len__(self):
+        return 3
+
+    def __iter__(self):
+        return iter([self.velocity, self.since, self.until])
+
+    def __hash__(self):
+        return hash((self.velocity, self.since, self.until))
+
+    def __richcmp__(self, other, int op):
+        cdef tuple x = (self.velocity, self.since, self.until)
+        cdef tuple y = tuple(other)
+        if op == 0:
+            return x < y
+        elif op == 1:
+            return x <= y
+        elif op == 2:
+            return x == y
+        elif op == 3:
+            return x != y
+        elif op == 4:
+            return x > y
+        elif op == 5:
+            return x >= y
+
     def __repr__(self):
         cdef str string
         string = '<{0} {1:+.2f}/s'.format(type(self).__name__, self.velocity)
