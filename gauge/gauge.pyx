@@ -551,6 +551,7 @@ cdef class Gauge:
         self.forget_past(value, at=at)
 
     def __reduce__(self):
+        cdef Momentum m
         return restore_gauge, (
             self.__class__,
             (self._base_time, self._base_value),
