@@ -603,7 +603,9 @@ cdef class Momentum:
     specific period.
     """
 
-    def __cinit__(self, double velocity, double since=-INF, double until=+INF):
+    def __cinit__(self,
+                  double velocity, double since=-INF, double until=+INF,
+                  *args, **kwargs):
         self.velocity = float(velocity)
         self.since = since
         self.until = until
