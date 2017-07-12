@@ -400,6 +400,18 @@ cdef class Line:
                 ''.format(type(self).__name__, string, self.since, self.until))
 
 
+cpdef Line Horizon(double since, double until, double value):
+    return Line(LN_HORIZON, since, until, value)
+
+
+cpdef Line Ray(double since, double until, double value, double velocity):
+    return Line(LN_RAY, since, until, value, velocity)
+
+
+cpdef Line Segment(double since, double until, double value, double final):
+    return Line(LN_SEGMENT, since, until, value, final)
+
+
 cdef class Boundary:
 
     cdef:
