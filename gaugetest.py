@@ -11,13 +11,14 @@ import time
 import pytest
 
 import gauge
-from gauge import CLAMP, Gauge, inf, Momentum, OK, ONCE
-from gauge.common import ADD, deprecate, NONE, REMOVE, TIME, VALUE
+from gauge import Gauge, Momentum
+from gauge.constants import ADD, CLAMP, NONE, OK, ONCE, REMOVE
 from gauge.deterministic import (
     Boundary, Determination, Horizon, Line, Ray, Segment)
 
 
 PRECISION = 8
+TIME, VALUE = 0, 1
 
 
 class FakeGauge(Gauge):
@@ -34,11 +35,11 @@ def round_(x):
 
 @contextmanager
 def t(timestamp):
-    gauge.common.now = lambda: float(timestamp)
+    gauge.gauge.now = lambda: float(timestamp)
     try:
         yield
     finally:
-        gauge.common.now = time.time
+        gauge.gauge.now = time.time
 
 
 def round_determination(determination, precision=0):
@@ -65,20 +66,6 @@ def shift_gauge(gauge, delta=0):
     for momentum in gauge.momenta:
         g.add_momentum(momentum)
     return g
-
-
-def test_deprecations():
-    # g = Gauge(0, 10, at=0)
-    # removed since v0.1.0
-    # pytest.deprecated_call(g.set, 0, limit=True)
-    # pytest.deprecated_call(g.set_max, 0, limit=True)
-    # removed since v0.2.0
-    # pytest.deprecated_call(g.current, 0)
-    # pytest.deprecated_call(Gauge.value.fget, g)
-    # pytest.deprecated_call(Gauge.value.fset, g, 10)
-    # pytest.deprecated_call(Gauge.set_at.fget, g)
-    # pytest.deprecated_call(Gauge.set_at.fset, g, 10)
-    pytest.skip()
 
 
 def test_momenta_in_range():
@@ -1164,7 +1151,3 @@ def test_invalidate_returns():
     g.get(0)
     assert g.invalidate()
     assert not g.invalidate()
-
-
-def test_deprecate():
-    pytest.deprecated_call(deprecate, 'Hello, {0}', 'world')
