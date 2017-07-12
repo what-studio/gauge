@@ -15,11 +15,16 @@ from sortedcontainers import SortedList, SortedListWithKey
 
 from gauge.__about__ import __version__  # noqa
 from gauge.constants cimport (
-    ADD, CLAMP, ERROR, INF, NONE, OK, ONCE, REMOVE, TIME, VALUE)
+    EV_ADD, EV_NONE, EV_REMOVE, INF, LI_CLAMP, LI_ERROR, LI_OK, LI_ONCE)
 from gauge.deterministic cimport Determination, SEGMENT_VALUE, SEGMENT_VELOCITY
 
 
 __all__ = ['Gauge', 'Momentum']
+
+
+# indices:
+DEF TIME = 0
+DEF VALUE = 1
 
 
 by_until = operator.itemgetter(2)
@@ -261,13 +266,13 @@ cdef class Gauge:
         """Predicts the final value."""
         return self.determination[-1][VALUE]
 
-    def incr(self, delta, outbound=ERROR, at=None):
+    def incr(self, delta, outbound=LI_ERROR, at=None):
         """Increases the value by the given delta immediately.  The
         determination would be changed.
 
         :param delta: the value to increase.
         :param outbound: the strategy to control modification to out of the
-                         range.  (default: ERROR)
+                         range.  (default: LI_ERROR)
         :param at: the time to increase.  (default: now)
 
         :raises ValueError: the value is out of the range.
@@ -275,9 +280,9 @@ cdef class Gauge:
         at = NOW_OR(at)
         prev_value = self.get(at=at)
         value = prev_value + delta
-        if outbound == ONCE:
-            outbound = OK if self.in_range(at) else ERROR
-        if outbound != OK:
+        if outbound == LI_ONCE:
+            outbound = LI_OK if self.in_range(at) else LI_ERROR
+        if outbound != LI_OK:
             items = [(
                 self.get_max, max, operator.gt,
                 'The value to set is bigger than the maximum ({0} > {1})'
@@ -291,33 +296,33 @@ cdef class Gauge:
                 limit = get_limit(at)
                 if not cmp_(value, limit):
                     continue
-                if outbound == ERROR:
+                if outbound == LI_ERROR:
                     raise ValueError(error_form.format(value, limit))
-                elif outbound == CLAMP:
+                elif outbound == LI_CLAMP:
                     value = clamp(prev_value, limit)
                     break
         return self.forget_past(value, at=at)
 
-    def decr(self, delta, outbound=ERROR, at=None):
+    def decr(self, delta, outbound=LI_ERROR, at=None):
         """Decreases the value by the given delta immediately.  The
         determination would be changed.
 
         :param delta: the value to decrease.
         :param outbound: the strategy to control modification to out of the
-                         range.  (default: ERROR)
+                         range.  (default: LI_ERROR)
         :param at: the time to decrease.  (default: now)
 
         :raises ValueError: the value is out of the range.
         """
         return self.incr(-delta, outbound=outbound, at=at)
 
-    def set(self, value, outbound=ERROR, at=None):
+    def set(self, value, outbound=LI_ERROR, at=None):
         """Sets the current value immediately.  The determination would be
         changed.
 
         :param value: the value to set.
         :param outbound: the strategy to control modification to out of the
-                         range.  (default: ERROR)
+                         range.  (default: LI_ERROR)
         :param at: the time to set.  (default: now)
 
         :raises ValueError: the value is out of the range.
@@ -339,7 +344,7 @@ cdef class Gauge:
         """Clamps the current value."""
         at = NOW_OR(at)
         value = self._clamp(self.get(at), at=at)
-        return self.set(value, outbound=OK, at=at)
+        return self.set(value, outbound=LI_OK, at=at)
 
     def when(self, value, after=0):
         """When the gauge reaches to the goal value.
@@ -427,9 +432,9 @@ cdef class Gauge:
         cdef Momentum momentum
         for momentum in momenta:
             self.momenta.add(momentum)
-            self._events.add((momentum.since, ADD, momentum))
+            self._events.add((momentum.since, EV_ADD, momentum))
             if momentum.until != +INF:
-                self._events.add((momentum.until, REMOVE, momentum))
+                self._events.add((momentum.until, EV_REMOVE, momentum))
         self.invalidate()
 
     def remove_momenta(self, momenta):
@@ -440,9 +445,9 @@ cdef class Gauge:
                 self.momenta.remove(momentum)
             except ValueError:
                 raise ValueError('{0} not in the gauge'.format(momentum))
-            self._events.remove((momentum.since, ADD, momentum))
+            self._events.remove((momentum.since, EV_ADD, momentum))
             if momentum.until != +INF:
-                self._events.remove((momentum.until, REMOVE, momentum))
+                self._events.remove((momentum.until, EV_REMOVE, momentum))
         self.invalidate()
 
     def add_momentum(self, *args, **kwargs):
@@ -474,7 +479,7 @@ cdef class Gauge:
 
     cdef list momentum_events(self):
         """Yields momentum adding and removing events.  An event is a tuple of
-        ``(time, ADD|REMOVE, momentum)``.
+        ``(time, EV_ADD|EV_REMOVE, momentum)``.
         """
         cdef:
             list events = []
@@ -482,7 +487,7 @@ cdef class Gauge:
             Momentum momentum
             double time
             int method
-        events.append((self._base_time, NONE, None))
+        events.append((self._base_time, EV_NONE, None))
         momentum_ids = set(id(momentum) for momentum in self.momenta)
         for time, method, momentum in self._events:
             if id(momentum) not in momentum_ids:
@@ -491,7 +496,7 @@ cdef class Gauge:
             events.append((time, method, momentum))
         for time, method, momentum in remove:
             self._events.remove((time, method, momentum))
-        events.append((+INF, NONE, None))
+        events.append((+INF, EV_NONE, None))
         return events
 
     def _rebase(self, value=None, at=None, remove_momenta_before=None):

@@ -9,22 +9,33 @@
    :license: BSD, see LICENSE for more details.
 
 """
+__all__ = ['NONE', 'ADD', 'REMOVE', 'ERROR', 'OK', 'ONCE', 'CLAMP', 'inf']
+
+
 cdef:
 
     # events:
-    int NONE = 0
-    int ADD = 1
-    int REMOVE = 2
-
-    # indices:
-    int TIME = 0
-    int VALUE = 1
+    int EV_NONE = 0
+    int EV_ADD = 1
+    int EV_REMOVE = 2
 
     # strategies to control modification to out of the limits:
-    int ERROR = 0
-    int OK = 1
-    int ONCE = 2
-    int CLAMP = 3
+    int LI_ERROR = 0
+    int LI_OK = 1
+    int LI_ONCE = 2
+    int LI_CLAMP = 3
 
     # numbers:
     double INF = float('inf')
+
+
+NONE = EV_NONE
+ADD = EV_ADD
+REMOVE = EV_REMOVE
+
+ERROR = LI_ERROR
+OK = LI_OK
+ONCE = LI_ONCE
+CLAMP = LI_CLAMP
+
+inf = INF

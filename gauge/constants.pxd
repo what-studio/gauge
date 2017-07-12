@@ -1,9 +1,7 @@
 cdef:
     # events:
-    int NONE, ADD, REMOVE
-    # indices:
-    int TIME, VALUE
+    int EV_NONE, EV_ADD, EV_REMOVE
     # strategies to control modification to out of the limits:
-    int ERROR, OK, ONCE, CLAMP
+    int LI_ERROR, LI_OK, LI_ONCE, LI_CLAMP
     # numbers:
     double INF

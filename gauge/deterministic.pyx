@@ -14,7 +14,7 @@ from __future__ import absolute_import
 import math
 import operator
 
-from gauge.constants cimport ADD, INF, REMOVE, TIME, VALUE
+from gauge.constants cimport EV_ADD, EV_REMOVE, INF
 from gauge.deterministic cimport SEGMENT_VALUE, SEGMENT_VELOCITY
 from gauge.gauge cimport Gauge, Momentum
 
@@ -26,6 +26,11 @@ __all__ = ['Determination', 'Line', 'Horizon', 'Ray', 'Segment', 'Boundary']
 DEF HORIZON = 1
 DEF RAY = 2
 DEF SEGMENT = 3
+
+
+# indices:
+DEF TIME = 0
+DEF VALUE = 1
 
 
 cdef inline list VALUE_LINES(Gauge gauge, double value):
@@ -206,9 +211,9 @@ cdef class Determination(list):
             value += velocity * (until - since)
             self._determine(until, value, in_range=not bounded or overlapped)
             # prepare the next iteration.
-            if method == ADD:
+            if method == EV_ADD:
                 velocities.append(momentum.velocity)
-            elif method == REMOVE:
+            elif method == EV_REMOVE:
                 velocities.remove(momentum.velocity)
             since = until
 
