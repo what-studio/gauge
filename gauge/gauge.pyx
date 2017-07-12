@@ -27,7 +27,7 @@ DEF TIME = 0
 DEF VALUE = 1
 
 
-by_until = operator.itemgetter(2)
+cdef by_until = operator.itemgetter(2)
 
 
 cdef inline double NOW_OR(time):
