@@ -14,7 +14,7 @@ from __future__ import absolute_import
 import math
 import operator
 
-from gauge.common import ADD, inf, REMOVE, TIME, VALUE
+from gauge.constants cimport ADD, INF, REMOVE, TIME, VALUE
 from gauge.deterministic cimport SEGMENT_VALUE, SEGMENT_VELOCITY
 from gauge.gauge cimport Gauge, Momentum
 
@@ -29,7 +29,7 @@ DEF SEGMENT = 3
 
 
 cdef inline list VALUE_LINES(Gauge gauge, double value):
-    return [Line(HORIZON, gauge._base_time, +inf, value)]
+    return [Line(HORIZON, gauge._base_time, +INF, value)]
 
 
 cdef inline list GAUGE_LINES(Gauge gauge, Gauge other_gauge):
@@ -45,7 +45,7 @@ cdef inline list GAUGE_LINES(Gauge gauge, Gauge other_gauge):
     for (time1, value1), (time2, value2) in zipped_determination:
         line = Line(SEGMENT, time1, time2, value1, value2)
         lines.append(line)
-    line = Line(HORIZON, last[TIME], +inf, last[VALUE])
+    line = Line(HORIZON, last[TIME], +INF, last[VALUE])
     lines.append(line)
     return lines
 
@@ -165,7 +165,7 @@ cdef class Determination(list):
                 line = Line(RAY, since, until, value, velocity)
                 if overlapped:
                     bound_until = min(bound.line.until, until)
-                    if bound_until == +inf:
+                    if bound_until == +INF:
                         break
                     # released from the boundary.
                     since, value = (bound_until, bound.line.get(bound_until))
@@ -191,7 +191,7 @@ cdef class Determination(list):
                     # find missing intersection caused by floating-point
                     # inaccuracy.
                     bound_until = min(boundary.line.until, until)
-                    if bound_until == +inf or bound_until < since:
+                    if bound_until == +INF or bound_until < since:
                         continue
                     boundary_value = boundary.line.get(bound_until)
                     if boundary.cmp_eq(line.get(bound_until), boundary_value):
@@ -200,7 +200,7 @@ cdef class Determination(list):
                     since, value = bound_until, boundary_value
                     self._determine(since, value)
                     break
-            if until == +inf:
+            if until == +INF:
                 break
             # determine the final node in the current itreration.
             value += velocity * (until - since)

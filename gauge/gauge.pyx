@@ -14,8 +14,8 @@ from six.moves import zip
 from sortedcontainers import SortedList, SortedListWithKey
 
 from gauge.__about__ import __version__  # noqa
-from gauge.common import (
-    ADD, CLAMP, ERROR, inf, NONE, OK, ONCE, REMOVE, TIME, VALUE)
+from gauge.constants cimport (
+    ADD, CLAMP, ERROR, INF, NONE, OK, ONCE, REMOVE, TIME, VALUE)
 from gauge.deterministic cimport Determination, SEGMENT_VALUE, SEGMENT_VELOCITY
 
 
@@ -225,7 +225,7 @@ cdef class Gauge:
             # skip bisect_right() because it is expensive
             x = 0
         else:
-            x = bisect_right(determination, (at, +inf))
+            x = bisect_right(determination, (at, +INF))
         if x == 0:
             return (determination[0][VALUE], 0.)
         try:
@@ -394,9 +394,9 @@ cdef class Gauge:
         :param velocity_or_momentum: a :class:`Momentum` object or just a
                                      number for the velocity.
         :param since: if the first argument is a velocity, it is the time to
-                      start to affect the momentum.  (default: ``-inf``)
+                      start to affect the momentum.  (default: ``-INF``)
         :param until: if the first argument is a velocity, it is the time to
-                      finish to affect the momentum.  (default: ``+inf``)
+                      finish to affect the momentum.  (default: ``+INF``)
 
         :raises ValueError: `since` later than or same with `until`.
         :raises TypeError: the first argument is a momentum, but other
@@ -411,12 +411,12 @@ cdef class Gauge:
         else:
             velocity = velocity_or_momentum
             if since is None:
-                since = -inf
+                since = -INF
             if until is None:
-                until = +inf
+                until = +INF
             momentum = Momentum(velocity, since, until)
         since, until = momentum.since, momentum.until
-        if since == -inf or until == +inf or since < until:
+        if since == -INF or until == +INF or since < until:
             pass
         else:
             raise ValueError('\'since\' should be earlier than \'until\'')
@@ -428,7 +428,7 @@ cdef class Gauge:
         for momentum in momenta:
             self.momenta.add(momentum)
             self._events.add((momentum.since, ADD, momentum))
-            if momentum.until != +inf:
+            if momentum.until != +INF:
                 self._events.add((momentum.until, REMOVE, momentum))
         self.invalidate()
 
@@ -441,7 +441,7 @@ cdef class Gauge:
             except ValueError:
                 raise ValueError('{0} not in the gauge'.format(momentum))
             self._events.remove((momentum.since, ADD, momentum))
-            if momentum.until != +inf:
+            if momentum.until != +INF:
                 self._events.remove((momentum.until, REMOVE, momentum))
         self.invalidate()
 
@@ -491,7 +491,7 @@ cdef class Gauge:
             events.append((time, method, momentum))
         for time, method, momentum in remove:
             self._events.remove((time, method, momentum))
-        events.append((+inf, NONE, None))
+        events.append((+INF, NONE, None))
         return events
 
     def _rebase(self, value=None, at=None, remove_momenta_before=None):
@@ -530,7 +530,7 @@ cdef class Gauge:
         :param at: the time base.  (default: now)
         """
         at = NOW_OR(at)
-        x = self.momenta.bisect_left((-inf, -inf, at))
+        x = self.momenta.bisect_left((-INF, -INF, at))
         return self._rebase(value, at=at, remove_momenta_before=x)
 
     def _limit_gauge_invalidated(self, limit_gauge):
@@ -598,7 +598,7 @@ cdef class Momentum:
     specific period.
     """
 
-    def __cinit__(self, double velocity, double since=-inf, double until=+inf):
+    def __cinit__(self, double velocity, double since=-INF, double until=+INF):
         self.velocity = float(velocity)
         self.since = since
         self.until = until
@@ -616,9 +616,9 @@ cdef class Momentum:
     def __repr__(self):
         cdef str string
         string = '<{0} {1:+.2f}/s'.format(type(self).__name__, self.velocity)
-        if self.since != -inf or self.until != +inf:
+        if self.since != -INF or self.until != +INF:
             string += ' ' + '~'.join([
-                '' if self.since == -inf else '{0:.2f}'.format(self.since),
-                '' if self.until == +inf else '{0:.2f}'.format(self.until)])
+                '' if self.since == -INF else '{0:.2f}'.format(self.since),
+                '' if self.until == +INF else '{0:.2f}'.format(self.until)])
         string += '>'
         return string
