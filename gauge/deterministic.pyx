@@ -275,9 +275,9 @@ cdef class Line:
             Line right
         # right is more reliable.
         if self.type < line.type:
-            left, right = line, self
-        else:
             left, right = self, line
+        else:
+            left, right = line, self
         if math.isinf(right.velocity()):
             # right is almost vertical.
             time = (right.since + right.until) / 2

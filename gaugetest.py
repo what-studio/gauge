@@ -395,7 +395,6 @@ def test_case5():
     assert g.get(11) == 0  # adjusted by min=0
 
 
-@pytest.mark.xfail
 def test_case6():
     g = Gauge(1, 10, at=1417868986.94428)
     g.add_momentum(+0.167)
