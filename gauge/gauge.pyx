@@ -3,6 +3,7 @@ from __future__ import absolute_import
 
 from bisect import bisect_right
 from collections import namedtuple
+import gc
 import operator
 from time import time as now
 try:
@@ -171,6 +172,7 @@ cdef class Gauge:
                 self._max_gauge._limited_gauges.discard(self)
             if isinstance(max_, Gauge):
                 limit_gauge = max_
+                limit_gauge._limited_gauges.add(self)
                 self._max_gauge = limit_gauge
                 self._max_value = limit_gauge.get(at)
                 forget_until = min(forget_until, limit_gauge._base_time)
@@ -185,6 +187,7 @@ cdef class Gauge:
                 self._min_gauge._limited_gauges.discard(self)
             if isinstance(min_, Gauge):
                 limit_gauge = min_
+                limit_gauge._limited_gauges.add(self)
                 self._min_gauge = limit_gauge
                 self._min_value = limit_gauge.get(at)
                 forget_until = min(forget_until, limit_gauge._base_time)
@@ -547,6 +550,10 @@ cdef class Gauge:
         at = NOW_OR(at)
         x = self.momenta.bisect_left((-INF, -INF, at))
         return self._rebase(value, at=at, remove_momenta_before=x)
+
+    def limited_gauges(self):
+        gc.collect()
+        return set(self._limited_gauges)
 
     def _limit_gauge_invalidated(self, limit_gauge):
         """The callback function which will be called at a limit gauge is

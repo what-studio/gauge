@@ -733,18 +733,17 @@ def test_hypergauge_with_different_base_time():
 def test_limited_gauges():
     max_g = Gauge(10, 100, at=0)
     g = Gauge(0, max_g, at=0)
-    assert g in max_g._limited_gauges
+    assert g in max_g.limited_gauges()
     g.set_max(10, at=0)
-    assert g not in max_g._limited_gauges
+    assert g not in max_g.limited_gauges()
     # clear dead links.
     g.set_max(max_g, at=0)
-    assert len(max_g._limited_gauges) == 1
+    assert len(max_g.limited_gauges()) == 1
     del g
     # NOTE: Weak references could not be collected by GC immediately in PyPy.
     for x in range(10):
-        gc.collect()
         try:
-            assert len(max_g._limited_gauges) == 0
+            assert len(max_g.limited_gauges()) == 0
         except AssertionError:
             continue
         else:
@@ -779,7 +778,7 @@ def test_pickle_hypergauge():
     assert g2.determination == [
         (0, 12), (1, 12), (2, 13), (3, 12), (5, 10), (6, 10), (8, 8)]
     assert g2.max_gauge.determination == [(0, 15), (5, 10)]
-    assert g2 in g2.max_gauge._limited_gauges
+    assert g2 in g2.max_gauge.limited_gauges()
 
 
 def test_thin_momenta():
