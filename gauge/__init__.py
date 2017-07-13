@@ -16,5 +16,4 @@ from gauge.constants import CLAMP, ERROR, OK, ONCE
 from gauge.gauge import Gauge, Momentum
 
 
-__all__ = ['Gauge', 'Momentum',
-           'ERROR', 'OK', 'ONCE', 'CLAMP']
+__all__ = ['Gauge', 'Momentum', 'ERROR', 'OK', 'ONCE', 'CLAMP']
