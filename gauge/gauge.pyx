@@ -188,7 +188,9 @@ cdef class Gauge:
             else:
                 self._max_gauge = None
                 self._max_value = max_
-            if not (_incomplete or in_range_since is None):
+            if _incomplete or in_range_since is None:
+                pass
+            elif in_range_since <= at:
                 value = min(value, self._max_value)
 
         if min_ is not None:
@@ -203,7 +205,9 @@ cdef class Gauge:
             else:
                 self._min_gauge = None
                 self._min_value = min_
-            if not (_incomplete or in_range_since is None):
+            if _incomplete or in_range_since is None:
+                pass
+            elif in_range_since <= at:
                 value = max(value, self._min_value)
 
         if _incomplete:
