@@ -28,6 +28,10 @@ class FakeGauge(Gauge):
         self._determination = Determination.__new__(Determination)
         self._determination.extend(determination)
 
+    @property
+    def determination(self):
+        return self._determination
+
 
 def round_(x):
     return round(x, PRECISION)
