@@ -993,6 +993,12 @@ def test_randomly():
         assert_all_in_range(g, 'random_gauge2(R({0}), far=1e4)'.format(seed))
 
 
+@pytest.mark.parametrize('seed', [5425676250556669398, 5788334089912086268])
+def test_cpu_hang(seed):
+    g = random_gauge1(Random(seed))
+    assert_all_in_range(g, 'random_gauge1(R({0}))'.format(seed))
+
+
 def test_repaired_random_gauges():
     # from test_randomly()
     assert_all_in_range(random_gauge1(Random(1098651790867685487)))
