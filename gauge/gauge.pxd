@@ -29,7 +29,7 @@ cdef class Gauge:
     cdef (double, double) _predict(self, double at)
     cdef double _clamp(self, double value, double at)
 
-    cdef list momentum_events(self)
+    cpdef list momentum_events(self)
 
 
 cdef class Momentum:

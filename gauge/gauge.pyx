@@ -490,7 +490,7 @@ cdef class Gauge:
         self.remove_momenta([momentum])
         return momentum
 
-    cdef list momentum_events(self):
+    cpdef list momentum_events(self):
         """Yields momentum adding and removing events.  An event is a tuple of
         ``(time, EV_ADD|EV_REMOVE, momentum)``.
         """
@@ -501,7 +501,7 @@ cdef class Gauge:
             double time
             int method
         events.append((self._base_time, EV_NONE, None))
-        momentum_ids = set(id(momentum) for momentum in self.momenta)
+        momentum_ids = set([id(momentum) for momentum in self.momenta])
         for time, method, momentum in self._events:
             if id(momentum) not in momentum_ids:
                 remove.append((time, method, momentum))
