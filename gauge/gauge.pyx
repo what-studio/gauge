@@ -627,6 +627,10 @@ cdef class Gauge:
         return self._repr()
 
 
+cdef inline (double, double, double) MOMENTUM_TUPLE(Momentum m):
+    return (m.velocity, m.since, m.until)
+
+
 cdef class Momentum:
     """A power of which increases or decreases the gauge continually between a
     specific period.
@@ -639,23 +643,20 @@ cdef class Momentum:
         self.since = since
         self.until = until
 
-    cdef inline (double, double, double) _as_tuple(self):
-        return (self.velocity, self.since, self.until)
-
     def __len__(self):
         return len(self._as_tuple())
 
     def __getitem__(self, index):
-        return self._as_tuple()[index]
+        return MOMENTUM_TUPLE(self)[index]
 
     def __iter__(self):
-        return iter(self._as_tuple())
+        return iter(MOMENTUM_TUPLE(self))
 
     def __hash__(self):
-        return hash(self._as_tuple())
+        return hash(MOMENTUM_TUPLE(self))
 
     def __richcmp__(self, other, int op):
-        cdef (double, double, double) it = self._as_tuple()
+        cdef (double, double, double) it = MOMENTUM_TUPLE(self)
         cdef tuple that = tuple(other)
         if op == 0:
             return it < that

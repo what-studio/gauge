@@ -38,5 +38,3 @@ cdef class Momentum:
         public double velocity
         public double since
         public double until
-
-    cdef inline (double, double, double) _as_tuple(self)
