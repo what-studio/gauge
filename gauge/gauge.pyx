@@ -54,7 +54,6 @@ def restore_gauge(gauge_class, base, momenta, max_value,
                   max_gauge, min_value, min_gauge):
     """Restores a gauge from the arguments.  It is used for Pickling."""
     gauge = gauge_class.__new__(gauge_class)
-    gauge.__preinit__()
     RESTORE_INTO(gauge, base, momenta, max_value,
                  max_gauge, min_value, min_gauge)
     return gauge
@@ -102,13 +101,11 @@ cdef class Gauge:
             self._min_gauge = gauge
 
     def __init__(self, double value, max, min=0, at=None):
-        self.__preinit__()
         at = NOW_OR(at)
         self._base_time, self._base_value = at, value
         self._set_range(max, min, at=at, _incomplete=True)
 
-    def __preinit__(self):
-        """Called by :meth:`__init__` and :meth:`__setstate__`."""
+    def __cinit__(self):
         self._max_gauge = self._min_gauge = None
         self.momenta = SortedListWithKey(key=by_until)
         self._determination = None
