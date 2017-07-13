@@ -295,10 +295,10 @@ cdef class Gauge:
         if outbound != LI_OK:
             items = [(
                 self.get_max, max, operator.gt,
-                'The value to set is bigger than the maximum ({0} > {1})'
+                'the value to set is bigger than the maximum ({0} > {1})'
             ), (
                 self.get_min, min, operator.lt,
-                'The value to set is smaller than the minimum ({0} < {1})'
+                'the value to set is smaller than the minimum ({0} < {1})'
             )]
             for get_limit, clamp, cmp_, error_form in items:
                 if not cmp_(delta, 0):
@@ -368,7 +368,7 @@ cdef class Gauge:
         for x, at in enumerate(self.whenever(value)):
             if x == after:
                 return at
-        form = 'The gauge will not reach to {0}' + \
+        form = 'the gauge will not reach to {0}' + \
                (' more than {1} times' if x else '')
         raise ValueError(form.format(value, x))
 
@@ -420,7 +420,7 @@ cdef class Gauge:
         cdef Momentum momentum
         if isinstance(velocity_or_momentum, Momentum):
             if not (since is None and until is None):
-                raise TypeError('Arguments behind the first argument as a '
+                raise TypeError('arguments behind the first argument as a '
                                 'momentum should be None')
             momentum = velocity_or_momentum
         else:

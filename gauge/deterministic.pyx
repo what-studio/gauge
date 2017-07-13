@@ -320,7 +320,7 @@ cdef class Line:
     def get(self, double at):
         ok, value = self._get(at)
         if not ok:
-            raise ValueError('Out of the time range: {0:.2f}~{1:.2f}'
+            raise ValueError('out of the time range: {0:.2f}~{1:.2f}'
                              ''.format(self.since, self.until))
         return value
 
