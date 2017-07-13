@@ -292,7 +292,7 @@ cdef class Gauge:
         """Predicts the final value."""
         return self.determination[-1][VALUE]
 
-    def incr(self, delta, outbound=LI_ERROR, at=None):
+    def incr(self, double delta, int outbound=LI_ERROR, at=None):
         """Increases the value by the given delta immediately.  The
         determination would be changed.
 
@@ -304,29 +304,33 @@ cdef class Gauge:
         :raises ValueError: the value is out of the range.
         """
         at = NOW_OR(at)
-        prev_value = self.get(at=at)
-        value = prev_value + delta
+        cdef:
+            double limit
+            double prev_value = self.get(at=at)
+            double value = prev_value + delta
         if outbound == LI_ONCE:
             outbound = LI_OK if self.in_range(at) else LI_ERROR
         if outbound != LI_OK:
-            items = [(
-                self.get_max, max, operator.gt,
-                'the value to set is bigger than the maximum ({0} > {1})'
-            ), (
-                self.get_min, min, operator.lt,
-                'the value to set is smaller than the minimum ({0} < {1})'
-            )]
-            for get_limit, clamp, cmp_, error_form in items:
-                if not cmp_(delta, 0):
-                    continue
-                limit = get_limit(at)
-                if not cmp_(value, limit):
-                    continue
-                if outbound == LI_ERROR:
-                    raise ValueError(error_form.format(value, limit))
+            if delta > 0:
+                limit = self.get_max(at)
+                if value <= limit:
+                    pass
                 elif outbound == LI_CLAMP:
-                    value = clamp(prev_value, limit)
-                    break
+                    value = max(prev_value, limit)
+                elif outbound == LI_ERROR:
+                    raise ValueError('the value to set is bigger '
+                                     'than the maximum ({0} > {1})'
+                                     ''.format(value, limit))
+            elif delta < 0:
+                limit = self.get_min(at)
+                if value >= limit:
+                    pass
+                elif outbound == LI_CLAMP:
+                    value = min(prev_value, limit)
+                elif outbound == LI_ERROR:
+                    raise ValueError('the value to set is smaller '
+                                     'than the minimum ({0} < {1})'
+                                     ''.format(value, limit))
         return self.forget_past(value, at=at)
 
     def decr(self, delta, outbound=LI_ERROR, at=None):
