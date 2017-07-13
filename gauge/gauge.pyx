@@ -69,25 +69,47 @@ cdef class Gauge:
     def base(self):
         return (self._base_time, self._base_value)
 
+    @base.setter
+    def base(self, (double, double) base):
+        self._base_time, self._base_value = base
+
     @property
     def max_value(self):
         if self._max_gauge is None:
             return self._max_value
+
+    @max_value.setter
+    def max_value(self, double value):
+        self._max_value = value
+        self._max_gauge = None
 
     @property
     def max_gauge(self):
         if self._max_gauge is not None:
             return self._max_gauge
 
+    @max_gauge.setter
+    def max_gauge(self, Gauge gauge):
+        self._max_gauge = gauge
+
     @property
     def min_value(self):
         if self._min_gauge is None:
             return self._min_value
 
+    @min_value.setter
+    def min_value(self, double value):
+        self._min_value = value
+        self._min_gauge = None
+
     @property
     def min_gauge(self):
         if self._min_gauge is not None:
             return self._min_gauge
+
+    @min_gauge.setter
+    def min_gauge(self, Gauge gauge):
+        self._min_gauge = gauge
 
     def __init__(self, double value, max, min=0, at=None):
         self.__preinit__()
