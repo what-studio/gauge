@@ -561,7 +561,7 @@ def test_boundary():
     lines = [Horizon(0, 10, 0),
              Ray(10, 20, 0, velocity=+1),
              Ray(20, 30, 10, velocity=-1)]
-    boundary = Boundary(iter(lines))
+    boundary = Boundary(lines)
     assert boundary.line is lines[0]
     boundary.walk()
     assert boundary.line is lines[1]
@@ -580,8 +580,8 @@ def test_boundary():
     assert not boundary.cmp_inv(1, 1)
     # best
     zero_line = Segment(0, 0, 0, 0)
-    ceil = Boundary(iter([zero_line]), operator.lt)
-    floor = Boundary(iter([zero_line]), operator.gt)
+    ceil = Boundary([zero_line], operator.lt)
+    floor = Boundary([zero_line], operator.gt)
     assert ceil.best is min
     assert floor.best is max
     # repr
