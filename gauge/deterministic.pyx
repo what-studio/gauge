@@ -89,6 +89,7 @@ cdef class Determination(list):
             double velocity = 0
             list velocities = []
             double boundary_value
+            double value_at_bound
         since, value = gauge._base_time, gauge._base_value
         self._in_range = False
         # boundaries.
@@ -113,7 +114,7 @@ cdef class Determination(list):
         for boundary in boundaries:
             # skip past boundaries.
             while boundary.line.until <= since:
-                boundary._walk()
+                boundary.walk()
             # check overflowing.
             if bounded:
                 continue
@@ -154,7 +155,7 @@ cdef class Determination(list):
                     for b in boundaries:
                         if b.line.until < boundary.line.until:
                             boundary = b
-                    boundary._walk()
+                    boundary.walk()
                     walked_boundaries = [boundary]
                 # calculate velocity.
                 if not bounded:
@@ -176,12 +177,14 @@ cdef class Determination(list):
                     if bound_until == +INF:
                         break
                     # released from the boundary.
-                    since, value = (bound_until, bound.line.get(bound_until))
+                    since = bound_until
+                    ok, value = bound.line._get(bound_until)
+                    assert ok
                     self._determine(since, value)
                     continue
                 for boundary in walked_boundaries:
                     # find the intersection with a boundary.
-                    ok, intersection = line.intersect(boundary.line)
+                    ok, intersection = line._intersect(boundary.line)
                     if not ok:
                         continue
                     if intersection[TIME] == since:
@@ -201,8 +204,11 @@ cdef class Determination(list):
                     bound_until = min(boundary.line.until, until)
                     if bound_until == +INF or bound_until < since:
                         continue
-                    boundary_value = boundary.line.get(bound_until)
-                    if boundary.cmp_eq(line.get(bound_until), boundary_value):
+                    ok, boundary_value = boundary.line._get(bound_until)
+                    assert ok
+                    ok, value_at_bound = line._get(bound_until)
+                    assert ok
+                    if boundary.cmp_eq(value_at_bound, boundary_value):
                         continue
                     bound, bounded, overlapped = boundary, True, True
                     since, value = bound_until, boundary_value
@@ -249,7 +255,7 @@ cdef class Line:
         self.value = value
         self.extra = extra
 
-    cdef (bint, (double, double)) intersect(self, Line line):
+    cdef (bint, (double, double)) _intersect(self, Line line):
         """Gets the intersection with the given line.
 
         :returns: (ok, (time, value))
@@ -284,30 +290,41 @@ cdef class Line:
         if not since <= time <= until:
             # intersection not in the time range.
             return (False, (0, 0))
-        value = left.get(time)
+        ok, value = left._get(time)
+        if not ok:
+            return (False, (0, 0))
         return (True, (time, value))
 
-    cdef double intercept(self):
+    def intersect(self, Line line):
+        ok, intersection = self._intersect(line)
+        if not ok:
+            raise ValueError('intersection not available')
+        return intersection
+
+    cpdef double intercept(self):
         """Gets the value-intercept. (Y-intercept)"""
         return self.value - self.velocity() * self.since
 
-    cdef double get(self, double at):
-        """Returns the value at the given time.
-
-        :raises ValueError: the given time is out of the time range.
-        """
+    cdef (bint, double) _get(self, double at):
+        """Returns the value at the given time."""
         if not self.since <= at <= self.until:
-            raise ValueError('Out of the time range: {0:.2f}~{1:.2f}'
-                             ''.format(self.since, self.until))
+            return False, 0
         if self.type == LN_HORIZON:
-            return self._get_horizon(at)
+            return True, self._get_horizon(at)
         elif self.type == LN_RAY:
-            return self._get_ray(at)
+            return True, self._get_ray(at)
         elif self.type == LN_SEGMENT:
-            return self._get_segment(at)
+            return True, self._get_segment(at)
         assert 0
 
-    cdef double guess(self, double at):
+    def get(self, double at):
+        ok, value = self._get(at)
+        if not ok:
+            raise ValueError('Out of the time range: {0:.2f}~{1:.2f}'
+                             ''.format(self.since, self.until))
+        return value
+
+    cpdef double guess(self, double at):
         """Returns the value at the given time even the time it out of the time
         range.
         """
@@ -326,7 +343,9 @@ cdef class Line:
             elif self.type == LN_SEGMENT:
                 return self._later_segment(at)
         else:
-            return self.get(at)
+            ok, value = self._get(at)
+            assert ok
+            return value
         assert 0
 
     cdef double velocity(self):
@@ -362,7 +381,10 @@ cdef class Line:
         return self.value
 
     cdef inline double _later_ray(self, double at):
-        return self._get(self.until)
+        cdef bint ok
+        cdef double value
+        ok, value = self._get(self.until)
+        return value
 
     cdef inline double _velocity_ray(self):
         return self.extra
@@ -425,26 +447,17 @@ cdef class Boundary:
         self.lines_iter = iter(lines)
         self.cmp = cmp
         self.best = {operator.lt: min, operator.gt: max}[cmp]
-        self._walk()
+        self.walk()
 
-    cdef _walk(self):
+    cpdef walk(self):
         """Choose the next line."""
         self.line = next(self.lines_iter)
 
-    cdef bint _cmp_eq(self, double x, double y):
+    cpdef bint cmp_eq(self, double x, double y):
         return x == y or self.cmp(x, y)
 
-    cdef bint _cmp_inv(self, double x, double y):
+    cpdef bint cmp_inv(self, double x, double y):
         return x != y and not self.cmp(x, y)
-
-    def walk(self):
-        return self._walk()
-
-    def cmp_eq(self, double x, double y):
-        return self._cmp_eq(x, y)
-
-    def cmp_inv(self, double x, double y):
-        return self._cmp_inv(x, y)
 
     def __repr__(self):
         # NOTE: __name__ is 'Boundary' in CPython, but 'deterministic.Boundary'

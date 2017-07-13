@@ -228,7 +228,14 @@ cdef class Gauge:
 
         :param at: the time to observe.  (default: now)
         """
-        determination = self.determination
+        cdef:
+            Determination determination = self.determination
+            double time1
+            double time2
+            double value
+            double value1
+            double value2
+            double velocity
         if len(determination) == 1:
             # skip bisect_right() because it is expensive
             x = 0
