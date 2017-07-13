@@ -85,11 +85,23 @@ cdef class Determination(list):
         cdef:
             double since
             double until
+            double time
             double value
             double velocity = 0
             list velocities = []
+            Boundary boundary
+            Boundary bound
+            Boundary b
             double boundary_value
             double value_at_bound
+            double bound_until
+            bint again
+            bint ok
+            int method
+            Momentum momentum
+            list walked_boundaries
+            Line line
+            (double, double) intersection
         since, value = gauge._base_time, gauge._base_value
         self._in_range = False
         # boundaries.
@@ -103,9 +115,6 @@ cdef class Determination(list):
         else:
             floor_lines = GAUGE_LINES(gauge, gauge._min_gauge)
         cdef:
-            Boundary boundary
-            Boundary bound
-            Boundary b
             ceil = Boundary(ceil_lines, operator.lt)
             floor = Boundary(floor_lines, operator.gt)
             list boundaries = [ceil, floor]
@@ -118,18 +127,10 @@ cdef class Determination(list):
             # check overflowing.
             if bounded:
                 continue
-            boundary_value = boundary.line.guess(since)
+            ok, boundary_value = boundary.line._guess(since)
+            assert ok
             if boundary.cmp(boundary_value, value):
                 bound, bounded, overlapped = boundary, True, False
-        cdef:
-            double time
-            double bound_until
-            int method
-            Momentum momentum
-            bint again, ok
-            list walked_boundaries
-            Line line
-            (double, double) intersection
         for time, method, momentum in gauge.momentum_events():
             # normalize time.
             until = max(time, gauge._base_time)
@@ -193,7 +194,9 @@ cdef class Determination(list):
                     bound, bounded, overlapped = boundary, True, True
                     since, value = intersection
                     # clamp by the boundary.
-                    value = boundary.best(value, boundary.line.guess(since))
+                    ok, boundary_value = boundary.line._guess(since)
+                    assert ok
+                    value = boundary.best(value, boundary_value)
                     self._determine(since, value)
                     break
                 if bounded:
@@ -296,6 +299,8 @@ cdef class Line:
         return (True, (time, value))
 
     def intersect(self, Line line):
+        cdef bint ok
+        cdef (double, double) intersection
         ok, intersection = self._intersect(line)
         if not ok:
             raise ValueError('intersection not available')
@@ -306,25 +311,27 @@ cdef class Line:
         return self.value - self.velocity() * self.since
 
     cdef (bint, double) _get(self, double at):
-        """Returns the value at the given time."""
         if not self.since <= at <= self.until:
             return False, 0
         if self.type == LN_HORIZON:
-            return True, self._get_horizon(at)
+            return self._get_horizon(at)
         elif self.type == LN_RAY:
-            return True, self._get_ray(at)
+            return self._get_ray(at)
         elif self.type == LN_SEGMENT:
-            return True, self._get_segment(at)
+            return self._get_segment(at)
         assert 0
 
     def get(self, double at):
+        """Returns the value at the given time."""
+        cdef bint ok
+        cdef double value
         ok, value = self._get(at)
         if not ok:
             raise ValueError('out of the time range: {0:.2f}~{1:.2f}'
                              ''.format(self.since, self.until))
         return value
 
-    cpdef double guess(self, double at):
+    cdef (bint, double) _guess(self, double at):
         """Returns the value at the given time even the time it out of the time
         range.
         """
@@ -343,12 +350,18 @@ cdef class Line:
             elif self.type == LN_SEGMENT:
                 return self._later_segment(at)
         else:
-            ok, value = self._get(at)
-            assert ok
-            return value
+            return self._get(at)
         assert 0
 
-    cdef double velocity(self):
+    def guess(self, double at):
+        cdef bint ok
+        cdef double value
+        ok, value = self._guess(at)
+        if not ok:
+            raise AssertionError('unexpected failure')
+        return value
+
+    cpdef double velocity(self):
         if self.type == LN_HORIZON:
             return self._velocity_horizon()
         elif self.type == LN_RAY:
@@ -359,48 +372,48 @@ cdef class Line:
 
     # HORIZON
 
-    cdef inline double _get_horizon(self, double at):
-        return self.value
+    cdef inline (bint, double) _get_horizon(self, double at):
+        return True, self.value
 
-    cdef inline double _earlier_horizon(self, double at):
-        return self.value
+    cdef inline (bint, double) _earlier_horizon(self, double at):
+        return True, self.value
 
-    cdef inline double _later_horizon(self, double at):
-        return self.value
+    cdef inline (bint, double) _later_horizon(self, double at):
+        return True, self.value
 
     cdef inline double _velocity_horizon(self):
         return 0
 
     # RAY
 
-    cdef inline double _get_ray(self, double at):
+    cdef inline (bint, double) _get_ray(self, double at):
         cdef double velocity = self.extra
-        return self.value + velocity * (at - self.since)
+        cdef double value = self.value + velocity * (at - self.since)
+        return True, value
 
-    cdef inline double _earlier_ray(self, double at):
-        return self.value
+    cdef inline (bint, double) _earlier_ray(self, double at):
+        return True, self.value
 
-    cdef inline double _later_ray(self, double at):
-        cdef bint ok
-        cdef double value
-        ok, value = self._get(self.until)
-        return value
+    cdef inline (bint, double) _later_ray(self, double at):
+        return self._get(self.until)
 
     cdef inline double _velocity_ray(self):
         return self.extra
 
     # SEGMENT
 
-    cdef inline double _get_segment(self, double at):
+    cdef inline (bint, double) _get_segment(self, double at):
+        cdef double value
         cdef double final = self.extra
-        return SEGMENT_VALUE(at, self.since, self.until, self.value, final)
+        value = SEGMENT_VALUE(at, self.since, self.until, self.value, final)
+        return True, value
 
-    cdef inline double _earlier_segment(self, double at):
-        return self.value
+    cdef inline (bint, double) _earlier_segment(self, double at):
+        return True, self.value
 
-    cdef inline double _later_segment(self, double at):
+    cdef inline (bint, double) _later_segment(self, double at):
         cdef double final = self.extra
-        return final
+        return True, final
 
     cdef inline double _velocity_segment(self):
         cdef double final = self.extra
