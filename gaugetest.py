@@ -523,13 +523,6 @@ def test_velocity():
 
 
 def test_lines():
-    line = Line(0, 0, 0)
-    with pytest.raises(NotImplementedError):
-        line.get(0)
-    with pytest.raises(NotImplementedError):
-        line.guess(-1)
-    with pytest.raises(NotImplementedError):
-        line.guess(+1)
     horizon = Horizon(0, 10, 1234)
     assert horizon.get(0) == 1234
     assert horizon.get(10) == 1234
