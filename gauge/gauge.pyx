@@ -639,40 +639,36 @@ cdef class Momentum:
         self.since = since
         self.until = until
 
-    def __getitem__(self, int index):
-        if index == 0:
-            return self.velocity
-        elif index == 1:
-            return self.since
-        elif index == 2:
-            return self.until
-        else:
-            raise IndexError
+    cdef inline (double, double, double) _as_tuple(self):
+        return (self.velocity, self.since, self.until)
 
     def __len__(self):
-        return 3
+        return len(self._as_tuple())
+
+    def __getitem__(self, index):
+        return self._as_tuple()[index]
 
     def __iter__(self):
-        return iter([self.velocity, self.since, self.until])
+        return iter(self._as_tuple())
 
     def __hash__(self):
-        return hash((self.velocity, self.since, self.until))
+        return hash(self._as_tuple())
 
     def __richcmp__(self, other, int op):
-        cdef tuple x = (self.velocity, self.since, self.until)
-        cdef tuple y = tuple(other)
+        cdef (double, double, double) it = self._as_tuple()
+        cdef tuple that = tuple(other)
         if op == 0:
-            return x < y
+            return it < that
         elif op == 1:
-            return x <= y
+            return it <= that
         elif op == 2:
-            return x == y
+            return it == that
         elif op == 3:
-            return x != y
+            return it != that
         elif op == 4:
-            return x > y
+            return it > that
         elif op == 5:
-            return x >= y
+            return it >= that
 
     def __repr__(self):
         cdef str string
