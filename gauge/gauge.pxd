@@ -24,6 +24,7 @@ cdef class Gauge:
         Determination _determination
         _events
         _limited_gauges
+        __weakref__
 
     cdef (double, double) _predict(self, double at)
     cdef double _clamp(self, double value, double at)
