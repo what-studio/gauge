@@ -165,7 +165,7 @@ cdef class Gauge:
     #: The alias of :meth:`get_min`.
     min = get_min
 
-    def _set_range(self, max_=None, min_=None, at=None, _incomplete=False):
+    def _set_range(self, max_=None, min_=None, at=None, bint _incomplete=False):
         at = NOW_OR(at)
         cdef:
             double forget_until = at
@@ -175,7 +175,7 @@ cdef class Gauge:
         if not _incomplete:
             value = self.get(at)
             in_range_since = self.determination.in_range_since
-
+        # set max.
         if max_ is not None:
             if self._max_gauge is not None:
                 self._max_gauge._limited_gauges.discard(self)
@@ -192,7 +192,7 @@ cdef class Gauge:
                 pass
             elif in_range_since <= at:
                 value = min(value, self._max_value)
-
+        # set min.  (copied from above)
         if min_ is not None:
             if self._min_gauge is not None:
                 self._min_gauge._limited_gauges.discard(self)
@@ -209,7 +209,7 @@ cdef class Gauge:
                 pass
             elif in_range_since <= at:
                 value = max(value, self._min_value)
-
+        # maybe modify value.
         if _incomplete:
             return
         return self.forget_past(value, at=forget_until)
@@ -333,7 +333,7 @@ cdef class Gauge:
                                      ''.format(value, limit))
         return self.forget_past(value, at=at)
 
-    def decr(self, delta, outbound=LI_ERROR, at=None):
+    def decr(self, double delta, int outbound=LI_ERROR, at=None):
         """Decreases the value by the given delta immediately.  The
         determination would be changed.
 
@@ -346,7 +346,7 @@ cdef class Gauge:
         """
         return self.incr(-delta, outbound=outbound, at=at)
 
-    def set(self, value, outbound=LI_ERROR, at=None):
+    def set(self, double value, int outbound=LI_ERROR, at=None):
         """Sets the current value immediately.  The determination would be
         changed.
 
@@ -358,7 +358,7 @@ cdef class Gauge:
         :raises ValueError: the value is out of the range.
         """
         at = NOW_OR(at)
-        delta = value - self.get(at=at)
+        cdef double delta = value - self.get(at=at)
         return self.incr(delta, outbound=outbound, at=at)
 
     cdef double _clamp(self, double value, double at):
@@ -376,7 +376,7 @@ cdef class Gauge:
         value = self._clamp(self.get(at), at=at)
         return self.set(value, outbound=LI_OK, at=at)
 
-    def when(self, value, after=0):
+    def when(self, double value, double after=0):
         """When the gauge reaches to the goal value.
 
         :param value: the goal value.
@@ -392,22 +392,23 @@ cdef class Gauge:
                (' more than {1} times' if x else '')
         raise ValueError(form.format(value, x))
 
-    def whenever(self, value):
+    def whenever(self, double value):
         """Yields multiple times when the gauge reaches to the goal value.
 
         :param value: the goal value.
         """
-        if self.determination:
-            determination = self.determination
-            first_time, first_value = determination[0]
-            if first_value == value:
-                yield first_time
-            zipped_determination = zip(determination[:-1], determination[1:])
-            for (time1, value1), (time2, value2) in zipped_determination:
-                if not (value1 < value <= value2 or value1 > value >= value2):
-                    continue
-                ratio = (value - value1) / float(value2 - value1)
-                yield (time1 + (time2 - time1) * ratio)
+        if not self.determination:
+            return
+        determination = self.determination
+        first_time, first_value = determination[0]
+        if first_value == value:
+            yield first_time
+        zipped_determination = zip(determination[:-1], determination[1:])
+        for (time1, value1), (time2, value2) in zipped_determination:
+            if not (value1 < value <= value2 or value1 > value >= value2):
+                continue
+            ratio = (value - value1) / float(value2 - value1)
+            yield (time1 + (time2 - time1) * ratio)
 
     def in_range(self, at=None):
         """Whether the gauge is between the range at the given time.
@@ -594,7 +595,7 @@ cdef class Gauge:
         return restore_gauge, (
             self.__class__,
             (self._base_time, self._base_value),
-            [(m.velocity, m.since, m.until) for m in self.momenta],
+            [MOMENTUM_TUPLE(m) for m in self.momenta],
             self._max_value, self._max_gauge,
             self._min_value, self._min_gauge
         )
@@ -607,8 +608,7 @@ cdef class Gauge:
         - ``<Gauge 0.00 between <Gauge 0.00/2.00>~<Gauge 2.00/2.00>>``
 
         """
-        cdef:
-            Gauge limit_gauge
+        cdef Gauge limit_gauge
         at = NOW_OR(at)
         value = self.get(at=at)
         hyper = False
