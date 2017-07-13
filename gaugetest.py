@@ -621,24 +621,32 @@ def bidir():
     return g
 
 
-@pytest.mark.xfail
-def test_hypergauge():
+def test_hypergauge_case1():
     g = Gauge(12, 100, at=0)
     g.add_momentum(+1, since=1, until=6)
     g.add_momentum(-1, since=3, until=8)
-    # case 1
     g.set_max(Gauge(15, 15, at=0), at=0)
     g.max_gauge.add_momentum(-1, until=5)
     assert g.determination == [
         (0, 12), (1, 12), (2, 13), (3, 12), (5, 10), (6, 10), (8, 8)]
     assert g.max_gauge.determination == [(0, 15), (5, 10)]
-    # case 2
+
+
+def test_hypergauge_case2():
+    g = Gauge(12, 100, at=0)
+    g.add_momentum(+1, since=1, until=6)
+    g.add_momentum(-1, since=3, until=8)
     g.set_max(Gauge(15, 15, at=0), at=0)
     g.max_gauge.add_momentum(-1, until=4)
     g.max_gauge.add_momentum(+1, since=4, until=6)
     assert g.determination == [
         (0, 12), (1, 12), (2, 13), (3, 12), (4, 11), (6, 11), (8, 9)]
-    # case 3
+
+
+def test_hypergauge_case3():
+    g = Gauge(12, 100, at=0)
+    g.add_momentum(+1, since=1, until=6)
+    g.add_momentum(-1, since=3, until=8)
     g.set_max(10, at=0)
     g.set(12, outbound=OK, at=0)
     assert g.determination == [
@@ -646,7 +654,12 @@ def test_hypergauge():
     g.set_max(Gauge(10, 100, at=0), at=0)
     assert g.determination == [
         (0, 12), (1, 12), (3, 12), (5, 10), (6, 10), (8, 8)]
-    # case 4
+
+
+def test_hypergauge_case4():
+    g = Gauge(12, 100, at=0)
+    g.add_momentum(+1, since=1, until=6)
+    g.add_momentum(-1, since=3, until=8)
     g.set_max(Gauge(15, 15, at=0), at=0)
     g.max_gauge.add_momentum(-1)
     assert g.determination == [
@@ -668,12 +681,15 @@ def test_hypergauge():
         (9, 7), (12, 4)]
     g_min.incr(1, at=5)
     assert g.determination == [(5, 5), (6, 6), (7, 7), (9, 7), (12, 4)]
-    # zigzag 1
-    g = zigzag()
-    assert g.determination == [
+
+
+def test_hypergauge_zigzag1(zigzag):
+    assert zigzag.determination == [
         (0, 1), (1, 2), (2, 1), (3.5, 2.5), (4, 2), (5.5, 0.5), (6, 1),
         (7.5, 2.5), (8, 2), (9, 3), (10, 2), (11.5, 0.5), (12, 1)]
-    # zigzag 2
+
+
+def test_hypergauge_zigzag2():
     g = Gauge(2, Gauge(3, 5, 3, at=0), Gauge(2, 2, 0, at=0), at=0)
     for x in range(5):
         g.max_gauge.add_momentum(+1, since=x * 4, until=x * 4 + 2)
@@ -687,17 +703,26 @@ def test_hypergauge():
     assert g.determination == [
         (0, 2), (1, 3), (2, 2), (3.5, 3.5), (4, 3), (6, 1), (8, 3), (9, 4),
         (11.5, 1.5), (12, 2), (14.5, 4.5), (16, 3), (18.5, 0.5), (20, 2)]
+
+
+def test_hypergauge_hybrid1():
     # hybrid 1: same velocity of `g` and `g.max_gauge`.
     # (suggested by @hybrid0)
     g = Gauge(0, Gauge(1, 5, at=0), at=0)
     g.add_momentum(+1)
     g.max_gauge.add_momentum(+1, since=1)
     assert g.determination == [(0, 0), (1, 1), (5, 5)]
+
+
+def test_hypergauge_hybrid2():
     # hybrid 2: velocity of `g.max_gauge` is faster than `g`'s.
     g = Gauge(0, Gauge(1, 5, at=0), at=0)
     g.add_momentum(+1)
     g.max_gauge.add_momentum(+2, since=1)
     assert g.determination == [(0, 0), (1, 1), (5, 5)]
+
+
+def test_hypergauge_hybrid3():
     # hybrid 3: velocity of `g.max_gauge` is slower than `g`'s.
     g = Gauge(0, Gauge(1, 5, at=0), at=0)
     g.add_momentum(+1)
