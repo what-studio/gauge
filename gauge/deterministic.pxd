@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+
+
 cdef class Determination(list):
 
     cdef:

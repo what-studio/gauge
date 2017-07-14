@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+
+
 cdef:
     # events:
     int EV_NONE, EV_ADD, EV_REMOVE
