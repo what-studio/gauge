@@ -108,6 +108,24 @@ class NamedMomentum(Momentum):
     def __init__(self, velocity, since, until, name):
         self.name = name
 
+    def _as_tuple(self):
+        return (self.velocity, self.since, self.until, self.name)
+
+    def __len__(self):
+        return len(self._as_tuple())
+
+    def __getitem__(self, index):
+        return self._as_tuple()[index]
+
+    def __iter__(self):
+        return iter(self._as_tuple())
+
+    def __hash__(self):
+        return hash(self._as_tuple())
+
+    def __eq__(self, other):
+        return self._as_tuple() == tuple(other)
+
 
 def test_basic():
     g = NamedGauge(50, 100, at=0)
