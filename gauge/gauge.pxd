@@ -18,10 +18,11 @@ cdef class Gauge:
         Gauge _min_gauge
         #: A sorted list of momenta.  The items are :class:`Momentum` objects.
         public momenta
+        #: The cached determination.
+        public Determination _determination
 
     # internal attributes:
     cdef:
-        Determination _determination
         _events
         _limited_gauges
         __weakref__
