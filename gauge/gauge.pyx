@@ -649,7 +649,7 @@ cdef class Momentum:
         self.until = until
 
     def __len__(self):
-        return len(self._as_tuple())
+        return len(MOMENTUM_TUPLE(self))
 
     def __getitem__(self, index):
         return MOMENTUM_TUPLE(self)[index]
