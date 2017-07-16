@@ -39,11 +39,11 @@ def round_(x):
 
 @contextmanager
 def t(timestamp):
-    gauge.gauge.now = lambda: float(timestamp)
+    gauge.core.now = lambda: float(timestamp)
     try:
         yield
     finally:
-        gauge.gauge.now = time.time
+        gauge.core.now = time.time
 
 
 def round_determination(determination, precision=0):

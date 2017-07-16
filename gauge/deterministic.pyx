@@ -15,8 +15,8 @@ import math
 import operator
 
 from gauge.constants cimport EV_ADD, EV_REMOVE, INF
+from gauge.core cimport Gauge, Momentum
 from gauge.deterministic cimport SEGMENT_VALUE, SEGMENT_VELOCITY
-from gauge.gauge cimport Gauge, Momentum
 
 
 __all__ = ['Determination', 'Line', 'Horizon', 'Ray', 'Segment', 'Boundary']

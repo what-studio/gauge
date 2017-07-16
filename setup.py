@@ -45,7 +45,7 @@ else:
 
 cython_extensions = [
     Extension('gauge.constants', ['gauge/constants.pyx']),
-    Extension('gauge.gauge', ['gauge/gauge.pyx']),
+    Extension('gauge.core', ['gauge/core.pyx']),
     Extension('gauge.deterministic', ['gauge/deterministic.pyx']),
 ]
 
