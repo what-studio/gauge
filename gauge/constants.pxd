@@ -8,3 +8,6 @@ cdef:
     int LI_ERROR, LI_OK, LI_ONCE, LI_CLAMP
     # numbers:
     double INF
+
+
+cdef inline str CLASS_NAME(obj)

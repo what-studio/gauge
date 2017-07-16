@@ -39,3 +39,8 @@ ONCE = LI_ONCE
 CLAMP = LI_CLAMP
 
 inf = INF
+
+
+cdef inline str CLASS_NAME(obj):
+    __, __, name = obj.__class__.__name__.rpartition('.')
+    return name

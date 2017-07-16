@@ -14,7 +14,7 @@ from __future__ import absolute_import
 import math
 import operator
 
-from gauge.constants cimport EV_ADD, EV_REMOVE, INF
+from gauge.constants cimport CLASS_NAME, EV_ADD, EV_REMOVE, INF
 from gauge.core cimport Gauge, Momentum
 from gauge.deterministic cimport SEGMENT_VALUE, SEGMENT_VELOCITY
 
@@ -432,7 +432,7 @@ cdef class Line:
         else:
             assert 0
         return ('<{0}{1} for {2:.2f}~{3:.2f}>'
-                ''.format(type(self).__name__, string, self.since, self.until))
+                ''.format(CLASS_NAME(self), string, self.since, self.until))
 
 
 cpdef Line Horizon(double since, double until, double value):
@@ -473,7 +473,5 @@ cdef class Boundary:
         return x != y and not self.cmp(x, y)
 
     def __repr__(self):
-        # NOTE: __name__ is 'Boundary' in CPython, but 'deterministic.Boundary'
-        # in PyPy.  So here it picks only the last word.
-        __, __, name = self.__class__.__name__.rpartition('.')
-        return '<{0} line={1}, cmp={2}>'.format(name, self.line, self.cmp)
+        return '<{0} line={1}, cmp={2}>'.format(CLASS_NAME(self),
+                                                self.line, self.cmp)

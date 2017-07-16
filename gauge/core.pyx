@@ -16,7 +16,8 @@ from sortedcontainers import SortedList, SortedListWithKey
 
 from gauge.__about__ import __version__  # noqa
 from gauge.constants cimport (
-    EV_ADD, EV_NONE, EV_REMOVE, INF, LI_CLAMP, LI_ERROR, LI_OK, LI_ONCE)
+    CLASS_NAME, EV_ADD, EV_NONE, EV_REMOVE, INF,
+    LI_CLAMP, LI_ERROR, LI_OK, LI_ONCE)
 from gauge.deterministic cimport Determination, SEGMENT_VALUE, SEGMENT_VELOCITY
 
 
@@ -626,7 +627,7 @@ cdef class Gauge:
             form += '/{2}>'
         else:
             form += ' between {3}~{2}>'
-        return form.format(type(self).__name__, value, *limit_reprs)
+        return form.format(CLASS_NAME(self), value, *limit_reprs)
 
     def __repr__(self):
         return self._repr()
@@ -677,7 +678,7 @@ cdef class Momentum:
 
     def __repr__(self):
         cdef str string
-        string = '<{0} {1:+.2f}/s'.format(type(self).__name__, self.velocity)
+        string = '<{0} {1:+.2f}/s'.format(CLASS_NAME(self), self.velocity)
         if self.since != -INF or self.until != +INF:
             string += ' ' + '~'.join([
                 '' if self.since == -INF else '{0:.2f}'.format(self.since),
