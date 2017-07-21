@@ -5,8 +5,7 @@ from __future__ import with_statement
 
 import os
 
-from Cython.Build import cythonize
-from setuptools import Command, setup
+from setuptools import Command, Extension, setup
 from setuptools.command.test import test
 from setuptools.extension import Extension
 
@@ -43,11 +42,25 @@ else:
     del WeakSet
 
 
-cython_extensions = [
-    Extension('gauge.constants', ['gauge/constants.pyx']),
-    Extension('gauge.core', ['gauge/core.pyx']),
-    Extension('gauge.deterministic', ['gauge/deterministic.pyx']),
+ext_modules = [
+    Extension('gauge.constants', ['gauge/constants.c']),
+    Extension('gauge.core', ['gauge/core.c']),
+    Extension('gauge.deterministic', ['gauge/deterministic.c']),
 ]
+if not all(all(os.path.exists(p) for p in ext.sources) for ext in ext_modules):
+    # Not cythonized yet.
+    from Cython.Build import cythonize
+    ext_modules = cythonize([
+        Extension('gauge.constants', ['gauge/constants.pyx']),
+        Extension('gauge.core', ['gauge/core.pyx']),
+        Extension('gauge.deterministic', ['gauge/deterministic.pyx']),
+    ])
+
+
+try:
+    from Cython.Build import build_ext
+except ImportError:
+    from setuptools.command.build_ext import build_ext
 
 
 setup(
@@ -62,7 +75,7 @@ setup(
     long_description=__doc__,
     platforms='any',
     packages=['gauge'],
-    ext_modules=cythonize(cython_extensions),
+    ext_modules=ext_modules,
     classifiers=['Development Status :: 4 - Beta',
                  'Intended Audience :: Developers',
                  'License :: OSI Approved :: BSD License',
@@ -82,5 +95,5 @@ setup(
     install_requires=install_requires,
     tests_require=['pytest'],
     test_suite='...',
-    cmdclass={'benchmark': Benchmark},
+    cmdclass={'build_ext': build_ext, 'benchmark': Benchmark},
 )
