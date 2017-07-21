@@ -7,7 +7,6 @@ import os
 
 from setuptools import Command, Extension, setup
 from setuptools.command.test import test
-from setuptools.extension import Extension
 
 
 # include __about__.py.
