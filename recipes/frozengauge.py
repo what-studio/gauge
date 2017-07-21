@@ -26,9 +26,13 @@ class FrozenGauge(Gauge):
     def base(self):
         raise TypeError('FrozenGauge doesn\'t keep the base')
 
-    @property
-    def momenta(self):
+    def _mutate_momenta(self, *args, **kwargs):
         raise TypeError('FrozenGauge doesn\'t keep the momenta')
+
+    add_momenta = remove_momenta = _mutate_momenta
+
+    def _rebase(self, *args, **kargs):
+        self.base
 
     def __getstate__(self):
         return (self._determination, self.max_value, self.max_gauge,

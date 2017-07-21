@@ -8,11 +8,41 @@ python:
 - 3.5
 - 3.6
 - pypy
-- pypy3
+# Fail with an abort: https://bitbucket.org/pypy/pypy/issues/2571
+# - pypy3
+
+before_install:  # Use PyPy-5.8.0.
+- cd "$HOME"
+- |
+  if [[ $TRAVIS_PYTHON_VERSION == 'pypy' ]]; then
+    deactivate
+    wget https://bitbucket.org/pypy/pypy/downloads/pypy2-v5.8.0-linux64.tar.bz2
+    tar -jxvf pypy2-v5.8.0-linux64.tar.bz2
+    pushd pypy2-v5.8.0-linux64/bin
+      export PATH="$PWD:$PATH"
+      ln -s pypy python
+      ./pypy -m ensurepip
+    pushd
+  fi
+- |
+  if [[ $TRAVIS_PYTHON_VERSION == 'pypy3' ]]; then
+    deactivate
+    wget https://bitbucket.org/pypy/pypy/downloads/pypy3-v5.8.0-linux64.tar.bz2
+    tar -jxvf pypy3-v5.8.0-linux64.tar.bz2
+    pushd pypy3-v5.8.0-linux64/bin
+      export PATH="$PWD:$PATH"
+      ln -s pypy3 python
+      ./pypy3 -m ensurepip
+    pushd
+  fi
+- cd "$TRAVIS_BUILD_DIR"
+
 install:
+- pip install cython
 - pip install -e .
 - pip install coveralls
 - pip install pytest-benchmark
+
 script:
 - coverage run --source=gauge setup.py test
 - |
@@ -20,5 +50,6 @@ script:
     --benchmark-group-by=func \
     --benchmark-sort=mean \
     --benchmark-min-time=0.1
+
 after_success:
 - coveralls

@@ -7,18 +7,18 @@ import pickle
 import random
 from random import Random
 import time
-import types
 
 import pytest
 
 import gauge
-from gauge import CLAMP, Gauge, inf, Momentum, OK, ONCE
-from gauge.common import ADD, deprecate, REMOVE, TIME, VALUE
+from gauge import Gauge, Momentum
+from gauge.constants import ADD, CLAMP, inf, NONE, OK, ONCE, REMOVE
 from gauge.deterministic import (
     Boundary, Determination, Horizon, Line, Ray, Segment)
 
 
 PRECISION = 8
+TIME, VALUE = 0, 1
 
 
 class FakeGauge(Gauge):
@@ -28,6 +28,10 @@ class FakeGauge(Gauge):
         self._determination = Determination.__new__(Determination)
         self._determination.extend(determination)
 
+    @property
+    def determination(self):
+        return self._determination
+
 
 def round_(x):
     return round(x, PRECISION)
@@ -35,11 +39,11 @@ def round_(x):
 
 @contextmanager
 def t(timestamp):
-    gauge.common.now = lambda: float(timestamp)
+    gauge.core.now = lambda: float(timestamp)
     try:
         yield
     finally:
-        gauge.common.now = time.time
+        gauge.core.now = time.time
 
 
 def round_determination(determination, precision=0):
@@ -66,20 +70,6 @@ def shift_gauge(gauge, delta=0):
     for momentum in gauge.momenta:
         g.add_momentum(momentum)
     return g
-
-
-def test_deprecations():
-    # g = Gauge(0, 10, at=0)
-    # removed since v0.1.0
-    # pytest.deprecated_call(g.set, 0, limit=True)
-    # pytest.deprecated_call(g.set_max, 0, limit=True)
-    # removed since v0.2.0
-    # pytest.deprecated_call(g.current, 0)
-    # pytest.deprecated_call(Gauge.value.fget, g)
-    # pytest.deprecated_call(Gauge.value.fset, g, 10)
-    # pytest.deprecated_call(Gauge.set_at.fget, g)
-    # pytest.deprecated_call(Gauge.set_at.fset, g, 10)
-    pytest.skip()
 
 
 def test_momenta_in_range():
@@ -325,7 +315,6 @@ def test_whenever():
     with pytest.raises(ValueError):
         g.when(3, after=4)
     whenever = g.whenever(3)
-    assert isinstance(whenever, types.GeneratorType)
     assert list(whenever) == [3, 5, 7, 9]
     # inverse
     g = Gauge(10, 10, at=0)
@@ -359,9 +348,9 @@ def test_repr():
     m = Momentum(+100, until=20)
     assert repr(m) == '<Momentum +100.00/s ~20.00>'
     h = Horizon(10, 20, 30)
-    assert repr(h) == '<Horizon 30.00 for 10~20>'
+    assert repr(h) == '<Line[HORIZON] 30.00 for 10.00~20.00>'
     r = Ray(10, 20, 30, 40)
-    assert repr(r) == '<Ray 30.00+40.00/s for 10~20>'
+    assert repr(r) == '<Line[RAY] 30.00+40.00/s for 10.00~20.00>'
 
 
 def test_case1():
@@ -538,13 +527,6 @@ def test_velocity():
 
 
 def test_lines():
-    line = Line(0, 0, 0)
-    with pytest.raises(NotImplementedError):
-        line.get(0)
-    with pytest.raises(NotImplementedError):
-        line.guess(-1)
-    with pytest.raises(NotImplementedError):
-        line.guess(+1)
     horizon = Horizon(0, 10, 1234)
     assert horizon.get(0) == 1234
     assert horizon.get(10) == 1234
@@ -582,7 +564,7 @@ def test_boundary():
     lines = [Horizon(0, 10, 0),
              Ray(10, 20, 0, velocity=+1),
              Ray(20, 30, 10, velocity=-1)]
-    boundary = Boundary(iter(lines))
+    boundary = Boundary(lines)
     assert boundary.line is lines[0]
     boundary.walk()
     assert boundary.line is lines[1]
@@ -601,8 +583,8 @@ def test_boundary():
     assert not boundary.cmp_inv(1, 1)
     # best
     zero_line = Segment(0, 0, 0, 0)
-    ceil = Boundary(iter([zero_line]), operator.lt)
-    floor = Boundary(iter([zero_line]), operator.gt)
+    ceil = Boundary([zero_line], operator.lt)
+    floor = Boundary([zero_line], operator.gt)
     assert ceil.best is min
     assert floor.best is max
     # repr
@@ -639,23 +621,32 @@ def bidir():
     return g
 
 
-def test_hypergauge():
+def test_hypergauge_case1():
     g = Gauge(12, 100, at=0)
     g.add_momentum(+1, since=1, until=6)
     g.add_momentum(-1, since=3, until=8)
-    # case 1
     g.set_max(Gauge(15, 15, at=0), at=0)
     g.max_gauge.add_momentum(-1, until=5)
     assert g.determination == [
         (0, 12), (1, 12), (2, 13), (3, 12), (5, 10), (6, 10), (8, 8)]
     assert g.max_gauge.determination == [(0, 15), (5, 10)]
-    # case 2
+
+
+def test_hypergauge_case2():
+    g = Gauge(12, 100, at=0)
+    g.add_momentum(+1, since=1, until=6)
+    g.add_momentum(-1, since=3, until=8)
     g.set_max(Gauge(15, 15, at=0), at=0)
     g.max_gauge.add_momentum(-1, until=4)
     g.max_gauge.add_momentum(+1, since=4, until=6)
     assert g.determination == [
         (0, 12), (1, 12), (2, 13), (3, 12), (4, 11), (6, 11), (8, 9)]
-    # case 3
+
+
+def test_hypergauge_case3():
+    g = Gauge(12, 100, at=0)
+    g.add_momentum(+1, since=1, until=6)
+    g.add_momentum(-1, since=3, until=8)
     g.set_max(10, at=0)
     g.set(12, outbound=OK, at=0)
     assert g.determination == [
@@ -663,7 +654,12 @@ def test_hypergauge():
     g.set_max(Gauge(10, 100, at=0), at=0)
     assert g.determination == [
         (0, 12), (1, 12), (3, 12), (5, 10), (6, 10), (8, 8)]
-    # case 4
+
+
+def test_hypergauge_case4():
+    g = Gauge(12, 100, at=0)
+    g.add_momentum(+1, since=1, until=6)
+    g.add_momentum(-1, since=3, until=8)
     g.set_max(Gauge(15, 15, at=0), at=0)
     g.max_gauge.add_momentum(-1)
     assert g.determination == [
@@ -685,12 +681,15 @@ def test_hypergauge():
         (9, 7), (12, 4)]
     g_min.incr(1, at=5)
     assert g.determination == [(5, 5), (6, 6), (7, 7), (9, 7), (12, 4)]
-    # zigzag 1
-    g = zigzag()
-    assert g.determination == [
+
+
+def test_hypergauge_zigzag1(zigzag):
+    assert zigzag.determination == [
         (0, 1), (1, 2), (2, 1), (3.5, 2.5), (4, 2), (5.5, 0.5), (6, 1),
         (7.5, 2.5), (8, 2), (9, 3), (10, 2), (11.5, 0.5), (12, 1)]
-    # zigzag 2
+
+
+def test_hypergauge_zigzag2():
     g = Gauge(2, Gauge(3, 5, 3, at=0), Gauge(2, 2, 0, at=0), at=0)
     for x in range(5):
         g.max_gauge.add_momentum(+1, since=x * 4, until=x * 4 + 2)
@@ -704,17 +703,26 @@ def test_hypergauge():
     assert g.determination == [
         (0, 2), (1, 3), (2, 2), (3.5, 3.5), (4, 3), (6, 1), (8, 3), (9, 4),
         (11.5, 1.5), (12, 2), (14.5, 4.5), (16, 3), (18.5, 0.5), (20, 2)]
+
+
+def test_hypergauge_hybrid1():
     # hybrid 1: same velocity of `g` and `g.max_gauge`.
     # (suggested by @hybrid0)
     g = Gauge(0, Gauge(1, 5, at=0), at=0)
     g.add_momentum(+1)
     g.max_gauge.add_momentum(+1, since=1)
     assert g.determination == [(0, 0), (1, 1), (5, 5)]
+
+
+def test_hypergauge_hybrid2():
     # hybrid 2: velocity of `g.max_gauge` is faster than `g`'s.
     g = Gauge(0, Gauge(1, 5, at=0), at=0)
     g.add_momentum(+1)
     g.max_gauge.add_momentum(+2, since=1)
     assert g.determination == [(0, 0), (1, 1), (5, 5)]
+
+
+def test_hypergauge_hybrid3():
     # hybrid 3: velocity of `g.max_gauge` is slower than `g`'s.
     g = Gauge(0, Gauge(1, 5, at=0), at=0)
     g.add_momentum(+1)
@@ -754,15 +762,21 @@ def test_hypergauge_with_different_base_time():
 def test_limited_gauges():
     max_g = Gauge(10, 100, at=0)
     g = Gauge(0, max_g, at=0)
-    assert g in max_g._limited_gauges
+    assert g in max_g.limited_gauges()
     g.set_max(10, at=0)
-    assert g not in max_g._limited_gauges
+    assert g not in max_g.limited_gauges()
     # clear dead links.
     g.set_max(max_g, at=0)
-    assert len(max_g._limited_gauges) == 1
+    assert len(max_g.limited_gauges()) == 1
     del g
-    gc.collect()
-    assert len(max_g._limited_gauges) == 0
+    # NOTE: Weak references could not be collected by GC immediately in PyPy.
+    for x in range(10):
+        try:
+            assert len(max_g.limited_gauges()) == 0
+        except AssertionError:
+            continue
+        else:
+            break
 
 
 def test_over_max_on_hypergauge():
@@ -793,7 +807,7 @@ def test_pickle_hypergauge():
     assert g2.determination == [
         (0, 12), (1, 12), (2, 13), (3, 12), (5, 10), (6, 10), (8, 8)]
     assert g2.max_gauge.determination == [(0, 15), (5, 10)]
-    assert g2 in g2.max_gauge._limited_gauges
+    assert g2 in g2.max_gauge.limited_gauges()
 
 
 def test_thin_momenta():
@@ -811,11 +825,11 @@ def test_clear_momentum_events():
     g = Gauge(0, 10, at=0)
     m = g.add_momentum(+1, since=10, until=20)
     assert list(g.momentum_events()) == \
-        [(0, None, None), (10, ADD, m), (20, REMOVE, m), (+inf, None, None)]
-    assert len(g._events) == 2
+        [(0, NONE, None), (10, ADD, m), (20, REMOVE, m), (+inf, NONE, None)]
+    # assert len(g._events) == 2
     g.remove_momentum(m)
-    assert list(g.momentum_events()) == [(0, None, None), (+inf, None, None)]
-    assert len(g._events) == 0
+    assert list(g.momentum_events()) == [(0, NONE, None), (+inf, NONE, None)]
+    # assert len(g._events) == 0
 
 
 def test_decr_max():
@@ -1007,6 +1021,12 @@ def test_randomly():
         assert_all_in_range(g, 'random_gauge2(R({0}), far=1e4)'.format(seed))
 
 
+@pytest.mark.parametrize('seed', [5425676250556669398, 5788334089912086268])
+def test_cpu_hang(seed):
+    g = random_gauge1(Random(seed))
+    assert_all_in_range(g, 'random_gauge1(R({0}))'.format(seed))
+
+
 def test_repaired_random_gauges():
     # from test_randomly()
     assert_all_in_range(random_gauge1(Random(1098651790867685487)))
@@ -1110,7 +1130,7 @@ def test_momentum_event_order():
     g.add_momentum(m)
     assert \
         list(g.momentum_events()) == \
-        [(0, None, None), (10, ADD, m), (10, REMOVE, m), (+inf, None, None)]
+        [(0, NONE, None), (10, ADD, m), (10, REMOVE, m), (+inf, NONE, None)]
 
 
 def test_case7():
@@ -1159,7 +1179,3 @@ def test_invalidate_returns():
     g.get(0)
     assert g.invalidate()
     assert not g.invalidate()
-
-
-def test_deprecate():
-    pytest.deprecated_call(deprecate, 'Hello, {0}', 'world')

@@ -1,5 +1,12 @@
 from __future__ import print_function
-from gauge import Gauge, now_or
+
+from time import time as now
+
+from gauge import Gauge
+
+
+def now_or(at=None):
+    return now() if at is None else at
 
 
 class Equilibrium(object):

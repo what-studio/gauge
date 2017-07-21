@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from gauge import Gauge, OK, CLAMP
+from gauge.deterministic import Determination
 
 
 __all__ = [b'StaticGauge']
@@ -9,7 +10,9 @@ class StaticGauge(Gauge):
 
     @property
     def determination(self):
-        return [self.base]
+        d = Determination.__new__(Determination)
+        list.__init__(d, [self.base])
+        return d
 
     def add_momentum(self, *args, **kwargs):
         raise TypeError('StaticGauge doesn\'t allow adding a momentum')

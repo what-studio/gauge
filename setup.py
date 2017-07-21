@@ -5,8 +5,10 @@ from __future__ import with_statement
 
 import os
 
+from Cython.Build import cythonize
 from setuptools import Command, setup
 from setuptools.command.test import test
+from setuptools.extension import Extension
 
 
 # include __about__.py.
@@ -41,6 +43,13 @@ else:
     del WeakSet
 
 
+cython_extensions = [
+    Extension('gauge.constants', ['gauge/constants.pyx']),
+    Extension('gauge.core', ['gauge/core.pyx']),
+    Extension('gauge.deterministic', ['gauge/deterministic.pyx']),
+]
+
+
 setup(
     name='gauge',
     version=about['__version__'],
@@ -53,6 +62,7 @@ setup(
     long_description=__doc__,
     platforms='any',
     packages=['gauge'],
+    ext_modules=cythonize(cython_extensions),
     classifiers=['Development Status :: 4 - Beta',
                  'Intended Audience :: Developers',
                  'License :: OSI Approved :: BSD License',
@@ -65,6 +75,7 @@ setup(
                  'Programming Language :: Python :: 3.3',
                  'Programming Language :: Python :: 3.4',
                  'Programming Language :: Python :: 3.5',
+                 'Programming Language :: Python :: 3.6',
                  'Programming Language :: Python :: Implementation :: CPython',
                  'Programming Language :: Python :: Implementation :: PyPy',
                  'Topic :: Games/Entertainment'],
