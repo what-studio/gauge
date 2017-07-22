@@ -8,8 +8,11 @@ python:
 - 3.5
 - 3.6
 - pypy
-# Fail with an abort: https://bitbucket.org/pypy/pypy/issues/2571
-# - pypy3
+- pypy3
+matrix:
+  allow_failures:
+  # Fail with an abort: https://bitbucket.org/pypy/pypy/issues/2571
+  - python: pypy3
 
 before_install:  # Use PyPy-5.8.0.
 - cd "$HOME"
