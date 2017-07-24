@@ -12,11 +12,11 @@
 from __future__ import absolute_import
 
 from gauge.__about__ import __version__  # noqa
-from gauge.constants import CLAMP, ERROR, OK, ONCE
+from gauge.constants import CLAMP, ERROR, inf, OK, ONCE
 from gauge.core import Gauge, Momentum
 
 
-__all__ = ['Gauge', 'Momentum', 'ERROR', 'OK', 'ONCE', 'CLAMP']
+__all__ = ['Gauge', 'Momentum', 'ERROR', 'OK', 'ONCE', 'CLAMP', 'inf']
 
 
 try:
