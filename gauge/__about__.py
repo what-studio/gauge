@@ -3,7 +3,7 @@
    gauge.__about__
    ~~~~~~~~~~~~~~~
 """
-__version__ = '0.4.0'
+__version__ = '0.4.1'
 __license__ = 'BSD'
 __author__ = 'What! Studio'
 __maintainer__ = 'Heungsub Lee'
