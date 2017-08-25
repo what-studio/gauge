@@ -76,7 +76,7 @@ class GaugeDisplay(object):
         bg.fill(BASE2)
         surf.blit(bg, (0, 0))
         # draw bar
-        ratio = self.gauge.current(at) / float(self.gauge.max)
+        ratio = self.gauge.get(at) / float(self.gauge.max(at))
         if ratio > 1:
             bar_color = BLUE
             ratio = 1
@@ -94,7 +94,7 @@ class GaugeDisplay(object):
             surf.blit(bar, (0, 0))
         # write current state
         text = font.render('{0}/{1}'.format(
-            int(self.gauge.current(at)), self.gauge.max), True, BASE1)
+            int(self.gauge.get(at)), self.gauge.max(at)), True, BASE1)
         surf.blit(text, (10, font.get_height() / 2))
         # write time recover in
         speed = self.gauge.velocity(at)
@@ -154,8 +154,9 @@ class GaugeGraph(object):
             left = x * col
             if left > self.size[0]:
                 break
-            value = self.gauge.current(at + x - past)
-            ratio = (1 - value / float(self.gauge.max)) / 2 + 0.25
+            t = at + x - past
+            value = self.gauge.get(t)
+            ratio = (1 - value / float(self.gauge.max(t))) / 2 + 0.25
             points.append((left, int(ratio * self.size[1])))
             x += 1
         pygame.draw.lines(surf, RED, False, points)
@@ -202,13 +203,13 @@ def main(gauge, fps=30, padding=0):
                     elif pressed[K_0]:
                         gauge.add_momentum(+10, at, later(2))
                     elif pressed[K_p]:
-                        gauge.max += 10
+                        gauge.set_max(gauge.get_max(at) + 10, at)
                     elif pressed[K_o]:
-                        gauge.max -= 10
+                        gauge.set_max(gauge.get_max(at) - 10, at)
                     elif pressed[K_w]:
-                        gauge.min += 10
+                        gauge.set_min(gauge.get_min(at) + 10, at)
                     elif pressed[K_q]:
-                        gauge.min -= 10
+                        gauge.set_min(gauge.get_min(at) - 10, at)
                     elif pressed[K_BACKQUOTE]:
                         gauge.forget_past(at=at)
                     elif pressed[K_SPACE]:
