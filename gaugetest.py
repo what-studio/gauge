@@ -1132,17 +1132,17 @@ def test_case7_reversed():
 
 @pytest.mark.xfail(strict=True)
 def test_case8():
-    m = Gauge(610.8769689888865, 680, at=1503909357.550852)
+    m = Gauge(610.8769689888865, 680, at=0)
     m.add_momentum(+0.001157)
-    m.add_momentum(0, since=1503909357.550852, until=1503909362.550852)
-    m.add_momentum(-0.2, since=1503909357.550852, until=1503909657.550852)
+    m.add_momentum(0, since=0, until=5)
+    m.add_momentum(-0.2, since=0, until=300)
 
-    g = Gauge(672.8235625729503, m, at=1503909357.657107)
+    g = Gauge(672.8235625729503, m, at=0.106255)
     g.add_momentum(+1)
 
     __, second_value = g.determination[1]
     assert second_value != approx(672.8235625729503)
-    assert g.get(1503909362.550852) == approx(609.8827539888864)
+    assert g.get(5) == approx(609.8827539888864)
 
 
 def test_intersection_of_vertical_segment():
