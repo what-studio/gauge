@@ -1140,6 +1140,8 @@ def test_case8():
     g = Gauge(672.8235625729503, m, at=1503909357.657107)
     g.add_momentum(+1)
 
+    __, second_value = g.determination[1]
+    assert second_value != approx(672.8235625729503)
     assert g.get(1503909362.550852) == approx(609.8827539888864)
 
 
