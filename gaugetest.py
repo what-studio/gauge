@@ -10,6 +10,7 @@ import time
 import types
 
 import pytest
+from pytest import approx
 
 import gauge
 from gauge import CLAMP, Gauge, inf, Momentum, OK, ONCE
@@ -1127,6 +1128,19 @@ def test_case7_reversed():
     g.add_momentum(+2)
     g.add_momentum(-1)
     assert g.determination == [(-1, -3.5), (0.5, -0.5), (1, 0)]
+
+
+@pytest.mark.xfail(strict=True)
+def test_case8():
+    m = Gauge(610.8769689888865, 680, at=1503909357.550852)
+    m.add_momentum(+0.001157)
+    m.add_momentum(0, since=1503909357.550852, until=1503909362.550852)
+    m.add_momentum(-0.2, since=1503909357.550852, until=1503909657.550852)
+
+    g = Gauge(672.8235625729503, m, at=1503909357.657107)
+    g.add_momentum(+1)
+
+    assert g.get(1503909362.550852) == approx(609.8827539888864)
 
 
 def test_intersection_of_vertical_segment():
