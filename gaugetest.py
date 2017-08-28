@@ -1132,17 +1132,115 @@ def test_case7_reversed():
 
 @pytest.mark.xfail(strict=True)
 def test_case8():
-    m = Gauge(610.8769689888865, 680, at=0)
+    """There's a hyper-gauge.  When the same effects are affected twice, the
+    underlying gauge became to be out of the limited range.
+    """
+    m = Gauge(679, 679, at=1503918965.158631)
     m.add_momentum(+0.001157)
-    m.add_momentum(0, since=0, until=5)
-    m.add_momentum(-0.2, since=0, until=300)
+    assert len(m.determination) == 1
+    assert m.determination[0] == approx((1503918965.158631, 679.0))
 
-    g = Gauge(672.8235625729503, m, at=0.106255)
+    g = Gauge(679, m, at=1503918965.158631)
     g.add_momentum(+1)
+    assert len(m.momenta) == 1
+    assert len(g.determination) == 1
+    assert g.determination[0] == approx((1503918965.158631, 679.0))
 
-    __, second_value = g.determination[1]
-    assert second_value != approx(672.8235625729503)
-    assert g.get(5) == approx(609.8827539888864)
+    # Gauge "g" should be always in the range of "m".
+    def G_SHOULD_BE_FULLY_IN_RANGE():
+        assert g.determination.in_range_since == g.base[TIME]
+
+    G_SHOULD_BE_FULLY_IN_RANGE()
+
+    # first effect ------------------------------------------------------------
+
+    m.forget_past(at=1503919261.248346)
+    assert len(m.momenta) == 1
+    assert len(m.determination) == 1
+    assert m.determination[0] == approx((1503919261.248346, 679.0))
+
+    G_SHOULD_BE_FULLY_IN_RANGE()
+
+    m.add_momentum(0, since=1503919261.248346, until=1503919266.248346)
+    m.forget_past(at=1503919261.248346)
+    assert len(m.momenta) == 2
+    assert len(m.determination) == 2
+    assert m.determination[0] == approx((1503919261.248346, 679.0))
+    assert m.determination[1] == approx((1503919266.248346, 679))
+
+    G_SHOULD_BE_FULLY_IN_RANGE()
+
+    m.add_momentum(-0.2, since=1503919261.248346, until=1503919561.248346)
+    assert len(m.momenta) == 3
+    assert len(m.determination) == 4
+    assert m.determination[0] == approx((1503919261.248346, 679.0))
+    assert m.determination[1] == approx((1503919266.248346, 678.005785))
+    assert m.determination[2] == approx((1503919561.248346, 619.3470999999998))
+    assert m.determination[3] == approx((1503971119.5024517, 679))
+
+    G_SHOULD_BE_FULLY_IN_RANGE()
+
+    # second effect -----------------------------------------------------------
+
+    m.forget_past(at=1503919279.381339)
+    assert len(m.momenta) == 2
+    assert len(m.determination) == 3
+    assert m.determination[0] == approx((1503919279.381339, 675.3943812763082))
+    assert m.determination[1] == approx((1503919561.248346, 619.3470999999998))
+    assert m.determination[2] == approx((1503971119.5024517, 679))
+
+    G_SHOULD_BE_FULLY_IN_RANGE()
+
+    m.forget_past(at=1503919279.381339)
+    assert len(m.momenta) == 2
+    assert len(m.determination) == 3
+    assert m.determination[0] == approx((1503919279.381339, 675.3943812763082))
+    assert m.determination[1] == approx((1503919561.248346, 619.3470999999998))
+    assert m.determination[2] == approx((1503971119.5024517, 679))
+
+    G_SHOULD_BE_FULLY_IN_RANGE()
+
+    m.add_momentum(0, since=1503919279.381339, until=1503919284.381339)
+    m.forget_past(at=1503919279.482356)
+    assert len(m.momenta) == 3
+    assert len(m.determination) == 4
+    assert m.determination[0] == approx((1503919279.482356, 675.374294753317))
+    assert m.determination[1] == approx((1503919284.381339, 674.4001662763083))
+    assert m.determination[2] == approx((1503919561.248346, 619.3471))
+    assert m.determination[3] == approx((1503971119.5024517, 679))
+
+    G_SHOULD_BE_FULLY_IN_RANGE()
+
+    m.remove_momentum(-0.2, since=1503919261.248346, until=1503919561.248346)
+    m.forget_past(at=1503919279.381339)
+    assert len(m.momenta) == 2
+    assert len(m.determination) == 3
+    assert m.determination[0] == approx((1503919279.381339, 675.374294753317))
+    assert m.determination[1] == approx((1503919284.381339, 675.380079753317))
+    assert m.determination[2] == approx((1503922413.093739, 679))
+
+    G_SHOULD_BE_FULLY_IN_RANGE()
+
+    m.add_momentum(-0.2, since=1503919279.381339, until=1503919579.381339)
+    assert len(m.momenta) == 3
+    assert len(m.determination) == 4
+    assert m.determination[0] == approx((1503919279.381339, 675.374294753317))
+    assert m.determination[1] == approx((1503919284.381339, 674.380079753317))
+    assert m.determination[2] == approx((1503919579.381339, 615.721394753317))
+    assert m.determination[3] == approx((1503974271.3478444, 679))
+
+    # failing!
+    G_SHOULD_BE_FULLY_IN_RANGE()
+
+    m.forget_past(at=1503919287.680848)
+    assert len(m.momenta) == 2
+    assert len(m.determination) == 3
+    assert m.determination[0] == approx((1503919287.680848, 673.7239955230016))
+    assert m.determination[1] == approx((1503919579.381339, 615.721394753317))
+    assert m.determination[2] == approx((1503974271.3478444, 679))
+
+    # failing!
+    G_SHOULD_BE_FULLY_IN_RANGE()
 
 
 def test_intersection_of_vertical_segment():
