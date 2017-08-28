@@ -1243,6 +1243,17 @@ def test_case8():
     G_SHOULD_BE_FULLY_IN_RANGE()
 
 
+def test_case8_simple():
+    m = Gauge(10, 10, at=0)
+    m.add_momentum(-1)
+    g = Gauge(10, m, at=0)
+
+    m.forget_past(at=2)
+    m.forget_past(at=1)  # forget older past.
+
+    assert g.get(99999) == approx(0)
+
+
 def test_intersection_of_vertical_segment():
     assert 0 != 1e-309
     assert math.isinf(1 / 1e-309)
