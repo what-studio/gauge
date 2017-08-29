@@ -490,7 +490,7 @@ def test_forget_past():
     assert len(g.momenta) == 2
 
 
-def test_forget_past_earlier_than_base_time():
+def test_forget_past_before_base_time():
     g = Gauge(0, 100, at=100)
     g.add_momentum(+1)
     assert g.get(100) == 0
