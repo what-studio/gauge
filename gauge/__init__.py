@@ -515,7 +515,7 @@ class Gauge(object):
         """
         at = now_or(at)
         if at < self.base[TIME]:
-            raise ValueError('too past')
+            raise ValueError('\'at\' should not be earlier than base time')
         x = self.momenta.bisect_left((-inf, -inf, at))
         return self._rebase(value, at=at, remove_momenta_before=x)
 
