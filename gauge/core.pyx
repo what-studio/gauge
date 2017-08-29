@@ -456,7 +456,7 @@ cdef class Gauge:
         if since == -INF or until == +INF or since < until:
             pass
         else:
-            raise ValueError('\'since\' should be earlier than \'until\'')
+            raise ValueError("'since' should be earlier than 'until'")
         return momentum
 
     def add_momenta(self, momenta):
@@ -570,7 +570,7 @@ cdef class Gauge:
         """
         at = NOW_OR(at)
         if at < self._base_time:
-            raise ValueError('\'at\' should not be earlier than base time')
+            raise ValueError("'at' should not be earlier than base time")
         x = self.momenta.bisect_left((-INF, -INF, at))
         return self._rebase(value, at=at, remove_momenta_before=x)
 
