@@ -876,7 +876,7 @@ def test_decr_max_skewed_hyper():
     assert g.get(20) == 5
 
 
-def test_decr_max_earlier_than_base_time():
+def test_decr_max_before_base_time():
     # decr max earlier than the gauge's base time.
     g = Gauge(0, Gauge(10, 100, at=10), at=5)
     g.add_momentum(+1)
