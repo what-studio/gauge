@@ -9,6 +9,7 @@ from random import Random
 import time
 
 import pytest
+from pytest import approx
 
 import gauge
 from gauge import Gauge, Momentum
@@ -478,6 +479,31 @@ def test_forget_past():
     assert len(g.momenta) == 2
 
 
+def test_forget_past_before_base_time():
+    g = Gauge(0, 100, at=100)
+    g.add_momentum(+1)
+    assert g.get(100) == 0
+    assert g.get(150) == 50
+    assert g.get(200) == 100
+
+    with pytest.raises(ValueError):
+        g.forget_past(at=50)
+    assert g.get(100) == 0
+    assert g.get(150) == 50
+    assert g.get(200) == 100
+
+    g.forget_past(at=150)
+    assert g.get(100) == 50
+    assert g.get(150) == 50
+    assert g.get(200) == 100
+
+    with pytest.raises(ValueError):
+        g.forget_past(0, at=100)
+    assert g.get(100) == 50
+    assert g.get(150) == 50
+    assert g.get(200) == 100
+
+
 def test_extensibility_of_make_momentum():
     class MyGauge(Gauge):
         def _make_momentum(self, *args):
@@ -832,8 +858,7 @@ def test_clear_momentum_events():
     # assert len(g._events) == 0
 
 
-def test_decr_max():
-    # normal gauge
+def test_decr_max_normal():
     g = Gauge(0, 10, at=0)
     g.add_momentum(+2)
     g.add_momentum(-1)
@@ -845,7 +870,9 @@ def test_decr_max():
     assert g.get(10) == 10
     assert g.get(15) == 5
     assert g.get(20) == 5
-    # hyper-gauge
+
+
+def test_decr_max_hyper():
     g = Gauge(0, Gauge(10, 100, at=0), at=0)
     g.add_momentum(+2)
     g.add_momentum(-1)
@@ -855,24 +882,33 @@ def test_decr_max():
     assert g.base[TIME] == 10
     assert g.get(10) == 5
     assert g.get(20) == 5
+
+
+def test_decr_max_skewed_hyper():
     # skewed hyper-gauge
     g = Gauge(0, Gauge(10, 100, at=10), at=0)
     g.add_momentum(+2)
     g.add_momentum(-1)
-    # assert g.base[TIME] == 0
+    assert g.base[TIME] == 0
     assert g.get(10) == 10
     g.max_gauge.decr(5, at=10)
-    # assert g.base[TIME] == 0
+    assert g.base[TIME] == 10
     assert g.get(10) == 5
     assert g.get(20) == 5
+
+
+def test_decr_max_before_base_time():
     # decr max earlier than the gauge's base time.
     g = Gauge(0, Gauge(10, 100, at=10), at=5)
     g.add_momentum(+1)
     assert g.determination == [(5, 0), (15, 10)]
-    g.max_gauge.decr(5, at=0)
-    assert g.determination == [(5, 0), (10, 5)]
+
+    with pytest.raises(ValueError):
+        g.max_gauge.decr(5, at=0)
+    assert g.determination == [(5, 0), (15, 10)]
+
     g.max_gauge.incr(10, at=10)
-    assert g.determination == [(10, 5), (20, 15)]
+    assert g.determination == [(10, 5), (25, 20)]
 
 
 def test_hypergauge_past_bugs(zigzag, bidir):
@@ -1147,6 +1183,72 @@ def test_case7_reversed():
     g.add_momentum(+2)
     g.add_momentum(-1)
     assert g.determination == [(-1, -3.5), (0.5, -0.5), (1, 0)]
+
+
+def test_case8():
+    """There's a hyper-gauge.  When the same effects are affected twice, the
+    underlying gauge became to be out of the limited range.
+    """
+    m = Gauge(679, 679, at=1503918965.158631)
+    m.add_momentum(+0.001157)
+
+    g = Gauge(679, m, at=1503918965.158631)
+    g.add_momentum(+1)
+
+    # Gauge "g" should be always in the range of "m".
+    def G_SHOULD_BE_FULLY_IN_RANGE():
+        assert g.determination.in_range_since == g.base[TIME]
+
+    G_SHOULD_BE_FULLY_IN_RANGE()
+
+    # first effect ------------------------------------------------------------
+
+    m.forget_past(at=1503919261.248346)
+    G_SHOULD_BE_FULLY_IN_RANGE()
+
+    m.add_momentum(0, since=1503919261.248346, until=1503919266.248346)
+    m.forget_past(at=1503919261.248346)
+    G_SHOULD_BE_FULLY_IN_RANGE()
+
+    m.add_momentum(-0.2, since=1503919261.248346, until=1503919561.248346)
+    G_SHOULD_BE_FULLY_IN_RANGE()
+
+    # second effect -----------------------------------------------------------
+
+    m.forget_past(at=1503919279.381339)
+    G_SHOULD_BE_FULLY_IN_RANGE()
+
+    m.forget_past(at=1503919279.381339)
+    G_SHOULD_BE_FULLY_IN_RANGE()
+
+    m.add_momentum(0, since=1503919279.381339, until=1503919284.381339)
+    G_SHOULD_BE_FULLY_IN_RANGE()
+
+    m.forget_past(at=1503919279.482356)
+    m.remove_momentum(-0.2, since=1503919261.248346, until=1503919561.248346)
+    G_SHOULD_BE_FULLY_IN_RANGE()
+
+    with pytest.raises(ValueError):
+        m.forget_past(at=1503919279.381339)
+    m.add_momentum(-0.2, since=1503919279.381339, until=1503919579.381339)
+    G_SHOULD_BE_FULLY_IN_RANGE()  # failing!
+
+    m.forget_past(at=1503919287.680848)
+    G_SHOULD_BE_FULLY_IN_RANGE()  # failing!
+
+
+def test_case8_simple():
+    max_ = Gauge(10, 10, at=0)
+    max_.add_momentum(-1)
+
+    g = Gauge(10, max_, at=0)
+
+    max_.forget_past(at=2)
+
+    with pytest.raises(ValueError):
+        max_.forget_past(at=1)  # forget older past.
+
+    assert g.get(99999) == approx(0)
 
 
 def test_intersection_of_vertical_segment():
