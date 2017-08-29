@@ -514,8 +514,8 @@ class Gauge(object):
         :param at: the time base.  (default: now)
         """
         at = now_or(at)
-        if value is None and at < self.base[TIME]:
-            return
+        if at < self.base[TIME]:
+            raise ValueError('too past')
         x = self.momenta.bisect_left((-inf, -inf, at))
         return self._rebase(value, at=at, remove_momenta_before=x)
 

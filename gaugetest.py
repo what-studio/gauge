@@ -497,12 +497,19 @@ def test_forget_past_before_base_time():
     assert g.get(150) == 50
     assert g.get(200) == 100
 
-    g.forget_past(at=50)
+    with pytest.raises(ValueError):
+        g.forget_past(at=50)
     assert g.get(100) == 0
     assert g.get(150) == 50
     assert g.get(200) == 100
 
     g.forget_past(at=150)
+    assert g.get(100) == 50
+    assert g.get(150) == 50
+    assert g.get(200) == 100
+
+    with pytest.raises(ValueError):
+        g.forget_past(0, at=100)
     assert g.get(100) == 50
     assert g.get(150) == 50
     assert g.get(200) == 100
@@ -881,10 +888,13 @@ def test_decr_max_before_base_time():
     g = Gauge(0, Gauge(10, 100, at=10), at=5)
     g.add_momentum(+1)
     assert g.determination == [(5, 0), (15, 10)]
-    g.max_gauge.decr(5, at=0)
-    assert g.determination == [(5, 0), (10, 5)]
+
+    with pytest.raises(ValueError):
+        g.max_gauge.decr(5, at=0)
+    assert g.determination == [(5, 0), (15, 10)]
+
     g.max_gauge.incr(10, at=10)
-    assert g.determination == [(10, 5), (20, 15)]
+    assert g.determination == [(10, 5), (25, 20)]
 
 
 def test_hypergauge_past_bugs(zigzag, bidir):
@@ -1192,13 +1202,14 @@ def test_case8():
     G_SHOULD_BE_FULLY_IN_RANGE()
 
     m.add_momentum(0, since=1503919279.381339, until=1503919284.381339)
+    G_SHOULD_BE_FULLY_IN_RANGE()
+
     m.forget_past(at=1503919279.482356)
-    G_SHOULD_BE_FULLY_IN_RANGE()
-
     m.remove_momentum(-0.2, since=1503919261.248346, until=1503919561.248346)
-    m.forget_past(at=1503919279.381339)
     G_SHOULD_BE_FULLY_IN_RANGE()
 
+    with pytest.raises(ValueError):
+        m.forget_past(at=1503919279.381339)
     m.add_momentum(-0.2, since=1503919279.381339, until=1503919579.381339)
     G_SHOULD_BE_FULLY_IN_RANGE()  # failing!
 
@@ -1213,7 +1224,9 @@ def test_case8_simple():
     g = Gauge(10, max_, at=0)
 
     max_.forget_past(at=2)
-    max_.forget_past(at=1)  # forget older past.
+
+    with pytest.raises(ValueError):
+        max_.forget_past(at=1)  # forget older past.
 
     assert g.get(99999) == approx(0)
 
