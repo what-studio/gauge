@@ -1244,12 +1244,13 @@ def test_case8():
 
 
 def test_case8_simple():
-    m = Gauge(10, 10, at=0)
-    m.add_momentum(-1)
-    g = Gauge(10, m, at=0)
+    max_ = Gauge(10, 10, at=0)
+    max_.add_momentum(-1)
 
-    m.forget_past(at=2)
-    m.forget_past(at=1)  # forget older past.
+    g = Gauge(10, max_, at=0)
+
+    max_.forget_past(at=2)
+    max_.forget_past(at=1)  # forget older past.
 
     assert g.get(99999) == approx(0)
 
