@@ -1155,7 +1155,6 @@ def test_case7_reversed():
     assert g.determination == [(-1, -3.5), (0.5, -0.5), (1, 0)]
 
 
-@pytest.mark.xfail(strict=True)
 def test_case8():
     """There's a hyper-gauge.  When the same effects are affected twice, the
     underlying gauge became to be out of the limited range.

@@ -514,6 +514,8 @@ class Gauge(object):
         :param at: the time base.  (default: now)
         """
         at = now_or(at)
+        if value is None and at < self.base[TIME]:
+            return
         x = self.momenta.bisect_left((-inf, -inf, at))
         return self._rebase(value, at=at, remove_momenta_before=x)
 
@@ -527,11 +529,24 @@ class Gauge(object):
         """The callback function which will be called at a limit gauge is
         rebased.
         """
-        at = max(now_or(at), self.base[TIME])
+        at = now_or(at)
+        if at < self.base[TIME]:
+            # `limit_gauge` is rebased earlier than the base time.
+            at = self.base[TIME]
+            limit_value = None
         value = self.get(at)
         if self.in_range(at):
-            clamp = {self.max_gauge: min, self.min_gauge: max}[limit_gauge]
-            value = clamp(value, limit_value)
+            if limit_value is None:
+                # when `limit_gauge` is rebased earlier than the base time,
+                # get the limit value at the base time because `at` has been
+                # changed.
+                limit_value = limit_gauge.get(at)
+            if limit_gauge is self.max_gauge:
+                value = min(value, limit_value)
+            elif limit_gauge is self.min_gauge:
+                value = max(value, limit_value)
+            else:
+                assert 0
         self.forget_past(value, at=at)
 
     def __reduce__(self):
