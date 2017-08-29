@@ -46,7 +46,13 @@ def test_determination(benchmark, g):
 
 
 def test_incr(benchmark, g):
-    benchmark(lambda: g.incr(r.uniform(-10, +10), CLAMP, r.randrange(1000)))
+    def gen_times():
+        t = 0
+        while True:
+            t += r.randrange(1000)
+            yield t
+    times = gen_times()
+    benchmark(lambda: g.incr(r.uniform(-10, +10), CLAMP, at=next(times)))
 
 
 def test_add_momentum(benchmark, g):
