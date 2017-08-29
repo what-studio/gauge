@@ -819,8 +819,7 @@ def test_clear_momentum_events():
     assert len(g._events) == 0
 
 
-def test_decr_max():
-    # normal gauge
+def test_decr_max_normal():
     g = Gauge(0, 10, at=0)
     g.add_momentum(+2)
     g.add_momentum(-1)
@@ -832,7 +831,9 @@ def test_decr_max():
     assert g.get(10) == 10
     assert g.get(15) == 5
     assert g.get(20) == 5
-    # hyper-gauge
+
+
+def test_decr_max_hyper():
     g = Gauge(0, Gauge(10, 100, at=0), at=0)
     g.add_momentum(+2)
     g.add_momentum(-1)
@@ -842,16 +843,22 @@ def test_decr_max():
     assert g.base[TIME] == 10
     assert g.get(10) == 5
     assert g.get(20) == 5
+
+
+def test_decr_max_skewed_hyper():
     # skewed hyper-gauge
     g = Gauge(0, Gauge(10, 100, at=10), at=0)
     g.add_momentum(+2)
     g.add_momentum(-1)
-    # assert g.base[TIME] == 0
+    assert g.base[TIME] == 0
     assert g.get(10) == 10
     g.max_gauge.decr(5, at=10)
-    # assert g.base[TIME] == 0
+    assert g.base[TIME] == 10
     assert g.get(10) == 5
     assert g.get(20) == 5
+
+
+def test_decr_max_earlier_than_base_time():
     # decr max earlier than the gauge's base time.
     g = Gauge(0, Gauge(10, 100, at=10), at=5)
     g.add_momentum(+1)
