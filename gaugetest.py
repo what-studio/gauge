@@ -490,6 +490,24 @@ def test_forget_past():
     assert len(g.momenta) == 2
 
 
+def test_forget_past_earlier_than_base_time():
+    g = Gauge(0, 100, at=100)
+    g.add_momentum(+1)
+    assert g.get(100) == 0
+    assert g.get(150) == 50
+    assert g.get(200) == 100
+
+    g.forget_past(at=50)
+    assert g.get(100) == 0
+    assert g.get(150) == 50
+    assert g.get(200) == 100
+
+    g.forget_past(at=150)
+    assert g.get(100) == 50
+    assert g.get(150) == 50
+    assert g.get(200) == 100
+
+
 def test_extensibility_of_make_momentum():
     class MyGauge(Gauge):
         def _make_momentum(self, *args):
