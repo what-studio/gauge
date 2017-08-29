@@ -565,8 +565,12 @@ cdef class Gauge:
 
         :param value: the value to set coercively.
         :param at: the time base.  (default: now)
+
+        :raises ValueError: the given time is earlier than the base time.
         """
         at = NOW_OR(at)
+        if at < self._base_time:
+            raise ValueError('\'at\' should not be earlier than base time')
         x = self.momenta.bisect_left((-INF, -INF, at))
         return self._rebase(value, at=at, remove_momenta_before=x)
 
@@ -584,9 +588,18 @@ cdef class Gauge:
         """The callback function which will be called at a limit gauge is
         rebased.
         """
-        at = max(NOW_OR(at), self._base_time)
+        at = NOW_OR(at)
+        if at < self._base_time:
+            # `limit_gauge` is rebased earlier than the base time.
+            at = self._base_time
+            limit_value = None
         value = self.get(at)
         if self.in_range(at):
+            if limit_value is None:
+                # when `limit_gauge` is rebased earlier than the base time, get
+                # the limit value at the base time because `at` has been
+                # changed.
+                limit_value = limit_gauge.get(at)
             clamp = {self._max_gauge: min, self._min_gauge: max}[limit_gauge]
             value = clamp(value, limit_value)
         self.forget_past(value, at=at)
