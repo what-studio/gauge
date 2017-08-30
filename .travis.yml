@@ -48,8 +48,8 @@ install:
 script:
 - coverage run --source=gauge setup.py test
 - |
-  py.test \  # `py.test` is available at Python 3.3 but not `pytest`.
-    gaugebenchmark.py \
+  # `py.test` is available at Python 3.3 but not `pytest`.
+  py.test gaugebenchmark.py \
     --benchmark-group-by=func \
     --benchmark-sort=mean \
     --benchmark-min-time=0.1
