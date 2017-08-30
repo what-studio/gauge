@@ -2,7 +2,6 @@ language: python
 sudo: false
 python:
 - 2.7
-- 3.3
 - 3.4
 - 3.5
 - 3.6
@@ -48,8 +47,7 @@ install:
 script:
 - coverage run --source=gauge setup.py test
 - |
-  # `py.test` is available at Python 3.3 but not `pytest`.
-  py.test gaugebenchmark.py \
+  pytest gaugebenchmark.py \
     --benchmark-group-by=func \
     --benchmark-sort=mean \
     --benchmark-min-time=0.1
